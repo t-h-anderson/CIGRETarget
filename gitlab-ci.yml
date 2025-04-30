@@ -1,0 +1,29 @@
+run_tests:
+    tags:
+        - linux-matlab
+            
+    script:
+        - mkdir artifacts
+        - matlab -batch "runAllTests"
+
+    artifacts:
+        # Artifacts created by MATLAB tests to be presented in gitlab.
+        # For a description of possible artifacts, take a look at
+        # https://docs.gitlab.com/ee/ci/pipelines/job_artifacts.html
+        when: always
+        name: "test_results"
+        paths:
+            - artifacts/
+        reports:
+            # junit: collect junit results (created by MATLABs XMLPlugin, see
+            # https://www.mathworks.com/help/releases/R2020b/matlab/ref/matlab.unittest.plugins.xmlplugin.producingjunitformat.html)
+            # They are later found in the "tests" tab of your pipeline
+            junit: artifacts/JunitXMLResults.xml
+
+            # cobertura: collects coverage results, see
+            # https://www.mathworks.com/help/releases/R2020b/matlab/ref/matlab.unittest.plugins.codecoverageplugin-class.html
+            coverage_report:
+                coverage_format: cobertura
+                path: artifacts/cobertura-coverage.xml
+
+            

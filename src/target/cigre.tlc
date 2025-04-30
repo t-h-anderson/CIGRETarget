@@ -1,0 +1,55 @@
+%% SYSTLC: CIGRE export target TMF: cigre_tmf MAKE: make_rtw \
+%%    EXTMODE: ext_comm
+%%
+%%   Copyright 2009 The MathWorks, Inc.
+%%   $Revision: 672 $  $Date: 2010-10-30 16:52:15 +0100 (Sat, 30 Oct 2010) $
+%%
+%% Abstract: CIGRE real-time system target file.
+%%
+%selectfile NULL_FILE
+
+%assign CodeFormat = "Embedded-C"
+
+%assign TargetType = "RT"
+%assign Language   = "C"
+%assign AutoBuildProcedure = !GenerateSampleERTMain
+
+%% The model_SetEventsForThisBaseRate function is not required for the
+%% VxWorks environment, i.e., when using an operating system.
+%assign SuppressSetEventsForThisBaseRateFcn = (TargetOS == "VxWorksExample") 
+
+%include "codegenentry.tlc"
+
+
+%% The contents between 'BEGIN_RTW_OPTIONS' and 'END_RTW_OPTIONS' in this file
+%% are used to maintain backward compatibility to R13 and preR13 custom target 
+%% file only.  If you want to use this file as a template to develop your
+%% own system target file, you need to remove the 'CONFIGSET_TARGET_COMPONENT'
+%% section at the end of this file.
+%%
+/%
+  BEGIN_RTW_OPTIONS
+  
+  %----------------------------------------%
+  % Configure RTW code generation settings %
+  %----------------------------------------%
+  
+  rtwgensettings.BuildDirSuffix = '_cigre_rtw';
+  rtwgensettings.DerivedFrom = 'ert.tlc';
+  rtwgensettings.Version = '1';
+  rtwgensettings.SelectCallback = 'cigre_callback_handler(hDlg, hSrc, ''select'')';
+
+  END_RTW_OPTIONS 
+ %/
+
+%% The content between 'BEGIN_CONFIGSET_TARGET_COMPONENT' and 
+%% 'END_CONFIGSET_TARGET_COMPONENT' is for the MathWorks internal use
+%% only.  You must remove this section if you intend to use this file
+%% as a template for your own system target development.
+/%
+  BEGIN_CONFIGSET_TARGET_COMPONENT
+ 
+  %%targetComponentClass = 'Simulink.ERTTargetCC';
+  
+  END_CONFIGSET_TARGET_COMPONENT
+ %/
