@@ -154,9 +154,17 @@ classdef CIGREWriter
 
 
             % Replace IO struct names
+            inputType = [modelDescriptions.InputData.Type];
+            assert(isscalar(inputType), "Scalar input type required")
+            results = strrep(results, "<<InputType>>", inputType);
+
             inputName = [modelDescriptions.InputData.Name];
             assert(isscalar(inputName), "Scalar input data struct required")
             results = strrep(results, "<<InputName>>", inputName);
+
+            outputType = [modelDescriptions.OutputData.Type];
+            assert(isscalar(outputType), "Scalar output type required")
+            results = strrep(results, "<<OutputType>>", outputType);
 
             outputName = [modelDescriptions.OutputData.Name];
             assert(isscalar(outputName), "Scalar ouput data struct required")

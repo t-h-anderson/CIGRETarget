@@ -30,8 +30,8 @@ __declspec(dllexport) int32_T Model_FirstCall(IEEE_Cigre_DLLInterface_Instance* 
 		logout("####################### Model_FirstCall Time > 0, assuming snapshot\n");
 		// Get the IO from the instance
 		MyModelParameters* parameters = (MyModelParameters*)instance->Parameters;
-		ExtU_<<WrapperName>>_T* inputs = (ExtU_<<WrapperName>>_T*)instance->ExternalInputs;
-        ExtY_<<WrapperName>>_T* outputs = (ExtY_<<WrapperName>>_T*)instance->ExternalOutputs;
+		<<InputType>>* inputs = (<<InputType>>*)instance->ExternalInputs;
+        <<OutputType>>* outputs = (<<OutputType>>*)instance->ExternalOutputs;
 
 		// Restore from heap
         <<RTMVarType>>* <<RTMStructName>> = (<<RTMVarType>>*)heap_get_address(&instance->IntStates[0], 0);
@@ -140,8 +140,8 @@ __declspec(dllexport) int32_T __cdecl Model_Outputs(IEEE_Cigre_DLLInterface_Inst
 
     // Get the IO from the instance
     MyModelParameters* parameters = (MyModelParameters*)instance->Parameters;
-	ExtU_<<WrapperName>>_T* inputs = (ExtU_<<WrapperName>>_T*)instance->ExternalInputs;
-    ExtY_<<WrapperName>>_T* outputs = (ExtY_<<WrapperName>>_T*)instance->ExternalOutputs;
+	<<InputType>>* inputs = (<<InputType>>*)instance->ExternalInputs;
+    <<OutputType>>* outputs = (<<OutputType>>*)instance->ExternalOutputs;
 
     // Restore from heap
     <<RTMVarType>>* <<RTMStructName>> = (<<RTMVarType>>*)heap_get_address(&instance->IntStates[0], 0);

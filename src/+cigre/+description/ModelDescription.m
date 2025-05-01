@@ -50,9 +50,9 @@ classdef ModelDescription < handle
 
     % Code info properties
     properties
-        Inputs struct
-        Outputs struct
-        Parameters struct
+        Inputs cigre.description.Variable
+        Outputs cigre.description.Variable
+        Parameters cigre.description.Variable
 
         InputData (1,:) cigre.description.Variable
         OutputData (1,:) cigre.description.Variable
@@ -343,6 +343,9 @@ classdef ModelDescription < handle
 
             % Ignore Inputs, outputs and RTM
             idx = find(endsWith([obj.InternalData.Name], "_M" + textBoundaryPattern), 1); % TODO: Make this more robust
+            if isempty(idx)
+                idx = find(contains([obj.InternalData.Name], "MODEL"), 1); % TODO: Make this more robust
+            end
 
             obj.RTMVarType = obj.InternalData(idx).Type;
             obj.RTMStruct = obj.InternalData((idx+1):end);
@@ -541,7 +544,7 @@ classdef ModelDescription < handle
 
         function loadInputInterface(obj)
             inports = obj.InterfaceCodeDescriptor.getDataInterfaces("Inports");
-            obj.Inputs = struct(...
+            obj.Inputs = cigre.description.Variable.create(...
                 "GraphicalName", obj.extractGraphicalName(inports), ...
                 "Name", obj.extractName(inports), ...
                 "Type", obj.extractType(inports), ...
@@ -552,7 +555,7 @@ classdef ModelDescription < handle
 
         function loadOutputInterface(obj)
             outports = obj.InterfaceCodeDescriptor.getDataInterfaces("Outports");
-            obj.Outputs = struct(...
+            obj.Outputs = cigre.description.Variable.create(...
                 "GraphicalName", obj.extractGraphicalName(outports), ...
                 "Name", obj.extractName(outports), ...
                 "Type", obj.extractType(outports), ...
@@ -563,7 +566,7 @@ classdef ModelDescription < handle
 
         function loadParameterInterface(obj)
             parameters = obj.ModelCodeDescriptor.getDataInterfaces("Parameters");
-            obj.Parameters = struct(...
+            obj.Parameters = cigre.description.Variable.create(...
                 "GraphicalName", obj.extractGraphicalName(parameters), ...
                 "Name", obj.extractName(parameters), ...
                 "Type", obj.extractType(parameters), ...
@@ -673,7 +676,7 @@ classdef ModelDescription < handle
 
         function val = get.InterfaceCodeInfo(obj)
 
-            if ~isempty(obj.InterfaceCodeInfo_)
+            if ~isempty(obj.InterfaceCodeInfo_) && isvalid(obj.InterfaceCodeInfo_)
                 val = obj.InterfaceCodeInfo_;
             else
                 here = Simulink.fileGenControl('getConfig').CodeGenFolder;
@@ -686,7 +689,7 @@ classdef ModelDescription < handle
 
         function val = get.WrapperCodeInfo(obj)
 
-            if ~isempty(obj.WrapperCodeInfo_)
+            if ~isempty(obj.WrapperCodeInfo_) && isvalid(obj.WrapperCodeInfo_)
                 val = obj.WrapperCodeInfo_;
             else
                 here = Simulink.fileGenControl('getConfig').CodeGenFolder;
@@ -773,7 +776,12 @@ classdef ModelDescription < handle
                 % Look at the implementation for the name
                 imp = interface(i).Implementation;
 
-                if isprop(imp, "Type")
+                if isa(imp, "coder.descriptor.Variable") || isa(imp, "RTW.Variable")
+                %if isprop(imp, "Identifier") && ~isempty(imp.Identifier)
+                    name{i} = imp.Identifier;
+                elseif isprop(imp, "ElementIdentifier") && ~isempty(imp.ElementIdentifier)
+                    name{i} = imp.ElementIdentifier;
+                elseif isprop(imp, "Type")
                     % We want the property name
                     type = imp.Type;
 
@@ -782,7 +790,7 @@ classdef ModelDescription < handle
                         type = type.BaseType;
                     end
 
-                    name{i} = type.Identifier;
+                    name{i} = type.Name;
                 end
 
             end   

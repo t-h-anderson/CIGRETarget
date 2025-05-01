@@ -126,7 +126,12 @@ switch hookMethod
                 error("Error building model description: " + me.message)
             end
             writer = cigre.writer.CIGREWriter;
-            desc.writeDLLSource(writer);
+
+            try
+                desc.writeDLLSource(writer);
+            catch me
+                error("Error writing dll source")
+            end
 
             inc = string(buildInfo.getIncludePaths(false))';
             inc = [inc; fullfile(cigreRoot, "src", "CIGRESource"); buildDir]; % Custom CIGRE code

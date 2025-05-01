@@ -3,9 +3,15 @@ classdef Variable
     %   Detailed explanation goes here
     
     properties
-        Name (1,1) string = ""
-        Type (1,1) string = ""
-        Pointers (1,1) string = ""
+        GraphicalName (:,1) string = ""
+        Name (:,1) string = ""
+        Type (:,1) string = ""
+        Pointers (:,1) string = ""
+        BaseType (:,1) string = ""
+        Dimensions = [NaN, NaN]
+        Min (:,1) = NaN
+        Max (:,1) = NaN
+        DefaultValue (:,1) = NaN
     end
     
     methods
@@ -17,7 +23,10 @@ classdef Variable
             fs = string(fields(nvp));
             for i = 1:numel(fs)
                 f = fs(i);
-                obj.(f) = nvp.(f);
+                val = nvp.(f);
+                if ~isempty(val)
+                    obj.(f) = val;
+                end
             end
             
         end
@@ -28,9 +37,8 @@ classdef Variable
 
         function objs = create(nvp)
             arguments
-                nvp.Name string
-                nvp.Type string
-                nvp.Pointers string
+                nvp.?cigre.description.Variable
+                nvp.Dimensions
             end
 
             objs = cigre.description.Variable.empty(1,0);
@@ -41,6 +49,8 @@ classdef Variable
             n = zeros(fn, 1);
             for i = 1:fn
                 f = fs(i);
+                % Everything is a vector, Dimension is cell array
+                % containing potentially disperate vectors
                 n(i) = numel(nvp.(f));
             end
 
@@ -58,10 +68,19 @@ classdef Variable
                     f = fs(j);
 
                     val = nvp.(f);
-                    if numel(val) ~= 1
+                    if numel(val) > 1
+                        % Everything scalar apart from Dimension which is a
+                        % cell array of potentially disperate vectors
                         val = val(i);
                     end
-                    in.(f) = val;
+
+                    if ~isempty(val)
+                        if f == "Dimensions"
+                            in.(f) = val{:};
+                        else
+                            in.(f) = val;
+                        end
+                    end
                 end
 
                 incell = namedargs2cell(in);
