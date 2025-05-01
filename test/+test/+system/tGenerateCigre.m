@@ -4,14 +4,14 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         
         %% Model Name
         %ModelName
-        %ModelName = test.util.getAllTestModels()
+        ModelName = test.util.getAllTestModels()
         %ModelName = {"Test_DataInput"}
         %ModelName = {"Test_SISO"}
         %ModelName = {"Test_StrtFunc"}
         %ModelName = {"Test_TopRef"}
         %ModelName = {"Test_BadNames"}
         %ModelName = {"Snap"}
-        ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
+        %ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
         %ModelName = {"Test_BlockIO"}
         %ModelName = {"Test_SignalObject"}
         %ModelName = {"Test_ParamModel"}

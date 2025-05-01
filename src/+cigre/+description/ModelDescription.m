@@ -630,6 +630,8 @@ classdef ModelDescription < handle
                     value{i} = failedValue; % Not found
                 end
             end
+
+            value = [value{:}]';
         end
 
     end
@@ -893,6 +895,8 @@ classdef ModelDescription < handle
                     end
                 end
             end
+
+            limitVal = [limitVal{:}]';
         end
 
         function [tbc, nTasks] = processRTMStructCode(headerCode)
