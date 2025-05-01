@@ -770,15 +770,22 @@ classdef ModelDescription < handle
             end
 
             for i = 1:sz
+                % Look at the implementation for the name
                 imp = interface(i).Implementation;
-                try
-                    name{i} = string(imp.Identifier);
-                catch
-                    % Params are different
-                    % TODO: Don't  try catch this
-                    name{i} = string(imp.ElementIdentifier);
+
+                if isprop(imp, "Type")
+                    % We want the property name
+                    type = imp.Type;
+
+                    while(isa(type, "coder.types.Pointer"))
+                        % Drill into pointer
+                        type = type.BaseType;
+                    end
+
+                    name{i} = type.Identifier;
                 end
-            end
+
+            end   
 
         end
 
