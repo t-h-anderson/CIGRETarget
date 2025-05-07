@@ -2,11 +2,7 @@
 #define _CIGRE_HEAP_
 
 #include <windows.h>
-
-//#include <inttypes.h>
 #include <stdint.h>
-//#include <rtwtypes.h>
-
 #include <stdio.h>
 
 #define HEAP_MAX_NR_BUFFERS 10

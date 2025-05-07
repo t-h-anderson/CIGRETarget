@@ -39,7 +39,7 @@ end
         
         %Basic solver settings
         setve('SolverType','Fixed-step',false);
-        setve('SolverName','FixedStepDiscrete',false);
+        % setve('SolverName','FixedStepDiscrete',false);
 
         % Outputs - for testing 
         %setve('SaveTime', true, fase);

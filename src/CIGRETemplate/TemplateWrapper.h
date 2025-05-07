@@ -1,14 +1,12 @@
-
-char ErrorMessage[1000];
-
 // ----------------------------------------------------------------------
 // Structures defining inputs, outputs, parameters and program structure
 // to be called by the DLLImport Tool
 // ----------------------------------------------------------------------
-
 #include "IEEE_Cigre_DLLInterface.h"
+#include "CIGRE_Defaults.h"
 #include "<<WrapperHeader>>"
 #include "heap.h"
+
 <<model_reference_types>>
 
 #define NUM_INPUT <<NumInputs>>
@@ -27,6 +25,8 @@ char ErrorMessage[1000];
 #ifndef rtmGetErrorStatusPointer
 #define rtmGetErrorStatusPointer(rtm)  ((const char **)(&((rtm)->errorStatus)))
 #endif
+
+char ErrorMessage[1000];
 
 #if NUM_INPUT > 0
 typedef struct _MyModelInputs {
@@ -164,29 +164,3 @@ IEEE_Cigre_DLLInterface_Model_Info Model_Info = {
     .NumFloatStates = 0,                                                // Number of Float states
     .NumDoubleStates = 0                                                // Number of Double states
 };
-
-// ----------------------------------------------------------------
-// Subroutines that can be called by the main power system program
-// ----------------------------------------------------------------
-__declspec(dllexport) const IEEE_Cigre_DLLInterface_Model_Info* Model_GetInfo();
-
-// ----------------------------------------------------------------
-__declspec(dllexport) int32_T Model_CheckParameters(IEEE_Cigre_DLLInterface_Instance* instance);
-
-// ----------------------------------------------------------------
-__declspec(dllexport) int32_T  Model_Initialize(IEEE_Cigre_DLLInterface_Instance* instance);
-
-// ----------------------------------------------------------------
-__declspec(dllexport) int32_T Model_FirstCall(IEEE_Cigre_DLLInterface_Instance* instance);
-
-// ----------------------------------------------------------------
-__declspec(dllexport) int32_T Model_Iterate(IEEE_Cigre_DLLInterface_Instance* instance);
-
-// ----------------------------------------------------------------
-__declspec(dllexport) int32_T Model_Outputs(IEEE_Cigre_DLLInterface_Instance* instance);
-
-// ----------------------------------------------------------------
-__declspec(dllexport) int32_T Model_Terminate(IEEE_Cigre_DLLInterface_Instance* instance);
-
-// ----------------------------------------------------------------
-__declspec(dllexport) int32_T Model_PrintInfo();

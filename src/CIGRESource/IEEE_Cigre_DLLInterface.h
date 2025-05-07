@@ -121,49 +121,43 @@ typedef struct _IEEE_Cigre_DLLInterface_Instance
     real64_T *      DoubleStates;           // Double State array
 } IEEE_Cigre_DLLInterface_Instance;
 
-
-
-
-/* Function pointer types used when DLL is loaded explicitely via LoadLibrary
-typedef const IEEE_Cigre_DLLInterface_Model_Info *(__cdecl* Model_GetInfo)(void);
+/* Function pointer types used when DLL is loaded explicitely via LoadLibrary */
+__declspec(dllexport) const IEEE_Cigre_DLLInterface_Model_Info* __cdecl Model_GetInfo();
 
 // Functions below return a integer value:
 // return 0 - fine
 // return 1 - general message (see LastGeneralMessage)
 // return 2 - error message and terminate (see LastErrorMessage)
 
-typedef int32_T (__cdecl* Model_FirstCall) (IEEE_Cigre_DLLInterface_Instance *pModelInstance);
+__declspec(dllexport) int32_T __cdecl Model_FirstCall(IEEE_Cigre_DLLInterface_Instance* instance);
   // Model_FirstCall is called in the first step of a simulation (so any malloc or creation needed
   // inside the DLL code be done).  Note memory for the pModelInstance is created by the calling
   // simulation tool (not by the DLL).
 
-typedef int32_T (__cdecl* Model_CheckParameters) (IEEE_Cigre_DLLInterface_Instance *pModelInstance);
+__declspec(dllexport) int32_T __cdecl Model_CheckParameters(IEEE_Cigre_DLLInterface_Instance* instance);
   // Model_CheckParameters is called in the first step of a simulation (so model writers can perform
   // more complex checks on input parameters in addition to simple min/max checks).
 
-typedef int32_T (__cdecl* Model_Initialize) (IEEE_Cigre_DLLInterface_Instance *pModelInstance);
+__declspec(dllexport) int32_T  __cdecl Model_Initialize(IEEE_Cigre_DLLInterface_Instance* instance);
   // Model_Initialize is called at Time=0.0 of a simulation, but could also be called repeatedly
   // if models are to be held at initial conditions until a certain release time.
 
-typedef int32_T (__cdecl* Model_Outputs) (IEEE_Cigre_DLLInterface_Instance *pModelInstance);
+__declspec(dllexport) int32_T __cdecl Model_Outputs(IEEE_Cigre_DLLInterface_Instance* instance);
   // Model_Outputs is called once every FixedStepBaseSampleTime seconds (with sample/hold logic that is added externally in
   // interface code in the main simulation program).  
   // The model code should also update/store its state variables at the end of this call before returning.
 
-typedef int32_T (__cdecl* Model_Iterate) (IEEE_Cigre_DLLInterface_Instance *pModelInstance);
+__declspec(dllexport) int32_T __cdecl Model_Iterate(IEEE_Cigre_DLLInterface_Instance* instance);
   // Model_Iterate is only called for RMS programs, N times after Model_Outputs is called.
   // It can be used for RMS programs to approximate fast control action (such as fault behaviour) which cannot directly
   // be simulated with large time step RMS programs.
   // The model code should also update/store its state variables at the end of this call before returning.
 
-typedef int32_T (__cdecl* Model_Terminate) (IEEE_Cigre_DLLInterface_Instance *pModelInstance);
+__declspec(dllexport) int32_T __cdecl Model_Terminate(IEEE_Cigre_DLLInterface_Instance* instance);
   // Called by the main simulation program at the end of a simulation (or in the event the simulation is terminated).
 
-typedef int32_T (__cdecl* Model_PrintInfo) (void)
+__declspec(dllexport) int32_T __cdecl Model_PrintInfo();
   // Called in the first step of a simulation to allow model writers to write general model info to the main simulation.
-
-*/
-
 
 #endif /* __IEEE_Cigre_DLLInterface__ */
 

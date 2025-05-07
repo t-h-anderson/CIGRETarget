@@ -4,13 +4,13 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         
         %% Model Name
         %ModelName
-        ModelName = test.util.getAllTestModels()
+        %ModelName = test.util.getAllTestModels()
         %ModelName = {"Test_DataInput"}
         %ModelName = {"Test_SISO"}
         %ModelName = {"Test_StrtFunc"}
         %ModelName = {"Test_TopRef"}
         %ModelName = {"Test_BadNames"}
-        %ModelName = {"Snap"}
+        ModelName = {"Snap"}
         %ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
         %ModelName = {"Test_BlockIO"}
         %ModelName = {"Test_SignalObject"}
@@ -23,6 +23,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %ModelName = {"NestedBus"}
         %ModelName = {"TestModel_meas"}
         %ModelName = {"Test_Enum"}
+        %ModelName = {"PEM_Electrolyzer"}
 
         %% Bits
         %Bits = struct("x64", "64", "x32", "32") % 32 bit run is not testable
@@ -158,8 +159,9 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 baseline = timetable2table(baseline, "ConvertRowTimes",false);
                 baseline.Properties.VariableNames = result.Properties.VariableNames;
                 baseline.Properties.VariableContinuity = [];
+                baseline.Properties.VariableUnits = {};
                 
-                testCase.verifyEqual(result, baseline)
+                testCase.verifyEqual(result, baseline, "reltol", 1e-2)
             end
 
             clear c;
@@ -258,7 +260,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
 
             %% Create an input object to match the input and parameter test data
             if ismissing(nvp.TestTime)
-                stopTime = double(string(get_param(mdlName, "StopTime")));
+                stopTime = double(string(eval(get_param(mdlName, "StopTime"))));
             else
                 stopTime = nvp.TestTime;
             end

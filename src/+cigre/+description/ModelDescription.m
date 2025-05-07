@@ -1069,13 +1069,13 @@ classdef ModelDescription < handle
                 code = srcCode(idxStart:idxEnd);
 
                 % Close out the initialize only function
-                code = [code; "}"];
+                code = [code; "};"];
 
             else
                 % Ensure there is always an initialize only function
                 code = [...
                     "{" ...
-                    "}"
+                    "};"
                     ];
             end
 

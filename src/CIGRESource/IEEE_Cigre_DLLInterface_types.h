@@ -2,6 +2,9 @@
 * File: IEEE_Cigre_DLLInterface_types.h
 */
 
+// #ifndef __IEEE_Cigre_DLLInterface_types__
+// #define __IEEE_Cigre_DLLInterface_types__
+
 typedef char            char_T;
 typedef signed char     int8_T; // TODO: added signed
 typedef unsigned char   uint8_T;
@@ -31,3 +34,5 @@ enum IEEE_Cigre_DLLInterface_Return_Value {
     IEEE_Cigre_DLLInterface_Return_Message = 1,
     IEEE_Cigre_DLLInterface_Return_Error = 2
 };
+
+// #endif /* __IEEE_Cigre_DLLInterface_types__ */

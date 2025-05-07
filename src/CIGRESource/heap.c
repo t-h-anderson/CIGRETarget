@@ -1,4 +1,3 @@
-
 #include "heap.h"
 
 typedef struct Heap_ {
@@ -26,7 +25,7 @@ void heap_print(void *heap_base)
 	}
 	printf("start_buffer:0x%llX\n", (uint64_t)heap->start_buffer);
 	printf("===== END HEAP =====\n");
-}
+};
 
 void heap_initialize(void *heap_base, int32_t max_size)
 {
@@ -43,7 +42,7 @@ void heap_initialize(void *heap_base, int32_t max_size)
 	for (idx = 0; idx < HEAP_MAX_NR_BUFFERS; idx++) {
 	    heap->buffer_pointers[idx] = 0; 
     }
-}
+};
 
 void *heap_malloc(void *heap_base, int32_t buf_size) {
 
@@ -83,7 +82,7 @@ void *heap_malloc(void *heap_base, int32_t buf_size) {
 	heap->nr_allocated_buffers = heap->nr_allocated_buffers + 1;
 
 	return return_addr;
-}
+};
 
 void * heap_get_address(void *heap_base, int32_t elem)
 {
@@ -98,5 +97,5 @@ void * heap_get_address(void *heap_base, int32_t elem)
 	b = (uint64_t)heap_base;
 
 	return (void*)(b + n);
-}
+};
 

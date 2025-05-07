@@ -1,21 +1,7 @@
-#include <windows.h>
-#include <inttypes.h>
-#include <stdio.h>
-
-#include "heap.h"
 #include "<<CigreHeader>>"
-#include "IEEE_Cigre_DLLInterface.h"
-
-#define DEBUG 1
 
 #pragma pack(push, 1)
 
-void logout(char *str){
-    if (DEBUG) {
-        printf(str);
-        fflush(stdout);
-    }
-}
 
 <<InitializeOnly>>
 
@@ -36,9 +22,6 @@ __declspec(dllexport) int32_T Model_FirstCall(IEEE_Cigre_DLLInterface_Instance* 
 		// Restore from heap
         <<RTMVarType>>* <<RTMStructName>> = (<<RTMVarType>>*)heap_get_address(&instance->IntStates[0], 0);
 	    <<InternalStatesRestore>> // localDW, rtdw
-
-	   // Parameters
-	   // No parameters found
 
 	   // Copy data back into model
         <<MapInternalStatesToModel>>
@@ -154,8 +137,7 @@ __declspec(dllexport) int32_T __cdecl Model_Outputs(IEEE_Cigre_DLLInterface_Inst
     <<MapInternalStatesToModel>>
 
     // Apply input data
-    *<<InputName>> = *inputs; // TODO: Find properly
-
+    *<<InputName>> = *inputs;
    
     <<ModelStep>>(<<ModelStepInputs>>);
 
