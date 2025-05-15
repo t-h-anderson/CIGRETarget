@@ -17,7 +17,7 @@ if stf == "cigre.tlc"
     if isModelBuild
         % Build the wrapper and call the utility function
         mdl = get_param(varargin{1}, "Name");
-        cigre.internal.buildCigreDLL(mdl);
+        cigre.internal.build(mdl);
     else
         % Do the standard build
         slbuild(varargin{:})
