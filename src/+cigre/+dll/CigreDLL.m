@@ -42,7 +42,7 @@ classdef CigreDLL < handle
             src = fullfile(cigreRoot, "src", "CIGRESource");
             header = fullfile(src, hfile);
             [l, w] = loadlibrary(dllName, header, ...
-                "includepath", src); %#ok<ASGLU>
+                "includepath", src, "alias", thisDLL); %#ok<ASGLU>
 
             obj.IsLoaded = true;
 
@@ -104,6 +104,10 @@ classdef CigreDLL < handle
 
             result = input.getOutput();
 
+        end
+        
+        function delete(obj)
+            obj.unload();
         end
 
         function unload(obj)
