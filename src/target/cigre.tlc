@@ -20,7 +20,6 @@
 
 %include "codegenentry.tlc"
 
-
 %% The contents between 'BEGIN_RTW_OPTIONS' and 'END_RTW_OPTIONS' in this file
 %% are used to maintain backward compatibility to R13 and preR13 custom target 
 %% file only.  If you want to use this file as a template to develop your
