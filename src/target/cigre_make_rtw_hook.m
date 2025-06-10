@@ -130,7 +130,7 @@ switch hookMethod
             try
                 desc.writeDLLSource(writer);
             catch me
-                error("Error writing dll source")
+                error("Error writing dll source: " + me.message)
             end
 
             inc = string(buildInfo.getIncludePaths(false))';

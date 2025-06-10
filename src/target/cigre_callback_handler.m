@@ -39,8 +39,7 @@ end
         
         %Basic solver settings
         setve('SolverType','Fixed-step',false);
-        % setve('SolverName','FixedStepDiscrete',false);
-
+        
         % Outputs - for testing 
         %setve('SaveTime', true, fase);
         %setve('SaveOutput', true, fase);
@@ -65,6 +64,7 @@ end
         
         % Needs to be reusable
         setve('CodeInterfacePackaging','Reusable function',false);
+        setve('ModelReferenceNumInstancesAllowed','Multi', false);
                
         %Code generation options
         setve('TargetLang', 'C', false); % Only supporting C code at the moment
@@ -84,9 +84,7 @@ end
 
         % TODO: May stop some issues with custom storage classes
         %setve('IgnoreCustomStorageClasses','on', true);
-        
- 
-                
+                 
     end
 
 % ==========================================================

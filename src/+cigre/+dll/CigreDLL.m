@@ -28,7 +28,7 @@ classdef CigreDLL < handle
 
         function cleanObj = load(obj)
 
-            dllName = obj.Name;
+            dllName = obj.Name + ".dll";
             thisDLL = obj.Name_;
             hfile = obj.Header;
 
