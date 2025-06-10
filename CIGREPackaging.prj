@@ -1,5 +1,5 @@
 <deployment-project plugin="plugin.toolbox" plugin-version="1.0">
-  <configuration file="C:\Users\toma\Documents\CIGRETarget\CIGREPackaging.prj" location="C:\Users\toma\Documents\CIGRETarget" name="CIGREPackaging" target="target.toolbox" target-name="Package Toolbox">
+  <configuration file="Z:\Work\CIGRE\cigre-target\CIGREPackaging.prj" location="Z:\Work\CIGRE\cigre-target" name="CIGREPackaging" target="target.toolbox" target-name="Package Toolbox">
     <param.appname>Simulink to CIGRE Export Tool</param.appname>
     <param.authnamewatermark />
     <param.email />
@@ -126,15 +126,14 @@ work</param.exclude.filters>
     <fileset.depfun.excluded />
     <fileset.package />
     <build-deliverables>
-      <file location="${PROJECT_ROOT}" name="Simulink to CIGRE Export Tool.mltbx" optional="false">C:\Users\toma\Documents\CIGRETarget\Simulink to CIGRE Export Tool.mltbx</file>
+      <file location="${PROJECT_ROOT}" name="Simulink to CIGRE Export Tool.mltbx" optional="false">Z:\Work\CIGRE\cigre-target\Simulink to CIGRE Export Tool.mltbx</file>
     </build-deliverables>
     <workflow />
     <matlab>
-      <root>C:\Program Files\MATLAB\R2023b</root>
+      <root>Z:\Program Files\MATLAB\R2023b</root>
       <toolboxes>
         <toolbox name="matlabcoder" />
         <toolbox name="embeddedcoder" />
-        <toolbox name="fixedpoint" />
         <toolbox name="neuralnetwork" />
       </toolboxes>
       <toolbox>
@@ -146,11 +145,6 @@ work</param.exclude.filters>
         <embeddedcoder>
           <enabled>true</enabled>
         </embeddedcoder>
-      </toolbox>
-      <toolbox>
-        <fixedpoint>
-          <enabled>true</enabled>
-        </fixedpoint>
       </toolbox>
       <toolbox>
         <neuralnetwork>
