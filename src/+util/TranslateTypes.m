@@ -87,7 +87,9 @@ classdef TranslateTypes < handle
 
             missingTypes = typeIn(~any(idx, 1));
             if ~isempty(missingTypes)
-                error("Type(s) '" + strjoin(missingTypes, ", ") + "' not found in " + nvp.From + " type list. If this is enum, check the port data type is not set to auto. This is not supported." );
+                typeOut = typeIn;
+                return
+                error("Type(s) '" + strjoin(missingTypes, ", ") + "' not found in supported " + nvp.From + " type list. If this is enum, check the port data type is not set to auto. This is not supported." );
             end
 
             firstIdxs = zeros(nTypesIn, 1);

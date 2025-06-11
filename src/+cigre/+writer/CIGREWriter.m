@@ -154,21 +154,31 @@ classdef CIGREWriter
 
 
             % Replace IO struct names
-            inputType = [modelDescriptions.InputData.Type];
-            assert(isscalar(inputType), "Scalar input type required")
-            results = strrep(results, "<<InputType>>", inputType);
+            inputType = string([modelDescriptions.InputData.Type]);
+            inputName = string([modelDescriptions.InputData.Name]);
+            if isempty(inputType)
+                results = strrep(results, "<<InputUnpack>>", " // No inputs");
+                results = strrep(results, "<<ApplyInputData>>", " // No input data");
+            else
+                results = strrep(results, "<<InputUnpack>>", "<<InputType>>* inputs = (<<InputType>>*)instance->ExternalInputs;");
+                results = strrep(results, "<<InputType>>", inputType);
 
-            inputName = [modelDescriptions.InputData.Name];
-            assert(isscalar(inputName), "Scalar input data struct required")
-            results = strrep(results, "<<InputName>>", inputName);
+                results = strrep(results, "<<ApplyInputData>>", "*<<InputName>> = *inputs;");
+                results = strrep(results, "<<InputName>>", inputName);
+            end
 
-            outputType = [modelDescriptions.OutputData.Type];
-            assert(isscalar(outputType), "Scalar output type required")
-            results = strrep(results, "<<OutputType>>", outputType);
-
+            outputType = string([modelDescriptions.OutputData.Type]);
             outputName = [modelDescriptions.OutputData.Name];
-            assert(isscalar(outputName), "Scalar ouput data struct required")
-            results = strrep(results, "<<OutputName>>", outputName);
+            if isempty(outputType)
+                results = strrep(results, "<<OutputUnpack>>", " // No outputs");
+                results = strrep(results, "<<ApplyOutputData>>", " // No output data");
+            else
+                results = strrep(results, "<<OutputUnpack>>", "<<OutputType>>* outputs = (<<OutputType>>*)instance->ExternalOutputs;");
+                results = strrep(results, "<<OutputType>>", outputType);
+
+                results = strrep(results, "<<ApplyOutputData>>", "*outputs = *<<OutputName>>;");
+                results = strrep(results, "<<OutputName>>", outputName);
+            end
 
             %% Replace input pointers
             defineInputs = "&" + inputNames + cigreSuffix;

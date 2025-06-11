@@ -1,6 +1,6 @@
-function [desc, dll, c] = buildDLL(model, nvp)
+function [desc, dll, c] = buildDLL(modelIn, nvp)
 arguments
-    model
+    modelIn
     nvp.SkipBuild (1,1) logical = false
     nvp.PreserveWrapper (1,1) logical = true
     nvp.CodeGenFolder (1,1) string = Simulink.fileGenControl('getConfig').CodeGenFolder
@@ -11,7 +11,7 @@ arguments
 end
 
 % Load the model and ensure the correct target is selected
-modelIn = model;
+model = modelIn;
 [~, cModel] = util.loadSystem(model); 
 
 stf = get_param(model, "SystemTargetFile");
@@ -47,38 +47,12 @@ desc = cigre.description.ModelDescription.analyseModel(model, iWrapper, wrapper)
 dll = model + "_CIGRE";
 c = [];
 
-% desc = cigre.description.ModelDescription.analyseModel(model, iWrapper, wrapper);
-% 
-% writer = cigre.writer.CIGREWriter;
-% desc.writeDLLSource(writer);
-% 
-% if ~nvp.SkipBuild
-%     cigre.internal.buildDLL(desc);
-% else
-%     dll = string(missing);
-%     c = [];
-%     return
-% end
-% 
 % % Move the generated dll and header to the right place
 cgf = nvp.CodeGenFolder;
 here = cgf;
 if ~isfolder(here)
     mkdir(here);
 end
-% 
-% % Build in code gen folder
-% dll = fullfile(cgf, desc.WrapperName + ".dll");
-% 
-% dllDeploy = fullfile(here, modelIn + "_CIGRE.dll");
-% copyfile(dll, dllDeploy);
-% delete(dll);
-% 
-% [~, dll] = fileparts(dllDeploy);
-% headerDeploy = fullfile(here, dll + ".h");
-% header = fullfile(cgf, "slprj", "cigre", model + "_CIGRE" + ".h");
-% 
-% copyfile(header, headerDeploy);
 
 if nvp.Verbose
     disp("CIGRE compatible DLL created for model " + model + ". This can be found " + here);

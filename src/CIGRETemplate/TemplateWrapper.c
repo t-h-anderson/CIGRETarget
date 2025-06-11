@@ -16,8 +16,8 @@ __declspec(dllexport) int32_T Model_FirstCall(IEEE_Cigre_DLLInterface_Instance* 
 		logout("####################### Model_FirstCall Time > 0, assuming snapshot\n");
 		// Get the IO from the instance
 		MyModelParameters* parameters = (MyModelParameters*)instance->Parameters;
-		<<InputType>>* inputs = (<<InputType>>*)instance->ExternalInputs;
-        <<OutputType>>* outputs = (<<OutputType>>*)instance->ExternalOutputs;
+        <<InputUnpack>>
+        <<OutputUnpack>>
 
 		// Restore from heap
         <<RTMVarType>>* <<RTMStructName>> = (<<RTMVarType>>*)heap_get_address(&instance->IntStates[0], 0);
@@ -27,7 +27,7 @@ __declspec(dllexport) int32_T Model_FirstCall(IEEE_Cigre_DLLInterface_Instance* 
         <<MapInternalStatesToModel>>
         
 		// Apply input data
-		*<<InputName>> = *inputs;
+		<<ApplyInputData>>
 
 		// Create a backup of dwork and blockIO
 		// malloc is used because bigger dworks will crash due to limited stash size (unless stash size is changed in the compiler)
@@ -44,8 +44,7 @@ __declspec(dllexport) int32_T Model_FirstCall(IEEE_Cigre_DLLInterface_Instance* 
 		<<WrapperName>>_initialize_only(<<ModelInitialiseInputs>>);
 
 		// Copy the outputs to the instance
-		*outputs = *<<OutputName>>;
-
+        <<ApplyOutputData>>
 
 	}
 	logout("####################### Model_FirstCall END ##############\n");
@@ -123,9 +122,9 @@ __declspec(dllexport) int32_T __cdecl Model_Outputs(IEEE_Cigre_DLLInterface_Inst
 
     // Get the IO from the instance
     MyModelParameters* parameters = (MyModelParameters*)instance->Parameters;
-	<<InputType>>* inputs = (<<InputType>>*)instance->ExternalInputs;
-    <<OutputType>>* outputs = (<<OutputType>>*)instance->ExternalOutputs;
-
+    <<InputUnpack>>
+    <<OutputUnpack>>
+    
     // Restore from heap
     <<RTMVarType>>* <<RTMStructName>> = (<<RTMVarType>>*)heap_get_address(&instance->IntStates[0], 0);
 	<<InternalStatesRestore>> // localDW, rtdw
@@ -137,12 +136,12 @@ __declspec(dllexport) int32_T __cdecl Model_Outputs(IEEE_Cigre_DLLInterface_Inst
     <<MapInternalStatesToModel>>
 
     // Apply input data
-    *<<InputName>> = *inputs;
+    <<ApplyInputData>>
    
     <<ModelStep>>(<<ModelStepInputs>>);
 
     // Copy the outputs to the instance
-    *outputs = *<<OutputName>>;
+    <<ApplyOutputData>>
     
     // Return success
     instance->LastGeneralMessage = ErrorMessage;

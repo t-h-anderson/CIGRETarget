@@ -21,5 +21,8 @@ switch where.SourceType
         end
 end
 
+% Fail early if we can't convert it to a double
+double(value);
+
 end
 

@@ -53,6 +53,7 @@ classdef ModelDescription < handle
         Inputs cigre.description.Variable
         Outputs cigre.description.Variable
         Parameters cigre.description.Variable
+        
 
         InputData (1,:) cigre.description.Variable
         OutputData (1,:) cigre.description.Variable
@@ -310,17 +311,17 @@ classdef ModelDescription < handle
             id = codeInfo.InternalData;
 
             % Dealt with cetain fields of model struct explicitly
-            name = obj.extractName(id);
+            name = cigre.description.Variable.extractName(id);
             idx = cellfun(@(x) x == "rt_errorStatus", name);
             idx = idx | cellfun(@(x) x == "timingBridge", name);
             idx = idx | cellfun(@(x) contains(x, "mdlref_TID"), name);
             id(idx) = [];
             
             % Ensure we don't have any name clases
-            name = obj.extractName(id);
+            name = cigre.description.Variable.extractName(id);
             name = obj.avoidReservedName(name);
 
-            [type, pointers] = obj.extractType(id);
+            [type, pointers] = cigre.description.Variable.extractType(id);
 
             % Separate external input and outputs
             idxInput = (string({id.GraphicalName}) == "ExternalInput");
@@ -391,8 +392,8 @@ classdef ModelDescription < handle
             initialise = codeDescObj.getFunctionInterfaces("Initialize");
 
             args = initialise.ActualArgs;
-            intInputs = string(obj.extractName(args));
-            types = string(obj.extractType(args));
+            intInputs = string(cigre.description.Variable.extractName(args));
+            types = string(cigre.description.Variable.extractType(args));
 
             intInputs = obj.translateNames(intInputs, types);
             inputs = cigre.description.Variable.create("Name", intInputs, "Type",types);
@@ -409,8 +410,8 @@ classdef ModelDescription < handle
             step = codeDescObj.getFunctionInterfaces("Output");
 
             args = step.ActualArgs;
-            stepInputs = string(obj.extractName(args.toArray()));
-            types = string(obj.extractType(args.toArray()));
+            stepInputs = string(cigre.description.Variable.extractName(args.toArray()));
+            types = string(cigre.description.Variable.extractType(args.toArray()));
 
             stepInputs = obj.translateNames(stepInputs, types);
             inputs = cigre.description.Variable.create("Name", stepInputs, "Type",types);
@@ -544,38 +545,27 @@ classdef ModelDescription < handle
 
         function loadInputInterface(obj)
             inports = obj.InterfaceCodeDescriptor.getDataInterfaces("Inports");
-            obj.Inputs = cigre.description.Variable.create(...
-                "GraphicalName", obj.extractGraphicalName(inports), ...
-                "Name", obj.extractName(inports), ...
-                "Type", obj.extractType(inports), ...
-                "BaseType", obj.extractBaseType(inports), ...
-                "Dimensions", obj.extractDimensions(inports) ...
-                );
+
+            % Remove outports that do not appear in code
+            idxNoIn = arrayfun(@(x) isempty(x.Implementation), inports);
+            inports(idxNoIn) = [];
+
+            obj.Inputs = cigre.description.Variable.fromDataInterface(inports, obj.ModelName);
         end
 
         function loadOutputInterface(obj)
             outports = obj.InterfaceCodeDescriptor.getDataInterfaces("Outports");
-            obj.Outputs = cigre.description.Variable.create(...
-                "GraphicalName", obj.extractGraphicalName(outports), ...
-                "Name", obj.extractName(outports), ...
-                "Type", obj.extractType(outports), ...
-                "BaseType", obj.extractBaseType(outports), ...
-                "Dimensions", obj.extractDimensions(outports)  ...
-                );
+            
+            % Remove outports that do not appear in code
+            idxNoOut = arrayfun(@(x) isempty(x.Implementation), outports);
+            outports(idxNoOut) = [];
+            
+            obj.Outputs = cigre.description.Variable.fromDataInterface(outports, obj.ModelName);
         end
 
         function loadParameterInterface(obj)
             parameters = obj.ModelCodeDescriptor.getDataInterfaces("Parameters");
-            obj.Parameters = cigre.description.Variable.create(...
-                "GraphicalName", obj.extractGraphicalName(parameters), ...
-                "Name", obj.extractName(parameters), ...
-                "Type", obj.extractType(parameters), ...
-                "BaseType", obj.extractBaseType(parameters), ...
-                "Min", obj.extract(parameters, "Min"), ...
-                "Max", obj.extract(parameters, "Max"), ...
-                "Dimensions", obj.extractDimensions(parameters),...
-                "DefaultValue", obj.extractDefaultParamValue(parameters)...
-                );
+            obj.Parameters = cigre.description.Variable.fromDataInterface(parameters, obj.ModelName);
         end
 
         function inputNames = translateNames(obj, inputNames, inputTypes)
@@ -593,8 +583,8 @@ classdef ModelDescription < handle
             % Replace graphial names "rtx_"/"rty_" + graphical name with
             % the internal name
             inputNames = erase(inputNames, ["rty_", "rtx_"]);
-            graphicalNames = [[obj.Inputs.GraphicalName], [obj.Outputs.GraphicalName]];
-            names = [[obj.Inputs.Name], [obj.Outputs.Name]];
+            graphicalNames = string([[obj.Inputs.GraphicalName], [obj.Outputs.GraphicalName]]);
+            names = string([[obj.Inputs.Name], [obj.Outputs.Name]]);
             for i = 1:numel(inputNames)
                 idx = ismember(graphicalNames, inputNames(i));
                 if any(idx)
@@ -618,20 +608,6 @@ classdef ModelDescription < handle
             % Replace RTM
             idx = inputTypes == obj.RTMVarType;
             inputNames(idx) = obj.RTMStructName;
-        end
-
-        function value = extractDefaultParamValue(obj, interface)
-            value = cell(1, numel(interface));
-            failedValue = 0; % Nan may be better, but also possibly not supported. 0 is safe.
-            for i = 1:numel(interface)
-                try
-                    value{i} = util.findParam(obj.ModelName, interface(i).GraphicalName);
-                catch
-                    value{i} = failedValue; % Not found
-                end
-            end
-
-            value = [value{:}]';
         end
 
     end
@@ -748,157 +724,6 @@ classdef ModelDescription < handle
         end
 
         % Local functions
-        function name = extractGraphicalName(interface)
-
-            name  = cell(1, numel(interface));
-
-            try
-                sz = interface.Size;
-            catch
-                sz = numel(interface);
-            end
-
-            for i = 1:sz
-                name{i} = string(interface(i).GraphicalName);
-            end
-
-        end
-
-        function name = extractName(interface)
-
-            name  = cell(1, numel(interface));
-
-            try
-                sz = interface.Size;
-            catch
-                sz = numel(interface);
-            end
-
-            for i = 1:sz
-                % Look at the implementation for the name
-                imp = interface(i).Implementation;
-
-                if isa(imp, "coder.descriptor.Variable") || isa(imp, "RTW.Variable")
-                %if isprop(imp, "Identifier") && ~isempty(imp.Identifier)
-                    name{i} = imp.Identifier;
-                elseif isprop(imp, "ElementIdentifier") && ~isempty(imp.ElementIdentifier)
-                    name{i} = imp.ElementIdentifier;
-                elseif isprop(imp, "Type")
-                    % We want the property name
-                    type = imp.Type;
-
-                    while(isa(type, "coder.types.Pointer"))
-                        % Drill into pointer
-                        type = type.BaseType;
-                    end
-
-                    name{i} = type.Name;
-                end
-
-            end   
-
-        end
-
-        function [types, pointers] = extractType(interface)
-
-            types = cell(1, numel(interface));
-            pointers = cell(1, numel(interface));
-
-            try
-                sz = interface.Size;
-            catch
-                sz = numel(interface);
-            end
-
-            for i = 1:sz
-                try
-                    type = interface(i).Implementation.Type;
-
-                    [type, pointer] = getPointerType(type);
-
-                    types{i} = string(type.Identifier);
-                    pointers{i} = pointer;
-
-                catch
-                    types{i} = "";
-                    pointers{i} = "";
-                end
-
-            end
-
-        end
-
-        function types = extractBaseType(interface)
-
-            types  = cell(1, numel(interface));
-
-            try
-                sz = interface.Size;
-            catch
-                sz = numel(interface);
-            end
-
-            for i = 1:sz
-                try
-                    types{i} = string(interface(i).Type.BaseType.Name);
-                catch
-                    types{i} = string(interface(i).Type.Name);
-                end
-            end
-
-        end
-
-        function value = extractDimensions(interface)
-            value = cell(1, numel(interface));
-            for i = 1:numel(interface)
-                try
-                    % TODO: why so many try catches?
-                    value{i} = interface(i).Type.Dimensions.toArray();
-                catch
-                    try
-                        value{i} = interface(i).Type.Dimensions;
-                    catch
-                        value{i} = [1,1];
-                    end
-                end
-            end
-        end
-
-        function limitVal = extract(interface, lim)
-
-            type = cigre.description.ModelDescription.extractBaseType(interface);
-
-            limitVal  = cell(1, numel(interface));
-            for i = 1:numel(interface)
-                limitVal{i} = string(interface(i).Range.(lim));
-
-                if contains(type{i}, "int", "IgnoreCase", true)
-                    isInt = true;
-                else
-                    isInt = false;
-                end
-
-                % Assumes we never have e.g. -inf on a max
-                if string(limitVal{i}) == "-inf" || string(limitVal{i}) == ""
-                    if isInt
-                        limitVal{i} = intmin(type{i});
-                    else
-                        limitVal{i} = realmin;
-                    end
-                end
-
-                if string(limitVal{i}) == "inf" || string(limitVal{i}) == ""
-                    if isInt
-                        limitVal{i} = intmax(type{i});
-                    else
-                        limitVal{i} = realmax / 2; % Using realmax cases a "constant too large error"
-                    end
-                end
-            end
-
-            limitVal = [limitVal{:}]';
-        end
-
         function [tbc, nTasks] = processRTMStructCode(headerCode)
             arguments
                 headerCode string
@@ -1098,19 +923,6 @@ classdef ModelDescription < handle
         end
 
     end
-
-end
-
-function [type, pointers] = getPointerType(type)
-
-pointers = "";
-if meta.class.fromName(class(type)) <= ?coder.types.Pointer || ...
-        meta.class.fromName(class(type)) <= ?coder.descriptor.types.Pointer || ...
-        meta.class.fromName(class(type)) <= ?coder.descriptor.types.Matrix
-    type = type.BaseType;
-    [type, pointers] = getPointerType(type);
-    pointers = pointers + "*";
-end
 
 end
 
