@@ -41,6 +41,7 @@ classdef Variable
         function objs = create(nvp)
             arguments
                 nvp.?cigre.description.Variable
+                nvp.NestedVariable
                 nvp.Dimensions
             end
 
@@ -49,12 +50,20 @@ classdef Variable
             fs = string(fields(nvp));
             fn = numel(fs);
 
-            n = zeros(fn, 1);
+            % Ensure the data is the correct size
+            n = NaN(1,0);
             for i = 1:fn
                 f = fs(i);
+
                 % Everything is a vector, Dimension is cell array
-                % containing potentially disperate vectors
-                n(i) = numel(nvp.(f));
+                % containing potentially disperate vectors, nested
+                % variables can be any size
+                switch f
+                    case {"NestedVariable", "Dimensions"}
+                        continue
+                end
+
+                n(end+1) = numel(nvp.(f)); %#ok<AGROW>
             end
 
             maxN = max(n);
@@ -64,6 +73,7 @@ classdef Variable
                 error("Entry must be scalar or all the same lenght");
             end
 
+            % Copy the data into new objects
             for i = 1:maxN
                 in = nvp;
 
@@ -94,31 +104,53 @@ classdef Variable
 
         end
 
-        function objs = fromDataInterface(di, modelName)
+        function objs = fromDataInterface(dis, modelName, nameroot)
             arguments
-                di
-                modelName (1,1) string = string(nan) % Requried to find default param value
+                dis
+                modelName (1,1) string = string(nan) % Required to find default param value
+                nameroot (1,:) string = string.empty % Allow nested parameter search
             end
 
-            graphicalNames = cigre.description.Variable.extractGraphicalName(di);
-            names = cigre.description.Variable.extractName(di);
-            types = cigre.description.Variable.extractType(di);
-            baseTypes = cigre.description.Variable.extractBaseType(di);
-            mins = cigre.description.Variable.extract(di, "Min");
-            maxs = cigre.description.Variable.extract(di, "Max");
-            dimensions = cigre.description.Variable.extractDimensions(di);
-            defaultValues = cigre.description.Variable.extractDefaultParamValue(di, modelName);
+            objs = cigre.description.Variable.empty(1,0);
 
-            objs = cigre.description.Variable.create(...
-                "GraphicalName", graphicalNames, ...
-                "Name", names, ...
-                "Type", types, ...
-                "BaseType", baseTypes, ...
-                "Min", mins, ...
-                "Max", maxs, ...
-                "Dimensions", dimensions,...
-                "DefaultValue", defaultValues ...
-                );
+            for i = 1:numel(dis)
+                di = dis(i);
+
+                graphicalNames = cigre.description.Variable.extractGraphicalName(di);
+                names = cigre.description.Variable.extractName(di);
+                types = cigre.description.Variable.extractType(di);
+                baseTypes = cigre.description.Variable.extractBaseType(di);
+                mins = cigre.description.Variable.extract(di, "Min");
+                maxs = cigre.description.Variable.extract(di, "Max");
+                dimensions = cigre.description.Variable.extractDimensions(di);
+
+                paramName = strjoin([nameroot, graphicalNames], ".");
+                defaultValues = cigre.description.Variable.extractDefaultParamValue(modelName, paramName);
+
+                if ~isa(di.Type, "coder.descriptor.types.Scalar") ...
+                        && (isprop(di.Type, "BaseType") && ~isa(di.Type.BaseType, "coder.descriptor.types.Scalar"))
+                    elements = di.Type.BaseType.Elements;
+
+                    sub = cigre.description.Variable.fromDataInterface(elements, modelName, [nameroot, graphicalNames]);
+                else
+                    sub = cigre.description.Variable.empty(1,0);
+                end
+
+                newObjs = cigre.description.Variable(...
+                    "GraphicalName", graphicalNames, ...
+                    "Name", names, ...
+                    "Type", types, ...
+                    "BaseType", baseTypes, ...
+                    "Min", mins, ...
+                    "Max", maxs, ...
+                    "Dimensions", dimensions,...
+                    "DefaultValue", defaultValues, ...
+                    "NestedVariable", sub ...
+                    );
+
+                objs = [objs, newObjs];
+            end
+
 
         end
 
@@ -126,19 +158,19 @@ classdef Variable
 
     % Methods interacting on coder interface objects
     methods (Static)
-        function name = extractGraphicalName(interface)
-
-            name  = cell(1, numel(interface));
-
-            try
-                sz = interface.Size;
-            catch
-                sz = numel(interface);
+        function name = extractGraphicalName(interfaces)
+            arguments
+                interfaces (1,1)
             end
 
-            for i = 1:sz
-                name{i} = string(interface(i).GraphicalName);
+            interface = interfaces;
+            if isprop(interface, "GraphicalName")
+                name = string(interfaces.GraphicalName);
+            else
+                name = cigre.description.Variable.extractName(interfaces);
             end
+
+            name = string(name);
 
         end
 
@@ -154,14 +186,22 @@ classdef Variable
 
             for i = 1:sz
                 % Look at the implementation for the name
-                imp = interface(i).Implementation;
+
+                if isprop(interface(i), "Implementation")
+                    imp = interface(i).Implementation;
+                else
+                    % E.g. an Aggregate element
+                    imp = interface(i);
+                end
 
                 if isempty(imp)
                     % Not implemented, so skip
                     continue
                 end
 
-                if isa(imp, "coder.descriptor.Variable") || isa(imp, "RTW.Variable")
+                if isa(imp, "coder.descriptor.Variable") ...
+                        || isa(imp, "RTW.Variable") ...
+                        || isa(imp, "coder.descriptor.types.AggregateElement")
                     name{i} = imp.Identifier;
                 elseif isprop(imp, "ElementIdentifier") && ~isempty(imp.ElementIdentifier)
                     name{i} = imp.ElementIdentifier;
@@ -199,7 +239,12 @@ classdef Variable
 
             for i = 1:sz
 
-                imp = interface(i).Implementation;
+                if isprop(interface(i), "Implementation")
+                    imp = interface(i).Implementation;
+                else
+                    % E.g. Aggregate element
+                    imp = interface(i);
+                end
 
                 if isempty(imp) && isprop(interface(i), "Type")
                     % Not implemented, so take the default type
@@ -220,98 +265,94 @@ classdef Variable
         end
 
         function types = extractBaseType(interface)
-
-            types  = cell(1, numel(interface));
-
-            try
-                sz = interface.Size;
-            catch
-                sz = numel(interface);
+            arguments
+                interface (1,1)
             end
 
-            for i = 1:sz
-                try
-                    types{i} = string(interface(i).Type.BaseType.Name);
-                catch
-                    types{i} = string(interface(i).Type.Name);
-                end
+            if isprop(interface.Type, "BaseType")
+                types = string(interface.Type.BaseType.Name);
+            else
+                types = string(interface.Type.Name);
             end
 
         end
 
         function value = extractDimensions(interface)
-            value = cell(1, numel(interface));
-            for i = 1:numel(interface)
+            arguments
+                interface (1,1)
+            end
+
+            try
+                % TODO: why so many try catches?
+                value = interface.Type.Dimensions.toArray();
+            catch
                 try
-                    % TODO: why so many try catches?
-                    value{i} = interface(i).Type.Dimensions.toArray();
+                    value = interface.Type.Dimensions;
                 catch
-                    try
-                        value{i} = interface(i).Type.Dimensions;
-                    catch
-                        value{i} = [1,1];
-                    end
+                    value = [1,1];
                 end
             end
         end
 
         function limitVal = extract(interface, lim)
+            arguments
+                interface (1,1)
+                lim (1,1) string {mustBeMember(lim, ["Min", "Max"])}
+            end
 
             type = cigre.description.Variable.extractBaseType(interface);
 
-            limitVal  = cell(1, numel(interface));
-            for i = 1:numel(interface)
-                limitVal{i} = string(interface(i).Range.(lim));
+            if ~isprop(interface, "Range")
+                % E.g. aggregate element
+                limitVal = "";
+            else
+                limitVal = string(interface.Range.(lim));
+            end
 
-                if contains(type{i}, "int", "IgnoreCase", true)
-                    isInt = true;
+            if contains(type, "int", "IgnoreCase", true)
+                isInt = true;
+            else
+                isInt = false;
+            end
+
+            % Assumes we never have e.g. -inf on a max
+            if string(limitVal) == "-inf" || (string(limitVal) == "" && lim == "Min")
+                if isInt
+                    limitVal = intmin(type);
                 else
-                    isInt = false;
-                end
-
-                % Assumes we never have e.g. -inf on a max
-                if string(limitVal{i}) == "-inf" || string(limitVal{i}) == ""
-                    if isInt
-                        limitVal{i} = intmin(type{i});
-                    else
-                        limitVal{i} = realmin;
-                    end
-                end
-
-                if string(limitVal{i}) == "inf" || string(limitVal{i}) == ""
-                    if isInt
-                        limitVal{i} = intmax(type{i});
-                    else
-                        limitVal{i} = realmax / 2; % Using realmax cases a "constant too large error"
-                    end
+                    limitVal = realmin;
                 end
             end
 
-            limitVal = [limitVal{:}]';
+            if string(limitVal) == "inf" || (string(limitVal) == "" && lim == "Max")
+                if isInt
+                    limitVal = intmax(type);
+                else
+                    limitVal = realmax / 2; % Using realmax cases a "constant too large error"
+                end
+            end
+
         end
 
-        function value = extractDefaultParamValue(interface, modelName)
+        function value = extractDefaultParamValue(modelName, paramName)
             arguments
-                interface
                 modelName (1,1) string = string(nan)
+                paramName (1,1) string = string(nan)
             end
 
             failedValue = 0; % Nan may be better, but also possibly not supported. 0 is safe.
-            if ismissing(modelName)
-                value = repelem(failedValue, 1, numel(interface));
+            if ismissing(modelName) || ismissing(paramName)
+                value = failedValue;
             else
 
-                value = cell(1, numel(interface));
-                for i = 1:numel(interface)
-                    try
-                        value{i} = util.findParam(modelName, interface(i).GraphicalName);
-                    catch
-                        value{i} = failedValue; % Not found
-                    end
+                try
+                    value = util.findParam(modelName, paramName);
+                catch
+                    value = failedValue; % Not found
                 end
 
-                value = [value{:}]';
             end
+
         end
 
     end
