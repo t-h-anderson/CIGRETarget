@@ -2,8 +2,9 @@
 
 #pragma pack(push, 1)
 
-
 <<InitializeOnly>>
+
+<<ParamGetMethods>>
 
 // ----------------------------------------------------------------
 __declspec(dllexport) int32_T Model_FirstCall(IEEE_Cigre_DLLInterface_Instance* instance) {
@@ -95,7 +96,9 @@ __declspec(dllexport) int32_T __cdecl Model_Initialize(IEEE_Cigre_DLLInterface_I
     <<MapInternalStatesToModel>>
 
     // Load the parameters from memory
+    /*
     <<LoadParameters>>
+    */
 
     // Model ref initialise and init
     <<ModelInitialize>>(<<ModelInitialiseInputs>>);
@@ -130,7 +133,9 @@ __declspec(dllexport) int32_T __cdecl Model_Outputs(IEEE_Cigre_DLLInterface_Inst
 	<<InternalStatesRestore>> // localDW, rtdw
 
     // Parameters
+    /*
     <<LoadParameters>>
+    */
 
     // Copy data back into model
     <<MapInternalStatesToModel>>

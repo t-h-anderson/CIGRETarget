@@ -16,32 +16,18 @@ classdef CIGREWriter
             cigreSuffix = modelDescriptions.CIGRESuffix; 
 
             model = modelDescriptions.ModelName;
-            interface = modelDescriptions.InterfaceName;
-            wrapper = modelDescriptions.WrapperName;
+            cigreInterface = modelDescriptions.CIGREInterfaceName;
 
             results = readFromFile("TemplateWrapper.c");
 
             % Input
             inputNames = string({modelDescriptions.Inputs.Name}'); 
             
-            inputTypes = string([modelDescriptions.Inputs.Type]);
-
-            inputTypes = util.TranslateTypes.translateType(inputTypes, "From", "Simulink", "To", "CIGRE", "Model", wrapper)';
-
             % Output
             outputNames = string({modelDescriptions.Outputs.Name}');
 
-            outputTypes = string([modelDescriptions.Outputs.Type]);
-
-            outputTypes = util.TranslateTypes.translateType(outputTypes, "From", "Simulink", "To", "CIGRE", "Model", wrapper)';
-
-            % Parameters
-            paramNames = string({modelDescriptions.Parameters.Name}');
-
-            % Removed because params are defined globally
-            % paramTypes = string([modelDescriptions.Parameters.Type]); 
-            % paramTypes = util.TranslateTypes.translateType(paramTypes, "From", "Simulink", "To", "CIGRE", "Model", mdl)';
-
+             % Parameters
+            paramNames = string({modelDescriptions.CIGREParameters.Name}');
             paramTypes = repelem("", numel(paramNames));
 
             %% InitializeOnly
@@ -122,11 +108,11 @@ classdef CIGREWriter
             backupStatesMap = "";
 
             for i = 1:numel(modelDescriptions.RTMStruct)
-                % DW_MyModel_iwrap_wrap_T* dwork_backup;
+                % DW_MyModel_wrap_T* dwork_backup;
                 backupStatesMap = backupStatesMap + newline ...
                     + "    " + modelDescriptions.RTMStruct(i).Type + "* " + modelDescriptions.RTMStruct(i).Name + "_backup;";
 
-                % dwork_backup = malloc(sizeof(DW_MyModel_iwrap_wrap_T));
+                % dwork_backup = malloc(sizeof(DW_MyModel_wrap_T));
                 backupStatesMap = backupStatesMap + newline ...
                     + "    " + modelDescriptions.RTMStruct(i).Name + "_backup = malloc(sizeof(" + modelDescriptions.RTMStruct(i).Type +"));";
 
@@ -180,6 +166,22 @@ classdef CIGREWriter
                 results = strrep(results, "<<OutputName>>", outputName);
             end
 
+            %% Parameter get
+            params = modelDescriptions.Parameters;
+            getIdx = (string([params.StorageSpecifier]) == "GetSet");
+            getParams = params(getIdx);
+            for i = 1:numel(getParams)
+                getFn = getParams(i).GetMethod;
+                type = "void";
+                getFn = type + " " + getFn + "(){" + newline ...
+                    + newline ...
+                    + "};" + newline ...
+                    + "<<ParamGetMethods>>";
+                
+                results = strrep(results, "<<ParamGetMethods>>", getFn);
+            end
+            results = strrep(results, "<<ParamGetMethods>>", "");
+            
             %% Replace input pointers
             defineInputs = "&" + inputNames + cigreSuffix;
             defineInputs = strjoin(defineInputs, ", ");
@@ -215,7 +217,7 @@ classdef CIGREWriter
                 initInputs = strjoin(string([modelDescriptions.InitInputs.Name]) + cigreSuffix, ", "); % Handle of everything except model handle (first input)
                 init = strrep(init, "<<ModelInitInputs>>", initInputs);
 
-                modelInitialize = interface + "_Init";
+                modelInitialize = cigreInterface + "_Init";
                 init = strrep(init, "<<ModelInitFn>>", modelInitialize);
 
             else
@@ -242,7 +244,7 @@ classdef CIGREWriter
             results = strrep(results, "<<ModelName>>", model);
 
             % Wrapper name
-            results = strrep(results, "<<WrapperName>>", wrapper);
+            results = strrep(results, "<<WrapperName>>", cigreInterface);
 
             %% Write the results
             filename = nvp.DLLName + ".c";
@@ -256,33 +258,48 @@ classdef CIGREWriter
             end
 
             model = modelDescriptions.ModelName;
-            interface = modelDescriptions.InterfaceName;
-            wrapper = modelDescriptions.WrapperName;
+            cigreInterface = modelDescriptions.CIGREInterfaceName;
 
             cigreSuffix = modelDescriptions.CIGRESuffix;
 
             results = readFromFile("TemplateWrapper.h");
 
+            % CIGRE Inputs
             inputNames = string([modelDescriptions.Inputs.Name]');
             inputTypes = [modelDescriptions.Inputs.Type]';
             inputDims = cellfun(@(x) string(prod(x)), {modelDescriptions.Inputs.Dimensions})';
 
-            inputTypes = util.TranslateTypes.translateType(inputTypes, "From", "Simulink", "To", "CIGRE", "Model", interface)';
+            inputTypes = util.TranslateTypes.translateType(inputTypes, "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
 
+            % CIGRE Outputs
             outputNames = string([modelDescriptions.Outputs.Name]');
             outputTypes = [modelDescriptions.Outputs.Type]';
 
-            outputTypes = util.TranslateTypes.translateType(outputTypes, "From", "Simulink", "To", "CIGRE", "Model", interface)';
+            outputTypes = util.TranslateTypes.translateType(outputTypes, "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
             outputDims = cellfun(@(x) string(prod(x)), {modelDescriptions.Outputs.Dimensions})';
 
-            parameterNames = string([modelDescriptions.Parameters.Name]');
-            parameterTypes = [modelDescriptions.Parameters.Type]';
-            parameterMin = {modelDescriptions.Parameters.Min}';
-            parameterMax = {modelDescriptions.Parameters.Max}';
-            parameterDefaultVal = {modelDescriptions.Parameters.DefaultValue}';
+            %% Parameter get
+            params = modelDescriptions.Parameters;
+            getIdx = (string([params.StorageSpecifier]) == "GetSet");
+            getParams = params(getIdx);
+            for i = 1:numel(getParams)
+                getFn = getParams(i).GetMethod;
+                type = "void";
+                getFn = type + " " + getFn + "();" + newline ...
+                    + "<<ParamGetMethods>>";
 
-            parameterTypes = util.TranslateTypes.translateType(parameterTypes, "From", "Simulink", "To", "CIGRE", "Model", interface)';
-            paramBaseTypes =  [modelDescriptions.Parameters.BaseType]';
+                results = strrep(results, "<<ParamGetMethods>>", getFn);
+            end
+            results = strrep(results, "<<ParamGetMethods>>", "");
+
+            % Parameters
+            parameterNames = string([modelDescriptions.CIGREParameters.Name]');
+            parameterTypes = [modelDescriptions.CIGREParameters.Type]';
+            parameterMin = {modelDescriptions.CIGREParameters.Min}';
+            parameterMax = {modelDescriptions.CIGREParameters.Max}';
+            parameterDefaultVal = {modelDescriptions.CIGREParameters.DefaultValue}';
+
+            parameterTypes = util.TranslateTypes.translateType(parameterTypes, "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
 
             isHeader = isfile("./slprj/ert/_sharedutils/model_reference_types.h");
             if isHeader
@@ -293,7 +310,7 @@ classdef CIGREWriter
             results = strrep(results, "<<model_reference_types>>", header );
 
             %% Replace model header
-            results = strrep(results, "<<WrapperHeader>>", wrapper + ".h");
+            results = strrep(results, "<<WrapperHeader>>", cigreInterface + ".h");
 
             %% Strrep
             results = strrep(results, "<<CIGRE Suffix>>", cigreSuffix);
@@ -461,13 +478,13 @@ classdef CIGREWriter
             results = strrep(results, "<<ModelHistory>>", modelDescriptions.ModelModifiedHistory);
 
             %% NoInputs
-            results = strrep(results, "<<NoInputs>>", string(numel(modelDescriptions.Inputs)));
+            results = strrep(results, "<<NoInputs>>", string(numInputs));
 
             %% NoOutputs
-            results = strrep(results, "<<NoOutputs>>", string(numel(modelDescriptions.Outputs)));
+            results = strrep(results, "<<NoOutputs>>", string(numOutputs));
 
             %% NoParams
-            results = strrep(results, "<<NoParams>>", string(numel(modelDescriptions.Parameters)));
+            results = strrep(results, "<<NoParams>>", string(numParameters));
 
             %% Int states needed
             numIntStates = heapSize(modelDescriptions); % What value does this need to be?
@@ -485,7 +502,7 @@ classdef CIGREWriter
 
             %% Model name
             results = strrep(results, "<<ModelName>>", model);
-            results = strrep(results, "<<WrapperName>>", wrapper);
+            results = strrep(results, "<<WrapperName>>", cigreInterface);
 
             %% Write the results
             filename = nvp.DLLName + ".h";

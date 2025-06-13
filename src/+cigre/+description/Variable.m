@@ -13,8 +13,15 @@ classdef Variable
         Max (:,1) = NaN
         DefaultValue (:,1) = NaN
 
+        StorageSpecifier (1,1) string = ""
+        GetMethod (1,1) string = ""
+
         % Allow, e.g. support for structs of parameters
         NestedVariable (1,:) cigre.description.Variable = cigre.description.Variable.empty(1,0)
+    end
+
+    properties (Dependent)
+        IsLeaf
     end
 
     methods
@@ -34,6 +41,21 @@ classdef Variable
 
         end
 
+        function val = get.IsLeaf(obj)
+            val = isempty(obj.NestedVariable);
+        end
+
+        function leaves = getLeaves(objs)
+
+            idx = [objs.IsLeaf];
+            leaves = objs(idx);
+
+            if any(~idx)
+                next = [objs(~idx).NestedVariable];
+                leaves = [leaves, next.getLeaves];
+            end
+
+        end
     end
 
     methods (Static)
@@ -123,15 +145,25 @@ classdef Variable
                 mins = cigre.description.Variable.extract(di, "Min");
                 maxs = cigre.description.Variable.extract(di, "Max");
                 dimensions = cigre.description.Variable.extractDimensions(di);
+                [storage, getMethod] = cigre.description.Variable.extractStorageSpecifier(di);
 
                 paramName = strjoin([nameroot, graphicalNames], ".");
                 defaultValues = cigre.description.Variable.extractDefaultParamValue(modelName, paramName);
 
-                if ~isa(di.Type, "coder.descriptor.types.Scalar") ...
-                        && (isprop(di.Type, "BaseType") && ~isa(di.Type.BaseType, "coder.descriptor.types.Scalar"))
-                    elements = di.Type.BaseType.Elements;
+                if ~isa(di.Type, "coder.descriptor.types.Scalar")
 
-                    sub = cigre.description.Variable.fromDataInterface(elements, modelName, [nameroot, graphicalNames]);
+                    if isprop(di.Type, "BaseType")
+                        type = di.Type.BaseType;
+                    else
+                        type = di.Type;
+                    end
+                
+                    if isprop(type, "Elements")
+                        elements = type.Elements;
+                        sub = cigre.description.Variable.fromDataInterface(elements, modelName, [nameroot, graphicalNames]);
+                    else
+                        sub = cigre.description.Variable.empty(1,0);
+                    end
                 else
                     sub = cigre.description.Variable.empty(1,0);
                 end
@@ -145,12 +177,13 @@ classdef Variable
                     "Max", maxs, ...
                     "Dimensions", dimensions,...
                     "DefaultValue", defaultValues, ...
+                    "StorageSpecifier", storage, ...
+                    "GetMethod", getMethod, ...
                     "NestedVariable", sub ...
                     );
 
                 objs = [objs, newObjs];
             end
-
 
         end
 
@@ -158,16 +191,15 @@ classdef Variable
 
     % Methods interacting on coder interface objects
     methods (Static)
-        function name = extractGraphicalName(interfaces)
+        function name = extractGraphicalName(interface)
             arguments
-                interfaces (1,1)
+                interface (1,1)
             end
 
-            interface = interfaces;
             if isprop(interface, "GraphicalName")
-                name = string(interfaces.GraphicalName);
+                name = string(interface.GraphicalName);
             else
-                name = cigre.description.Variable.extractName(interfaces);
+                name = cigre.description.Variable.extractName(interface);
             end
 
             name = string(name);
@@ -175,91 +207,81 @@ classdef Variable
         end
 
         function name = extractName(interface)
-
-            name  = cell(1, numel(interface));
-
-            try
-                sz = interface.Size;
-            catch
-                sz = numel(interface);
+            arguments
+                interface (1,1)
             end
 
-            for i = 1:sz
-                % Look at the implementation for the name
+            % Look at the implementation for the name
 
-                if isprop(interface(i), "Implementation")
-                    imp = interface(i).Implementation;
-                else
-                    % E.g. an Aggregate element
-                    imp = interface(i);
-                end
-
-                if isempty(imp)
-                    % Not implemented, so skip
-                    continue
-                end
-
-                if isa(imp, "coder.descriptor.Variable") ...
-                        || isa(imp, "RTW.Variable") ...
-                        || isa(imp, "coder.descriptor.types.AggregateElement")
-                    name{i} = imp.Identifier;
-                elseif isprop(imp, "ElementIdentifier") && ~isempty(imp.ElementIdentifier)
-                    name{i} = imp.ElementIdentifier;
-                elseif isprop(imp, "Type")
-                    % We want the property name
-                    type = imp.Type;
-
-                    while(isa(type, "coder.types.Pointer"))
-                        % Dricll into pointer
-                        type = type.BaseType;
-                    end
-
-                    name{i} = type.Name;
-                elseif isprop(imp, "Identifier")
-                    name{i} = imp.Identifier;
-                else
-                    error("Extraction of name failed")
-                end
-
-
+            if isprop(interface, "Implementation")
+                imp = interface.Implementation;
+            else
+                % E.g. an Aggregate element
+                imp = interface;
             end
+
+            if isa(imp, "coder.descriptor.Variable") ...
+                    || isa(imp, "RTW.Variable") ...
+                    || isa(imp, "coder.descriptor.types.AggregateElement")
+                name = imp.Identifier;
+            elseif isa(imp, "coder.descriptor.CustomExpression")
+                % We are a get/set parameter
+                % TODO: The get function can be customised. Can we make this more
+                % robust?
+                name = erase(imp.ReadExpression, "get_");
+            elseif isprop(imp, "ElementIdentifier") && ~isempty(imp.ElementIdentifier)
+                name = imp.ElementIdentifier;
+            elseif isprop(imp, "Type")
+                % We want the property name
+                type = imp.Type;
+
+                while(isa(type, "coder.types.Pointer"))
+                    % Dricll into pointer
+                    type = type.BaseType;
+                end
+
+                if isprop(type, "name")
+                    name = type.name;
+                else
+                    name = type.Name;
+                end
+            elseif isprop(imp, "Identifier")
+                name = imp.Identifier;
+            else
+                error("Extraction of name failed")
+            end
+
+            name = string(name);
 
         end
 
-        function [types, pointers] = extractType(interface)
-
-            types = cell(1, numel(interface));
-            pointers = cell(1, numel(interface));
-
-            try
-                sz = interface.Size;
-            catch
-                sz = numel(interface);
+        function [type, pointer] = extractType(interface)
+            arguments
+                interface (1,1)
             end
 
-            for i = 1:sz
+            if isprop(interface, "Implementation")
+                imp = interface.Implementation;
+            else
+                % E.g. Aggregate element
+                imp = interface;
+            end
 
-                if isprop(interface(i), "Implementation")
-                    imp = interface(i).Implementation;
-                else
-                    % E.g. Aggregate element
-                    imp = interface(i);
-                end
+            if isempty(imp) && isprop(interface, "Type")
+                % Not implemented, so take the default type
+                type = interface.Type;
+            elseif isprop(imp, "Type")
+                type = imp.Type;
+            else
+                error("Extraction of type failed")
+            end
 
-                if isempty(imp) && isprop(interface(i), "Type")
-                    % Not implemented, so take the default type
-                    type = interface(i).Type;
-                elseif isprop(imp, "Type")
-                    type = imp.Type;
-                else
-                    error("Extraction of type failed")
-                end
+            [type, pointer] = getPointerType(type);
 
-                [type, pointer] = getPointerType(type);
-
-                types{i} = string(type.Identifier);
-                pointers{i} = pointer;
-
+            if isprop(type, "Identifier")
+                type = string(type.Identifier);
+            else
+                type = "";
             end
 
         end
@@ -330,6 +352,27 @@ classdef Variable
                 else
                     limitVal = realmax / 2; % Using realmax cases a "constant too large error"
                 end
+            end
+
+        end
+
+        function [storage, getMethod] = extractStorageSpecifier(interface)
+        
+            getMethod = "";
+            if isa(interface, "coder.descriptor.types.AggregateElement")
+                storage = "InternalStruct";
+                return
+            end
+
+            imp = interface.Implementation;
+
+            if isprop(imp, "StorageSpecifier")
+                storage = imp.StorageSpecifier;
+            elseif isprop(imp, "ReadExpression")
+                storage = "GetSet";
+                getMethod = imp.ReadExpression;
+            else
+                storage = "unknown";
             end
 
         end

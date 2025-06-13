@@ -6,12 +6,12 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %ModelName
         %ModelName = test.util.getAllTestModels()
         %ModelName = {"Test_DataInput"}
-        %ModelName = {"Test_SISO"}
+        ModelName = {"Test_SISO"}
         %ModelName = {"Test_StrtFunc"}
         %ModelName = {"Test_TopRef"}
         %ModelName = {"Test_BadNames"}
         %ModelName = {"Snap"}
-        ModelName = {"ComplexParams"}
+        %ModelName = {"ComplexParams"}
         %ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
         %ModelName = {"Test_BlockIO"}
         %ModelName = {"Test_SignalObject"}
@@ -147,7 +147,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             
             testCase.defineInputsAndParameters(desc);
             
-            baseline = testCase.captureBaseline(desc.WrapperName); % Run the wrapper to easily support buses
+            baseline = testCase.captureBaseline(desc.CIGREInterfaceName); % Run the wrapper to easily support buses
             
             testCase.assertTrue(isfile(dll + ".dll"));
             
@@ -203,7 +203,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             testCase.defineInputsAndParameters(desc);
             
             % Wrapper IO and baseline should match Simulink
-            baseline = testCase.captureBaseline(desc.WrapperName);
+            baseline = testCase.captureBaseline(desc.CIGREInterfaceName);
             
             % Build manually in Visual Studio following the instruction herein
             dll = testCase.doVSBuild(ModelName);
@@ -242,7 +242,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             fld = fld + fullfile(matlabroot, "extern", "include")+";";
             fld = fld + fullfile(matlabroot, "simulink", "include") + ";";
             fld = fld + fullfile(matlabroot, "rtw\c\src") + ";";
-            fld = fld + fullfile(pwd, modelName + "_iwrap_wrap_cigre_rtw");
+            fld = fld + fullfile(pwd, modelName + "_wrap_cigre_rtw");
             %      clipboard("copy", fld);
             
             keyboard

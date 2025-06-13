@@ -5,7 +5,7 @@ arguments
     desc (1,1) cigre.description.ModelDescription
 end
 
-wrapper = desc.WrapperName;
+wrapper = desc.CIGREInterfaceName;
 modelName = desc.ModelName;
 
 here = Simulink.fileGenControl('getConfig').CodeGenFolder; % TODO: This isn't good for testing. Inject location?

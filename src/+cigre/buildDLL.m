@@ -6,7 +6,6 @@ arguments
     nvp.CodeGenFolder (1,1) string = Simulink.fileGenControl('getConfig').CodeGenFolder
     nvp.BusAs (1,1) string {mustBeMember(nvp.BusAs, ["Ports", "Vector"])} = "Vector"
     nvp.Verbose (1,1) logical = true
-    nvp.InterWrapSuffix (1,1) string = "_iwrap"
     nvp.WrapSuffix (1,1) string = "_wrap"
 end
 
@@ -19,30 +18,24 @@ if stf ~= "cigre.tlc"
     error("Target must be cigre.tlc")
 end
 
-% Ensure the intermediate wrapper suffix is different from the top level
-% wrapper and model as this can cause issues processing the name
-intermediateWrapSuffix = nvp.InterWrapSuffix;
+% Ensure the wrapper suffix is different from model name as this can cause 
+% issues processing the name
 wrapSuffix = nvp.WrapSuffix;
-if contains(wrapSuffix, intermediateWrapSuffix) ...
-        || contains(intermediateWrapSuffix, wrapSuffix) ...
-        || contains(model, intermediateWrapSuffix) ...
-        || contains(model, wrapSuffix)
-    error("Wrap suffix " + wrapSuffix + " or intermediate wrap suffix " + intermediateWrapSuffix + " clash with each other or the model " + model);   
+if contains(model, wrapSuffix)
+    error("Wrap suffix " + wrapSuffix + " clashes with the model " + model);   
 end
 
 % Produce an intermediate wrapper to deal with buses
 if nvp.PreserveWrapper
-    iWrapper = cigre.internal.cigreWrap(model, "BusAs", nvp.BusAs, "NameSuffix", intermediateWrapSuffix);
-    cIWrap = [];
+    wrapper = cigre.internal.cigreWrap(model, "BusAs", nvp.BusAs, "NameSuffix", wrapSuffix);
+    cWrap = [];
 else 
-    [iWrapper, cIWrap] = cigre.internal.cigreWrap(model, "BusAs", nvp.BusAs, "NameSuffix", intermediateWrapSuffix); 
+    [wrapper, cWrap] = cigre.internal.cigreWrap(model, "BusAs", nvp.BusAs, "NameSuffix", wrapSuffix); 
 end
 
-% Wrap the wrapper to provide the standard model reference interface
-[wrapper, cWrap] = cigre.internal.cigreWrap(iWrapper, "NameSuffix", wrapSuffix);
 cigre.internal.build(wrapper);
 
-desc = cigre.description.ModelDescription.analyseModel(model, iWrapper, wrapper);
+desc = cigre.description.ModelDescription.analyseModel(model, wrapper);
            
 dll = model + "_CIGRE";
 c = [];
@@ -60,6 +53,6 @@ end
 
 % Output cleanup objects if requests to stop auto cleanup of wrapper
 if nargout > 2
-    c = {cModel, cWrap, cIWrap};
+    c = {cModel, cWrap};
 end
 

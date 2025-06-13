@@ -92,24 +92,17 @@ switch hookMethod
         % Called just after to invoking TLC Compiler (actual code generation.)
         % Valid arguments at this stage are hookMethod, modelName, and
         % buildArgs
-        % if ~isNotModelRefTarget
-        %     buildCigre(modelName);
-        % end
 
     case 'before_make'
         % Called after code generation is complete, and just prior to kicking
         % off make process (assuming code generation only is not selected.)  All
         % arguments are valid at this stage
 
-        %if ~isNotModelRefTarget
-        %    disp(modelName);
-        % end
-
-        if contains(modelName, "_iwrap_wrap")
+        % TODO: Can we make this more robust?
+        if contains(modelName, "_wrap")
 
             wrapperName = modelName;
-            midName = erase(modelName, "_wrap");
-            modelName = erase(wrapperName, "_iwrap_wrap");
+            modelName = erase(wrapperName, "_wrap");
 
             here = Simulink.fileGenControl('getConfig').CodeGenFolder; % TODO: This isn't good for testing. Inject location?
             buildDir = fullfile(here, "slprj", "cigre");
@@ -121,7 +114,7 @@ switch hookMethod
 
             % Create the dll
             try
-                desc = cigre.description.ModelDescription.analyseModel(modelName, midName, wrapperName);
+                desc = cigre.description.ModelDescription.analyseModel(modelName, wrapperName);
             catch me
                 error("Error building model description: " + me.message)
             end
@@ -151,18 +144,17 @@ switch hookMethod
         % Called after make process is complete. All arguments are valid at
         % this stage.
 
-        if contains(modelName, "_iwrap_wrap")
+        if contains(modelName, "_wrap")
 
             wrapperName = modelName;
-            midName = erase(modelName, "_wrap");
-            modelName = erase(wrapperName, "_iwrap_wrap");
+            modelName = erase(wrapperName, "_wrap");
 
-            desc = cigre.description.ModelDescription.analyseModel(modelName, midName, wrapperName);
+            desc = cigre.description.ModelDescription.analyseModel(modelName, wrapperName);
             % Build in code gen folder
             here = Simulink.fileGenControl('getConfig').CodeGenFolder; % TODO: This isn't good for testing. Inject location?
             cgf = here;
             
-            dll = fullfile(cgf, desc.WrapperName + ".dll");
+            dll = fullfile(cgf, wrapperName + ".dll");
 
             dllDeploy = fullfile(here, modelName + "_CIGRE.dll");
             copyfile(dll, dllDeploy);
