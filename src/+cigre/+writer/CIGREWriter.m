@@ -27,7 +27,8 @@ classdef CIGREWriter
             outputNames = string({modelDescriptions.Outputs.Name}');
 
              % Parameters
-            paramNames = string({modelDescriptions.CIGREParameters.Name}');
+            paramNames = string({modelDescriptions.CIGREParameters.Name}'); % Path to param if in struct
+            paramGraphicalNames = string({modelDescriptions.CIGREParameters.GraphicalName}'); % Parameter raw name
             paramTypes = repelem("", numel(paramNames));
 
             %% InitializeOnly
@@ -39,22 +40,6 @@ classdef CIGREWriter
 
             %% Replace wrapper header
             results = strrep(results, "<<CigreHeader>>", model + "_CIGRE.h");
-
-            % Load Parameters
-            if numel(modelDescriptions.Parameters) > 0
-
-                paramMap = "";
-                for i = 1:numel(modelDescriptions.Parameters)
-                    pName = paramNames(i);
-                    pType = paramTypes(i);
-                    paramMap = paramMap + pType + " " +  pName + " = " + "parameters->" + pName + ";" + newline;
-                end
-
-                results = strrep(results, "<<LoadParameters>>", paramMap); % TODO: Generalise
-            else
-                results = strrep(results, "<<LoadParameters>>", "// No parameters found");
-            end
-
 
             %% Heap definition
             heapdef = heapSize(modelDescriptions);
@@ -96,14 +81,35 @@ classdef CIGREWriter
             internalStatesMap = ...
                 "char errorStatus[255];" + newline ...
                 + "    errorStatus[0] = '\0';" + newline ...
-                + "    <<RTMStructName>>->errorStatus = errorStatus;";
+                + "    <<RTMStructName>>->errorStatus = errorStatus;" + newline;
 
             for i = 1:numel([modelDescriptions.RTMStruct.Name])
                 internalStatesMap = internalStatesMap + newline ...
-                    + "    " + "<<RTMStructName>>->" + modelDescriptions.RTMStruct(i).Name + " = " + modelDescriptions.RTMStruct(i).Name + ";";
+                    + "    " + "<<RTMStructName>>->" + modelDescriptions.RTMStruct(i).Name + " = " + modelDescriptions.RTMStruct(i).Name + ";" + newline;
             end
+
             results = strrep(results, "<<MapInternalStatesToModel>>", internalStatesMap);
 
+            % Load Parameters
+            paramMaps = "";
+            if numel(modelDescriptions.Parameters) > 0
+
+                for i = 1:numel(modelDescriptions.Parameters)
+                    pName = paramNames(i);
+                    pGraphical = paramGraphicalNames(i);
+                    paramMap = " = " + "parameters->" + pGraphical + ";" + newline;
+
+                    paramMaps = paramMaps + ...
+                        "<<RTMStructName>>->dwork->mdl_InstanceData.rtm.<<ModelName>>_InstP_ref->" + pName ... % Simulink structure
+                        + paramMap; % CIGRE Memory
+                end
+
+            else
+                paramMaps = paramMaps + "// No parameters found" + newline;
+            end
+
+            results = strrep(results, "<<MapParamsToModel>>", paramMaps);
+           
             %% Cache internal states
             backupStatesMap = "";
 
@@ -293,7 +299,7 @@ classdef CIGREWriter
             results = strrep(results, "<<ParamGetMethods>>", "");
 
             % Parameters
-            parameterNames = string([modelDescriptions.CIGREParameters.Name]');
+            parameterNames = string([modelDescriptions.CIGREParameters.GraphicalName]');
             parameterTypes = [modelDescriptions.CIGREParameters.Type]';
             parameterMin = {modelDescriptions.CIGREParameters.Min}';
             parameterMax = {modelDescriptions.CIGREParameters.Max}';

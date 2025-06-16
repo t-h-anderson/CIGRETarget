@@ -6,12 +6,12 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %ModelName
         %ModelName = test.util.getAllTestModels()
         %ModelName = {"Test_DataInput"}
-        ModelName = {"Test_SISO"}
+        %ModelName = {"Test_SISO"}
         %ModelName = {"Test_StrtFunc"}
         %ModelName = {"Test_TopRef"}
         %ModelName = {"Test_BadNames"}
         %ModelName = {"Snap"}
-        %ModelName = {"ComplexParams"}
+        %ModelName = {"TestCP"}
         %ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
         %ModelName = {"Test_BlockIO"}
         %ModelName = {"Test_SignalObject"}
@@ -48,7 +48,10 @@ classdef tGenerateCigre < test.util.WithParallelFixture
 
         Inputs
         Outputs
-        Parameters
+
+        SimulinkParameters % Can contains structs
+        CIGREParameters % Must be CIGRE data
+        
         
         SrcFolder
         
@@ -328,23 +331,42 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             testCase.Inputs = input;
             
             %% Parameters
-            testCase.Parameters = struct("Name", {}, "Value", {});
+            testCase.SimulinkParameters = struct("Name", {}, "Value", {});
+            testCase.CIGREParameters = struct("Name", {}, "Value", {});
             
-            params = desc.Parameters;
-            for i = 1:numel(params)
-                c = params(i).BaseType;
+            simulinkParams = desc.Parameters;
+            cigreParams = simulinkParams.getLeaves();
+
+            simulinkNames = string.empty();
+            for i = 1:numel(cigreParams)
+                c = cigreParams(i).BaseType;
                 
-                value = i;
+                cigreVal = i;
                 
                 try
-                    val = cast(value, c);
+                    cigreVal = cast(cigreVal, c);
                 catch
                     % TODO: Not a Simulink.Parameter
-                    val = cast(value, c);
+                    cigreVal = cast(cigreVal, c);
                 end
-                testCase.Parameters(i) = struct("Name", params(i).GraphicalName, "Value", val);
+
+                cigreName = cigreParams(i).Name; % e.g. a.b.c
+                testCase.CIGREParameters(i) = struct("Name", cigreName, "Value", cigreVal);
+                
+                % Now create or update the parameter for simulink
+                eval(cigreName + " = cigreVal;");  % Hacky way to convert name "a.b.c" with value = val into the struct
+                simulinkName = extractBefore(cigreName + ".", "."); % e.g. a
+                simulinkNames = [simulinkNames, simulinkName];
+                
             end
-            
+
+            % Append any unique simulink names
+            names = unique(simulinkNames);
+            for i = 1:numel(names)
+                name = names(i);
+                testCase.SimulinkParameters(i) = struct("Name", name, "Value", util.valToString(eval(name)));
+            end
+
         end
         
         function baseline = captureBaseline(testCase, mdlName)
@@ -390,25 +412,18 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             end
             
             % Parameters
-            % TODO: How do we access parameters?
-            mdlRefs = string(find_mdlrefs(mdlName, "AllLevels", true));
-            for i = 1:numel(mdlRefs)
-                mdlRef = mdlRefs(i);
-                testCase.tempLoad(mdlRef);
-                params = Simulink.findVars(mdlRef);
-                                
-                for j = 1:numel(params)
-                    name = params(j).Name;
-                    idx = (string({testCase.Parameters.Name}) == name);
-                    if ~any(idx)
-                        % Parameter not in input set
-                        continue
-                    end
-                    val = testCase.Parameters(idx).Value;
-                    simIn = setVariable(simIn, name, val, "Workspace", mdlRef);
-                end
+            params = testCase.SimulinkParameters;
+            ip = get_param(simIn.ModelName + "/mdl", "InstanceParameters");
+            for i = 1:numel(params)
+                name = testCase.SimulinkParameters(i).Name;
+                val = testCase.SimulinkParameters(i).Value;
+                idx = [string({ip.Name})] == name;
+                ip(idx).Value = char(val);
             end
+            ipNew = arrayfun(@(x) renameStructField(x, 'Path', 'FullPath'), ip);
+            simIn = simIn.setBlockParameter(simIn.ModelName + "/mdl", "InstanceParameters", ipNew);
 
+            % Simulation time
             simIn = setModelParameter(simIn, "StopTime", string(testCase.SimTime), "FixedStep", string(testCase.TimeStep));
             
             % Get the outputs
@@ -443,7 +458,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             inputs = inputs(:,2:end);
 
             outputs = testCase.Outputs;
-            params = testCase.Parameters;
+            params = testCase.CIGREParameters;
 
             instance1 = cigre.dll.InterfaceInstance(inputs, outputs, params);
             if nvp.TwoData

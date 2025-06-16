@@ -149,7 +149,6 @@ switch hookMethod
             wrapperName = modelName;
             modelName = erase(wrapperName, "_wrap");
 
-            desc = cigre.description.ModelDescription.analyseModel(modelName, wrapperName);
             % Build in code gen folder
             here = Simulink.fileGenControl('getConfig').CodeGenFolder; % TODO: This isn't good for testing. Inject location?
             cgf = here;

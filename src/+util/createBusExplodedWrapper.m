@@ -40,23 +40,28 @@ newConfig.Name = "CopiedConfig";
 attachConfigSet(wrapperName, newConfig);
 setActiveConfigSet(wrapperName, newConfig.Name);
 
+% Update the coder mappings
+%cm = coder.mapping.api.get(wrapperName,'EmbeddedCoderC');
+cm = coder.mapping.utils.create(wrapperName);
+cm.setDataDefault("ModelParameterArguments", "StorageClass", "MultiInstance");
+
 % Copy the data dictionaries
 dd = get_param(model, "DataDictionary");
 set_param(wrapperName, "DataDictionary", dd);
 
 % Add a model reference back to the model
 ref = wrapperName + "/mdl";
-b = add_block("built-in/ModelReference", ref);
-set_param(b, "ModelNameDialog", model) % Link to the original model
-set_param(b, "SimulationMode", "Normal") % Ensure we are not in rapid accelerator mode
+mdlRef = add_block("built-in/ModelReference", ref);
+set_param(mdlRef, "ModelNameDialog", model) % Link to the original model
+set_param(mdlRef, "SimulationMode", "Normal") % Ensure we are not in rapid accelerator mode
 
 % Update the model reference to set the model parameters
-p = get_param(b, "InstanceParameters");
+p = get_param(mdlRef, "InstanceParameters");
 for i = 1:numel(p)
     p(i).Value = '0';
     p(i).Argument = true;
 end
-set_param(b, "InstanceParameters", p);
+set_param(mdlRef, "InstanceParameters", p);
 
 %% Input
 % Find in the inports on the top level model. Work backwards from the
@@ -164,8 +169,6 @@ for i = 1:numel(outh)
         signalName = inputSignals.SignalName; 
         set_param(l, "Name", signalName);
 
-
-
     else
 
         outInputSignals = get_param(outh(i), "PortHandles");
@@ -182,6 +185,20 @@ end
 
 Simulink.BlockDiagram.arrangeSystem(wrapperName);
 
+
+% Set the parameters in the wrapper
+ip = get_param(mdlRef, "InstanceParameters");
+for i = 1:numel(ip)
+    ip(i).Value = '';
+end
+ipNew = arrayfun(@(x) renameStructField(x, {"Path"}, {"FullPath"}), ip);
+set_param(mdlRef, "InstanceParameters", ipNew);
+
+% mw = get_param(model, "ModelWorkspace");
+% mw.whos
+% 
+% ww = get_param(wrapperName, "ModelWorkspace");
+% error("Update the wrapper workspace here?")
 end
 
 function name = cleanName(name)
