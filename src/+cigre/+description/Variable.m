@@ -131,11 +131,12 @@ classdef Variable
 
         end
 
-        function objs = fromDataInterface(dis, modelName, nameroot)
+        function objs = fromDataInterface(dis, modelName, nameroot, nvp)
             arguments
                 dis
                 modelName (1,1) string = string(nan) % Required to find default param value
                 nameroot (1,:) string = string.empty % Allow nested parameter search
+                nvp.OverloadStorage (1,1) string = string(nan)
             end
 
             objs = cigre.description.Variable.empty(1,0);
@@ -151,6 +152,9 @@ classdef Variable
                 maxs = cigre.description.Variable.extract(di, "Max");
                 dimensions = cigre.description.Variable.extractDimensions(di);
                 [storage, getMethod] = cigre.description.Variable.extractStorageSpecifier(di);
+                if ~ismissing(nvp.OverloadStorage)
+                    storage = nvp.OverloadStorage;
+                end                    
 
                 paramName = strjoin([nameroot, graphicalNames], ".");
                 defaultValues = cigre.description.Variable.extractDefaultParamValue(modelName, paramName);
@@ -165,7 +169,9 @@ classdef Variable
                 
                     if isprop(type, "Elements")
                         elements = type.Elements;
-                        sub = cigre.description.Variable.fromDataInterface(elements, modelName, [nameroot, graphicalNames]);
+                        % Pass the storage onto the children in the case of
+                        % a struct
+                        sub = cigre.description.Variable.fromDataInterface(elements, modelName, [nameroot, graphicalNames], "OverloadStorage", storage);
                     else
                         sub = cigre.description.Variable.empty(1,0);
                     end
@@ -377,7 +383,7 @@ classdef Variable
                 storage = "GetSet";
                 getMethod = imp.ReadExpression;
             elseif isprop(imp, "BaseRegion")
-                storage = "ModelArgument:Snap_InstP_ref";
+                storage = "ModelArgument:" + imp.BaseRegion.Identifier;
             else
                 storage = "unknown";
             end

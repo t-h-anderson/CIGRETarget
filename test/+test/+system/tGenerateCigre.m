@@ -10,8 +10,8 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %ModelName = {"Test_StrtFunc"}
         %ModelName = {"Test_TopRef"}
         %ModelName = {"Test_BadNames"}
-        ModelName = {"Snap"}
-        %ModelName = {"Test_CP"}
+        %ModelName = {"Snap"}
+        ModelName = {"Test_CP"}
         %ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
         %ModelName = {"Test_BlockIO"}
         %ModelName = {"Test_SignalObject"}
@@ -144,10 +144,16 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             testCase.applyFixture(WorkingFolderFixture);
             
             cfg = Simulink.fileGenControl('getConfig');
-            cfgOriginal = cfg;
+            oldCodeGenFolder = cfg.CodeGenFolder;
             cfg.CodeGenFolder = fullfile(pwd);
             Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir',true);
-            testCase.addTeardown(@() Simulink.fileGenControl('setConfig', 'config', cfgOriginal));
+            testCase.addTeardown(@() resetCFG(oldCodeGenFolder));
+            
+            function resetCFG(oldCodeGenFolder)
+                cfg = Simulink.fileGenControl('getConfig');
+                cfg.CodeGenFolder = oldCodeGenFolder;
+                Simulink.fileGenControl('setConfig', 'config', cfg)
+            end
             
             % Switch the toolchain
             % tc = cigre.install("Toolchain", Toolchain, "Type", "64");

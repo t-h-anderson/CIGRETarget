@@ -41,7 +41,7 @@ switch where.SourceType
         cuo = onCleanup(@() dd.close()); 
         s = dd.getSection("Design Data");
         param = s.getEntry(where.Name);
-        value = p.getValue();
+        value = param.getValue();
         if ~isnumeric(value)
             value = value.Value;
         end

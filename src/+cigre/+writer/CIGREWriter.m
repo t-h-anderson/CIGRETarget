@@ -93,6 +93,7 @@ classdef CIGREWriter
             % Load Parameters
             paramMaps = "";
             params = modelDescriptions.Parameters;
+            params = params.getLeaves();
             
             % Model arguments
             modelArgParams = params([params.IsModelArgument]);
