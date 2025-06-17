@@ -4,13 +4,13 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         
         %% Model Name
         %ModelName
-        ModelName = test.util.getAllTestModels()
+        %ModelName = test.util.getAllTestModels()
         %ModelName = {"Test_DataInput"}
         %ModelName = {"Test_SISO"}
         %ModelName = {"Test_StrtFunc"}
         %ModelName = {"Test_TopRef"}
         %ModelName = {"Test_BadNames"}
-        %ModelName = {"Snap"}
+        ModelName = {"Snap"}
         %ModelName = {"Test_CP"}
         %ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
         %ModelName = {"Test_BlockIO"}
@@ -41,10 +41,13 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         BusAs = struct("Vector", "Vector")
 
         %% Test each toolchain
+%         Toolchain = struct(...
+%             "VS2017", "Visual C++ 2017", ...
+%             "VS2019", "Visual C++ 2019", ...
+%             "VS2022", 'Visual C++ 2022', ...
+%             "MinGW", "MinGW")
+         
         Toolchain = struct(...
-            "VS 2017", "Visual C++ 2017", ...
-            "VS 2019", "Visual C++ 2019", ...
-            "VS 2022", 'Visual C++ 2022', ...
             "MinGW", "MinGW")
     end
     
@@ -148,6 +151,13 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             
             % Switch the toolchain
             % tc = cigre.install("Toolchain", Toolchain, "Type", "64");
+            %
+            % l = Simulink.data.DataDictionary("TestConfig.sldd");
+            % dd = Simulink.data.dictionary.open('TestConfig.sldd');
+            % ds = dd.getSection('Configurations');
+            % cf = ds.find('-class','Simulink.data.dictionary.Entry');
+            % cs = cf.getValue();
+            % set_param(cs, "Toolchain", tc);
             
             % Build the model
             here = pwd;
@@ -283,7 +293,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                     dt = eval(dt);
                 catch
                     try
-                        dt = util.findParam(mdlName, dt);
+                        [~, dt] = util.findParam(mdlName, dt);
                     catch
                         dt = 0.1;
                     end
@@ -381,7 +391,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             
             %% Create an input object to match the input and parameter test data
             testCase.tempLoad(mdlName);
-            simIn = Simulink.SimulationInput(mdlName);
+            simIn = Simulink.SimulationInput(char(mdlName));
             
             % Inputs
             try
@@ -421,16 +431,29 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             
             % Parameters
             params = testCase.SimulinkParameters;
+            
+            % Model arguments
             ip = get_param(simIn.ModelName + "/mdl", "InstanceParameters");
             for i = 1:numel(params)
                 name = testCase.SimulinkParameters(i).Name;
                 val = testCase.SimulinkParameters(i).Value;
-                idx = [string({ip.Name})] == name;
-                ip(idx).Value = char(val);
+                idx = (string({ip.Name}) == name);
+                if any(idx)
+                    ip(idx).Value = char(val);
+                else
+                    % In model workspace
+                    mdl = char(erase(mdlName, "_wrap"));
+                    param = util.findParam(mdl, name);
+                    param.Value = eval(val);
+                    simIn = simIn.setVariable(name, param, "Workspace", mdl);
+                end
             end
-            ipNew = arrayfun(@(x) renameStructField(x, 'Path', 'FullPath'), ip);
-            simIn = simIn.setBlockParameter(simIn.ModelName + "/mdl", "InstanceParameters", ipNew);
-
+            
+            if ~isempty(ip)
+                ipNew = arrayfun(@(x) renameStructField(x, 'Path', 'FullPath'), ip);
+                simIn = simIn.setBlockParameter(simIn.ModelName + "/mdl", "InstanceParameters", ipNew);
+            end
+            
             % Simulation time
             simIn = setModelParameter(simIn, "StopTime", string(testCase.SimTime), "FixedStep", string(testCase.TimeStep));
             

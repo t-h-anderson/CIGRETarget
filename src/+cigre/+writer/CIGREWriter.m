@@ -92,22 +92,44 @@ classdef CIGREWriter
 
             % Load Parameters
             paramMaps = "";
-            if numel(modelDescriptions.Parameters) > 0
+            params = modelDescriptions.Parameters;
+            
+            % Model arguments
+            modelArgParams = params([params.IsModelArgument]);
+            if numel(modelArgParams) > 0
 
-                for i = 1:numel(modelDescriptions.Parameters)
-                    pName = paramNames(i);
-                    pGraphical = paramGraphicalNames(i);
+                for i = 1:numel(modelArgParams)
+                    modelArgParam = modelArgParams(i);
+                    pName = modelArgParam.Name;
+                    pGraphical = modelArgParam.GraphicalName;
                     paramMap = " = " + "parameters->" + pGraphical + ";" + newline;
+                    structName = erase(modelArgParam.StorageSpecifier, "ModelArgument:");
 
                     paramMaps = paramMaps + ...
-                        "<<RTMStructName>>->dwork->mdl_InstanceData.rtm.<<ModelName>>_InstP_ref->" + pName ... % Simulink structure
+                        "<<RTMStructName>>->dwork->mdl_InstanceData.rtm." + structName + "->" + pName ... % Simulink structure
                         + paramMap; % CIGRE Memory
                 end
 
             else
-                paramMaps = paramMaps + "// No parameters found" + newline;
+                paramMaps = paramMaps + "// No model argument parameters found" + newline + newline;
             end
-
+            
+            % Global params
+            globalParams = params(~[params.IsModelArgument]);
+            if ~isempty(globalParams)
+                warning("Global parameters found:" + strjoin([globalParams.Name], ", ") + "." + newline ...
+                    + "DLL may be non-deterministic when called in parallel. Instead, try to define all parameters as model arguments");
+            end
+            
+            for i = 1:numel(globalParams)
+                globalParam = globalParams(i);
+                pName = globalParam.Name;
+                pGraphical = globalParam.GraphicalName;
+                
+                paramMaps = paramMaps + ...
+                    pName + " = " + "parameters->" + pGraphical + ";" + newline;
+            end
+            
             results = strrep(results, "<<MapParamsToModel>>", paramMaps);
            
             %% Cache internal states

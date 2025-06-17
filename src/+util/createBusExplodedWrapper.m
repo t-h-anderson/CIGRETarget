@@ -43,7 +43,9 @@ setActiveConfigSet(wrapperName, newConfig.Name);
 % Update the coder mappings
 %cm = coder.mapping.api.get(wrapperName,'EmbeddedCoderC');
 cm = coder.mapping.utils.create(wrapperName);
-cm.setDataDefault("ModelParameterArguments", "StorageClass", "MultiInstance");
+if ~verLessThan("MATLAB", "9.9")
+    cm.setDataDefault("ModelParameterArguments", "StorageClass", "MultiInstance");
+end
 
 % Copy the data dictionaries
 dd = get_param(model, "DataDictionary");
@@ -190,8 +192,21 @@ Simulink.BlockDiagram.arrangeSystem(wrapperName);
 ip = get_param(mdlRef, "InstanceParameters");
 
 if ~isempty(ip)
-    for i = 1:numel(ip)
-        ip(i).Value = '';
+    
+    mws = get_param(model, "ModelWorkspace");
+    p = mws.whos;
+    wws = get_param(wrapperName, "ModelWorkspace");
+    
+    ipNames = string({ip.Name});
+    for i= 1:numel(p)
+        name = p(i).name;
+        var = mws.getVariable(name);
+        assignin(wws, name, var);
+        
+        idx = (ipNames == name);
+        if any(idx)
+            ip(idx).Value = char(util.valToString(var.Value));
+        end
     end
 
     ipNew = arrayfun(@(x) renameStructField(x, {"Path"}, {"FullPath"}), ip);

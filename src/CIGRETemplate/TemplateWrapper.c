@@ -41,6 +41,9 @@ __declspec(dllexport) int32_T Model_FirstCall(IEEE_Cigre_DLLInterface_Instance* 
 		// Call initialise to set up the memory structure (needs to not zero states) before calling step
 		// Rebuild pointers
 		<<WrapperName>>_initialize_only(<<ModelInitialiseInputs>>);
+        
+        // Map any parameters into the model dwork
+        <<MapParamsToModel>>
 
 		// Copy the outputs to the instance
         <<ApplyOutputData>>
@@ -133,6 +136,9 @@ __declspec(dllexport) int32_T __cdecl Model_Outputs(IEEE_Cigre_DLLInterface_Inst
 
     // Apply input data
     <<ApplyInputData>>
+    
+    // Enable parameter update
+    <<MapParamsToModel>>
    
     <<ModelStep>>(<<ModelStepInputs>>);
 

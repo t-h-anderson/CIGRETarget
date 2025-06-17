@@ -22,6 +22,7 @@ classdef Variable
 
     properties (Dependent)
         IsLeaf
+        IsModelArgument (1,1) logical
     end
 
     methods
@@ -43,6 +44,10 @@ classdef Variable
 
         function val = get.IsLeaf(obj)
             val = isempty(obj.NestedVariable);
+        end
+        
+        function val = get.IsModelArgument(obj)
+            val = contains(obj.StorageSpecifier, "ModelArgument");
         end
 
         function leaves = getLeaves(objs)
@@ -371,6 +376,8 @@ classdef Variable
             elseif isprop(imp, "ReadExpression")
                 storage = "GetSet";
                 getMethod = imp.ReadExpression;
+            elseif isprop(imp, "BaseRegion")
+                storage = "ModelArgument:Snap_InstP_ref";
             else
                 storage = "unknown";
             end
@@ -389,7 +396,7 @@ classdef Variable
             else
 
                 try
-                    value = util.findParam(modelName, paramName);
+                    [~, value] = util.findParam(modelName, paramName);
                 catch
                     value = failedValue; % Not found
                 end

@@ -1,4 +1,4 @@
-function value = findParam(mdl,param)
+function [param,value] = findParam(mdl,param)
 arguments
     mdl (1,1) string
     param (1,1) string
@@ -25,8 +25,10 @@ end
 switch where.SourceType
     case "model workspace"
         mw = get_param(mdl, "ModelWorkspace");
-        value = getVariable(mw, paramPath(1)).Value;
+        param = getVariable(mw, paramPath(1));
+        value = param.Value;
     case "base workspace"
+        param = [];
         value = failedValue; % Not supported
     otherwise
         % Try in a data dictionary
@@ -38,7 +40,7 @@ switch where.SourceType
         end
         cuo = onCleanup(@() dd.close()); 
         s = dd.getSection("Design Data");
-        p = s.getEntry(where.Name);
+        param = s.getEntry(where.Name);
         value = p.getValue();
         if ~isnumeric(value)
             value = value.Value;
