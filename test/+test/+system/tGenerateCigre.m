@@ -4,14 +4,14 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         
         %% Model Name
         %ModelName
-        %ModelName = test.util.getAllTestModels()
+        ModelName = test.util.getAllTestModels()
         %ModelName = {"Test_DataInput"}
         %ModelName = {"Test_SISO"}
         %ModelName = {"Test_StrtFunc"}
         %ModelName = {"Test_TopRef"}
         %ModelName = {"Test_BadNames"}
         %ModelName = {"Snap"}
-        %ModelName = {"TestCP"}
+        %ModelName = {"Test_CP"}
         %ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
         %ModelName = {"Test_BlockIO"}
         %ModelName = {"Test_SignalObject"}
@@ -39,6 +39,13 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %% Wrapper bus type
         %BusAs = struct("Ports", "Ports", "Vector", "Vector")
         BusAs = struct("Vector", "Vector")
+
+        %% Test each toolchain
+        Toolchain = struct(...
+            "VS 2017", "Visual C++ 2017", ...
+            "VS 2019", "Visual C++ 2019", ...
+            "VS 2022", 'Visual C++ 2022', ...
+            "MinGW", "MinGW")
     end
     
     properties
@@ -124,7 +131,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
     
     methods (Test)
         
-        function tBuild(testCase, ModelName, Bits, Snapshot, BusAs)
+        function tBuild(testCase, ModelName, Bits, Snapshot, BusAs, Toolchain)
             
             testCase.loadData(ModelName);
 
@@ -139,7 +146,8 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir',true);
             testCase.addTeardown(@() Simulink.fileGenControl('setConfig', 'config', cfgOriginal));
             
-            % TODO: Switch the toolchain to 32/64
+            % Switch the toolchain
+            % tc = cigre.install("Toolchain", Toolchain, "Type", "64");
             
             % Build the model
             here = pwd;

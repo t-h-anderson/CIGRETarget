@@ -188,17 +188,16 @@ Simulink.BlockDiagram.arrangeSystem(wrapperName);
 
 % Set the parameters in the wrapper
 ip = get_param(mdlRef, "InstanceParameters");
-for i = 1:numel(ip)
-    ip(i).Value = '';
-end
-ipNew = arrayfun(@(x) renameStructField(x, {"Path"}, {"FullPath"}), ip);
-set_param(mdlRef, "InstanceParameters", ipNew);
 
-% mw = get_param(model, "ModelWorkspace");
-% mw.whos
-% 
-% ww = get_param(wrapperName, "ModelWorkspace");
-% error("Update the wrapper workspace here?")
+if ~isempty(ip)
+    for i = 1:numel(ip)
+        ip(i).Value = '';
+    end
+
+    ipNew = arrayfun(@(x) renameStructField(x, {"Path"}, {"FullPath"}), ip);
+    set_param(mdlRef, "InstanceParameters", ipNew);
+end
+
 end
 
 function name = cleanName(name)
