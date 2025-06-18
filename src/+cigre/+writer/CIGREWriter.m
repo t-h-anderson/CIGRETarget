@@ -19,18 +19,7 @@ classdef CIGREWriter
             cigreInterface = modelDescriptions.CIGREInterfaceName;
 
             results = readFromFile("TemplateWrapper.c");
-
-            % Input
-            inputNames = string({modelDescriptions.Inputs.Name}'); 
             
-            % Output
-            outputNames = string({modelDescriptions.Outputs.Name}');
-
-             % Parameters
-            paramNames = string({modelDescriptions.CIGREParameters.Name}'); % Path to param if in struct
-            paramGraphicalNames = string({modelDescriptions.CIGREParameters.GraphicalName}'); % Parameter raw name
-            paramTypes = repelem("", numel(paramNames));
-
             %% InitializeOnly
             initializeOnlyCode = modelDescriptions.InitializeOnlyCode;
             if initializeOnlyCode == ""
@@ -44,9 +33,6 @@ classdef CIGREWriter
             %% Heap definition
             heapdef = heapSize(modelDescriptions);
             results = strrep(results, "<<heap definition>>", heapdef);
-
-            %% Strrep
-            results = strrep(results, "<<CIGRE Suffix>>", cigreSuffix);
 
             %% Internal memory
 
@@ -211,59 +197,19 @@ classdef CIGREWriter
             end
             results = strrep(results, "<<ParamGetMethods>>", "");
             
-            %% Replace input pointers
-            defineInputs = "&" + inputNames + cigreSuffix;
-            defineInputs = strjoin(defineInputs, ", ");
-            results = strrep(results, "<<InputPointers>>", defineInputs);
-
-            %% Replace output pointers
-            defineOutputs = "&" + outputNames + cigreSuffix;
-            defineOutputs = strjoin(defineOutputs, ", ");
-            results = strrep(results, "<<OutputPointers>>", defineOutputs);
-
-            % Replace InputVariables
-            defineInputs = inputNames + cigreSuffix;
-            defineInputs = strjoin(defineInputs, ", ");
-            results = strrep(results, "<<InputVariables>>", defineInputs);
-
-            % Replace OutputVariables
-            defineOutputs = outputNames + cigreSuffix;
-            defineOutputs = strjoin(defineOutputs, ", ");
-            results = strrep(results, "<<OutputVariables>>", defineOutputs);
-
             % Replace initialise
             modelInitialize = modelDescriptions.InitializeName;
             results = strrep(results, "<<ModelInitialize>>", modelInitialize);
 
             initialiseInputs = strjoin(string([modelDescriptions.InitialiseInputs.Name]) + cigreSuffix, ", ");
             results = strrep(results, "<<ModelInitialiseInputs>>", initialiseInputs);
-
            
-            % Replace init
-            if modelDescriptions.HasInitFunction
-                init = "<<ModelInitFn>>(<<ModelInitInputs>>);";
-
-                initInputs = strjoin(string([modelDescriptions.InitInputs.Name]) + cigreSuffix, ", "); % Handle of everything except model handle (first input)
-                init = strrep(init, "<<ModelInitInputs>>", initInputs);
-
-                modelInitialize = cigreInterface + "_Init";
-                init = strrep(init, "<<ModelInitFn>>", modelInitialize);
-
-            else
-                init = "// No init function found";
-            end
-
-            results = strrep(results, "<<ModelInit>>", init);
-
             % Replace step
             modelStep = modelDescriptions.StepName;
             results = strrep(results, "<<ModelStep>>", modelStep);
 
             stepInputs = strjoin(string([modelDescriptions.StepInputs.Name]) + cigreSuffix, ", ");
             results = strrep(results, "<<ModelStepInputs>>", stepInputs);
-
-            %% Set number of tasks
-            results = strrep(results, "<<Number of tasks>>", string(modelDescriptions.NumberOfTasks));
 
             %% RTM Struct
             results = strrep(results, "<<RTMStructName>>", modelDescriptions.RTMStructName);
@@ -288,8 +234,6 @@ classdef CIGREWriter
 
             model = modelDescriptions.ModelName;
             cigreInterface = modelDescriptions.CIGREInterfaceName;
-
-            cigreSuffix = modelDescriptions.CIGRESuffix;
 
             results = readFromFile("TemplateWrapper.h");
 
@@ -340,9 +284,6 @@ classdef CIGREWriter
 
             %% Replace model header
             results = strrep(results, "<<WrapperHeader>>", cigreInterface + ".h");
-
-            %% Strrep
-            results = strrep(results, "<<CIGRE Suffix>>", cigreSuffix);
 
             %% Replace DefineInputs
             defineInputs = inputTypes + " " + inputNames + "[" + inputDims + "];";
@@ -436,9 +377,9 @@ classdef CIGREWriter
                 "           .Unit = ""sec"",                                            // Units", ...
                 "           .DataType = IEEE_Cigre_DLLInterface_DataType_<<ParamType>>, // Signal Type", ...
                 "           .FixedValue = 0,                                            // 0 for parameters which can be modified at any time, 1 for parameters which need to be defined at T0 but cannot be changed.", ...
-                "           .DefaultValue.<<Val Type>> = <<Param Default Val>>,         // Default value", ...
-                "           .MinValue.<<Val Type>> = <<Param Min>>,                     // Minimum value", ...
-                "           .MaxValue.<<Val Type>> = <<Param Max>>                      // Maximum value", ...
+                "           .DefaultValue.<<ValType>> = <<ParamDefaultVal>>,         // Default value", ...
+                "           .MinValue.<<ValType>> = <<ParamMin>>,                     // Minimum value", ...
+                "           .MaxValue.<<ValType>> = <<ParamMax>>                      // Maximum value", ...
                 "      }" ...
                 ];
 
@@ -459,16 +400,16 @@ classdef CIGREWriter
                 valType = strrep(parameterTypes(i), "_T", "_Val");
                 valType{1,1}(1) = upper(valType{1,1}(1));
 
-                paramDefI = strrep(paramDefI, "<<Val Type>>", valType);
+                paramDefI = strrep(paramDefI, "<<ValType>>", valType);
 
                 paramMin = string(double(parameterMin{i}));
-                paramDefI = strrep(paramDefI, "<<Param Min>>", paramMin);
+                paramDefI = strrep(paramDefI, "<<ParamMin>>", paramMin);
 
                 paramMax = string(double(parameterMax{i}));
-                paramDefI = strrep(paramDefI, "<<Param Max>>", paramMax);
+                paramDefI = strrep(paramDefI, "<<ParamMax>>", paramMax);
 
                 paramDefault = string(double(parameterDefaultVal{i}));
-                paramDefI = strrep(paramDefI, "<<Param Default Val>>", paramDefault);
+                paramDefI = strrep(paramDefI, "<<ParamDefaultVal>>", paramDefault);
 
                 paramDef(i) = paramDefI;
             end
@@ -522,11 +463,7 @@ classdef CIGREWriter
             %% SampleTime
             results = strrep(results, "<<SampleTime>>", string(modelDescriptions.SampleTime));
 
-            % Set number of tasks
-            results = strrep(results, "<<Number of tasks>>", string(modelDescriptions.NumberOfTasks));
-
             %% RTM Struct
-            results = strrep(results, "<<RTMStruct>>", modelDescriptions.RTMStructName);
             results = strrep(results, "<<RTMType>>", modelDescriptions.RTMVarType);
 
             %% Model name

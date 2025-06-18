@@ -1,7 +1,5 @@
 classdef DataMap
-    %DATAMAP Summary of this class goes here
-    %   Detailed explanation goes here
-
+ 
     properties
         Data
         Words (1,:)
@@ -161,11 +159,8 @@ classdef DataMap
                     targetVal = typecast(val, target);
                 catch
                    
-                    try
                     n = max(size(typecast(val, "int8")));
-                    catch me
-                        me
-                    end
+                    
                     nTarget = max(size(typecast(eval(target + "(1)"), "int8")));
 
                     nPad = (nTarget - n)/n;

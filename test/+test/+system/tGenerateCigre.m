@@ -105,7 +105,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
     
     methods (TestClassTeardown)
         
-        function tearDown(testCase)
+        function tearDown(testCase) %#ok<MANU>
             bdclose("all")
             Simulink.data.dictionary.closeAll('-discard')
         end
@@ -269,9 +269,9 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             fld = fld + fullfile(matlabroot, "simulink", "include") + ";";
             fld = fld + fullfile(matlabroot, "rtw\c\src") + ";";
             fld = fld + fullfile(pwd, modelName + "_wrap_cigre_rtw");
-            %      clipboard("copy", fld);
+            clipboard("copy", fld);
             
-            keyboard
+            keyboard %#ok<KEYBOARDFUN>
             
         end
         
@@ -400,7 +400,11 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             
             % Inputs
             try
-                inDS = createInputDataset(mdlName);
+                if verLessThan("MATLAB", "25.1") %#ok<VERLESSMATLAB>
+                    inDS = createInputDataset(mdlName);
+                else
+                    inDS = createInputDataset(mdlName, "UpdateDiagram", false);
+                end
                 nInputs = numel(inDS.getElementNames());
             catch me
                 % errors if no inputs
@@ -474,6 +478,11 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             
             % Get the outputs
             results = sim(simIn);
+            if isempty(results.yout{1}.Values.Data)
+                % There is a potential bug in R2025a where results are not
+                % generated the first time the simulation is run
+                results = sim(simIn);
+            end
             
             baseline = extractData(results);
             
@@ -548,7 +557,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 end
 
                 cigreDll.unload();
-                c = cigreDll.load();
+                c = cigreDll.load(); %#ok<NASGU>
 
                 instance1 = cigre.dll.InterfaceInstance(inputs, outputs, params, "IntStates", stateMemory1);
                 if nvp.TwoData

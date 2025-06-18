@@ -1,4 +1,4 @@
-function cigre_make_rtw_hook(hookMethod,modelName,rtwroot,templateMakefile,buildOpts,buildArgs,buildInfo)
+function cigre_make_rtw_hook(hookMethod,modelName,~,~,~,buildArgs,buildInfo)
 % ERT_MAKE_RTW_HOOK - This is the standard ERT hook file for the build
 % process (make_rtw), and implements automatic configuration of the
 % models configuration parameters.  When the buildArgs option is specified

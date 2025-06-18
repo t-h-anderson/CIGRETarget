@@ -55,19 +55,10 @@ end
 if ~terminate
     sigs = s;
 else
-    b = add_block("built-in/Outport", mdl + "/" + toName);
+    add_block("built-in/Outport", mdl + "/" + toName);
     s = get_param(s, "Name");
     add_line(mdl, s + "/" + 1, toName + "/1");
     sigs = [];
 end
 
-end
-
-function val = selectBusName(signal)
-
-if iscell(signal)
-    val = string(signal{1});
-else
-    val = string(signal);
-end
 end

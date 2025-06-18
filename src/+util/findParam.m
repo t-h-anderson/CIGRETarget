@@ -4,7 +4,7 @@ arguments
     param (1,1) string
 end
 
-[~, co] = util.loadSystem(mdl);
+[~, co] = util.loadSystem(mdl); %#ok<ASGLU>
 
 % Probably should be missing, but not supported for e.g. integers
 failedValue = 0;

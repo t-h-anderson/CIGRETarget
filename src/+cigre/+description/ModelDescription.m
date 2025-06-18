@@ -648,7 +648,6 @@ classdef ModelDescription < handle
             end
 
         end
-z
 
         function val = get.CIGREInterfaceCodeInfo(obj)
 
@@ -716,7 +715,7 @@ z
                 headerCode string
             end
 
-            if numel(headerCode) == 1
+            if isscalar(headerCode)
                 headerCode = strsplit(headerCode, newline);
             end
 

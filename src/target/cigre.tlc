@@ -18,6 +18,8 @@
 %% VxWorks environment, i.e., when using an operating system.
 %assign SuppressSetEventsForThisBaseRateFcn = (TargetOS == "VxWorksExample") 
 
+%assign PreCodeGenExecCompliant = 1
+
 %include "codegenentry.tlc"
 
 %% The contents between 'BEGIN_RTW_OPTIONS' and 'END_RTW_OPTIONS' in this file
