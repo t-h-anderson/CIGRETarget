@@ -144,48 +144,58 @@ classdef Variable
             for i = 1:numel(dis)
                 di = dis(i);
 
-                graphicalNames = cigre.description.Variable.extractGraphicalName(di);
-                names = cigre.description.Variable.extractName(di);
-                types = cigre.description.Variable.extractType(di);
-                baseTypes = cigre.description.Variable.extractBaseType(di);
-                mins = cigre.description.Variable.extract(di, "Min");
-                maxs = cigre.description.Variable.extract(di, "Max");
+                graphicalName = cigre.description.Variable.extractGraphicalName(di);
+                name = cigre.description.Variable.extractName(di);
+                type = cigre.description.Variable.extractType(di);
+                baseType = cigre.description.Variable.extractBaseType(di);
+                minVal = cigre.description.Variable.extract(di, "Min");
+                maxVal = cigre.description.Variable.extract(di, "Max");
                 dimensions = cigre.description.Variable.extractDimensions(di);
                 [storage, getMethod] = cigre.description.Variable.extractStorageSpecifier(di);
                 if ~ismissing(nvp.OverloadStorage)
                     storage = nvp.OverloadStorage;
                 end                    
 
-                paramName = strjoin([nameroot, graphicalNames], ".");
+                paramName = strjoin([nameroot, graphicalName], ".");
                 defaultValues = cigre.description.Variable.extractDefaultParamValue(modelName, paramName);
 
+                % Determine if the data interface describes a parameter
+                % struct
                 if ~isa(di.Type, "coder.descriptor.types.Scalar")
 
                     if isprop(di.Type, "BaseType")
-                        type = di.Type.BaseType;
+                        typeObj = di.Type.BaseType;
                     else
-                        type = di.Type;
+                        typeObj = di.Type;
                     end
-                
-                    if isprop(type, "Elements")
-                        elements = type.Elements;
+                    
+                    % Structs have elements, so recursively traverse the
+                    % struct
+                    if isprop(typeObj, "Elements")
+                        elements = typeObj.Elements;
                         % Pass the storage onto the children in the case of
                         % a struct
-                        sub = cigre.description.Variable.fromDataInterface(elements, modelName, [nameroot, graphicalNames], "OverloadStorage", storage);
+                        sub = cigre.description.Variable.fromDataInterface(elements, modelName, [nameroot, graphicalName], "OverloadStorage", storage);
                     else
                         sub = cigre.description.Variable.empty(1,0);
                     end
+
                 else
                     sub = cigre.description.Variable.empty(1,0);
                 end
+                
+                if ~isempty(nameroot)
+                    % Nested parameter
+                    name = paramName;
+                end
 
                 newObjs = cigre.description.Variable(...
-                    "GraphicalName", graphicalNames, ...
-                    "Name", paramName, ...
-                    "Type", types, ...
-                    "BaseType", baseTypes, ...
-                    "Min", mins, ...
-                    "Max", maxs, ...
+                    "GraphicalName", graphicalName, ...
+                    "Name", name, ...
+                    "Type", type, ...
+                    "BaseType", baseType, ...
+                    "Min", minVal, ...
+                    "Max", maxVal, ...
                     "Dimensions", dimensions,...
                     "DefaultValue", defaultValues, ...
                     "StorageSpecifier", storage, ...

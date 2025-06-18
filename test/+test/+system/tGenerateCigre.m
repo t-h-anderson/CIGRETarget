@@ -5,7 +5,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %% Model Name
         %ModelName
         %ModelName = test.util.getAllTestModels()
-        %ModelName = {"Test_DataInput"}
+        ModelName = {"Test_DataInput"}
         %ModelName = {"Test_SISO"}
         %ModelName = {"Test_StrtFunc"}
         %ModelName = {"Test_TopRef"}
@@ -15,7 +15,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
         %ModelName = {"Test_BlockIO"}
         %ModelName = {"Test_SignalObject"}
-        ModelName = {"Test_ParamModel"}
+        %ModelName = {"Test_ParamModel"}
         %ModelName = {"Test_MultiInput"}
         %ModelName = {"Test_MultiOutput"}
         %ModelName = struct("Test_MIMO", "Test_MIMO")
@@ -24,7 +24,6 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %ModelName = {"NestedBus"}
         %ModelName = {"TestModel_meas"}
         %ModelName = {"Test_Enum"}
-        %ModelName = {"PEM_Electrolyzer"}
 
         %% Bits
         %Bits = struct("x64", "64", "x32", "32") % 32 bit run is not testable
@@ -415,8 +414,10 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             testCase.assertTrue(size(testCase.Inputs, 2) == nInputs, "Number of test inputs does not match model");
             
             if nInputs > 0
+                
                 for i = 1:nInputs
                     input = testCase.Inputs(:, i);
+                    
                     if istimetable(input)
                         vals = input.Variables;
                         if numel(size(vals)) > 2
@@ -498,7 +499,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             end
             
             % Two data sets to check they work independently
-            inputs = testCase.Inputs;
+            inputs = retime(testCase.Inputs, 'regular', 'nearest', 'TimeStep', seconds(testCase.TimeStep));
             inputs = table2cell(timetable2table(inputs)); % Input timetable is *very* slow so convery to cell
             inputs = inputs(:,2:end);
 

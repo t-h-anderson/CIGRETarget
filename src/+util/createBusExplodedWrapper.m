@@ -86,6 +86,10 @@ for i = 1:numel(inhs)
 
     if isBus
         
+        if isempty(inputSignals.BusObject)
+            error(inTypes + " definition not found")
+        end
+        
         % define what needs creating - a bus creator that will be linked to
         % the first port of the reference model
         creatorName = "creator" + i;
