@@ -11,11 +11,11 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %ModelName = {"Test_TopRef"}
         %ModelName = {"Test_BadNames"}
         %ModelName = {"Snap"}
-        ModelName = {"Test_CP"}
+        %ModelName = {"Test_CP"}
         %ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
         %ModelName = {"Test_BlockIO"}
         %ModelName = {"Test_SignalObject"}
-        %ModelName = {"Test_ParamModel"}
+        ModelName = {"Test_ParamModel"}
         %ModelName = {"Test_MultiInput"}
         %ModelName = {"Test_MultiOutput"}
         %ModelName = struct("Test_MIMO", "Test_MIMO")
@@ -450,8 +450,16 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                     % In model workspace
                     mdl = char(erase(mdlName, "_wrap"));
                     param = util.findParam(mdl, name);
-                    param.Value = eval(val);
-                    simIn = simIn.setVariable(name, param, "Workspace", mdl);
+                    if isa(param, "Simulink.data.dictionary.Entry")
+                        simIn = simIn.setVariable(name, eval(val));
+                    elseif isfield(param, "Value") || isprop(param, "Value")
+                        param.Value = eval(val);
+                        simIn = simIn.setVariable(name, param, "Workspace", mdl);
+                    else
+                        param = eval(value);
+                        simIn = simIn.setVariable(name, param, "Workspace", mdl);
+                    end
+                    
                 end
             end
             
