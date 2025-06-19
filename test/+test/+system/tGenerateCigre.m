@@ -5,13 +5,13 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %% Model Name
         %ModelName
         %ModelName = test.util.getAllTestModels()
-        ModelName = {"Test_DataInput"}
+        %ModelName = {"Test_DataInput"}
         %ModelName = {"Test_SISO"}
         %ModelName = {"Test_StrtFunc"}
         %ModelName = {"Test_TopRef"}
         %ModelName = {"Test_BadNames"}
         %ModelName = {"Snap"}
-        %ModelName = {"Test_CP"}
+        ModelName = {"Test_CP"}
         %ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
         %ModelName = {"Test_BlockIO"}
         %ModelName = {"Test_SignalObject"}
@@ -141,20 +141,8 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             
             % Move to temp folder
             testCase.applyFixture(WorkingFolderFixture);
-            
-            cfg = Simulink.fileGenControl('getConfig');
-            oldCodeGenFolder = cfg.CodeGenFolder;
-            cfg.CodeGenFolder = fullfile(pwd);
-            cfg.CacheFolder = fullfile(pwd);
-            Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir',true);
-            testCase.addTeardown(@() resetCFG(oldCodeGenFolder, oldCacheFolder));
-            
-            function resetCFG(oldCodeGenFolder)
-                cfg = Simulink.fileGenControl('getConfig');
-                cfg.CodeGenFolder = oldCodeGenFolder;
-                Simulink.fileGenControl('setConfig', 'config', cfg)
-            end
-            
+            testCase.applyCodeGenFixture(fullfile(pwd));
+                       
             % Switch the toolchain
             % tc = cigre.install("Toolchain", Toolchain, "Type", "64");
             %
@@ -215,12 +203,8 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             here = pwd;
             cd(fixture.Folder);
             testCase.addTeardown(@() cd(here));
-            
-            cfg = Simulink.fileGenControl('getConfig');
-            cfgOriginal = cfg;
-            cfg.CodeGenFolder = fullfile(pwd);
-            Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir',true);
-            testCase.addTeardown(@() Simulink.fileGenControl('setConfig', 'config', cfgOriginal));
+
+            testCase.applyCodeGenFixture(fullfile(pwd));
             
             % Generate the code only
             desc = cigre.buildDLL(ModelName, "SkipBuild", true, "BusAs", BusAs);
@@ -374,12 +358,13 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                     cigreVal = cast(cigreVal, c);
                 end
 
-                cigreName = cigreParams(i).Name; % e.g. a.b.c
+                cigreName = cigreParams(i).ExternalName; % e.g. a.b.c
                 testCase.CIGREParameters(i) = struct("Name", cigreName, "Value", cigreVal);
                 
                 % Now create or update the parameter for simulink
-                eval(cigreName + " = cigreVal;");  % Hacky way to convert name "a.b.c" with value = val into the struct
-                simulinkName = extractBefore(cigreName + ".", "."); % e.g. a
+                simulinkName = cigreParams(i).SimulinkName;
+                eval(simulinkName + " = cigreVal;");  % Hacky way to convert name "a.b.c" with value = val into the struct
+                simulinkName = extractBefore(simulinkName + ".", "."); % i.e. the "root" if it is a struct
                 simulinkNames = [simulinkNames, simulinkName];
                 
             end
@@ -591,6 +576,30 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 testCase.addTeardown(@()close_system(mdlName, 0));
             end
             
+        end
+
+        function applyCodeGenFixture(testCase, pth)
+            cfg = Simulink.fileGenControl('getConfig');
+
+            oldCodeGenFolder = cfg.CodeGenFolder;
+            oldCacheFolder = cfg.CacheFolder;
+
+            cfg.CodeGenFolder = pth;
+            cfg.CacheFolder = pth;
+            Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir',true);
+
+            % Reset to what we hard before, rather then bruteforce using
+            % "reset"
+            testCase.addTeardown(@() resetCFG(oldCodeGenFolder, oldCacheFolder));
+            
+            function resetCFG(oldCodeGenFolder, oldCacheFolder)
+                % Path is relative... so hard to restore
+                % cfgi = Simulink.fileGenControl('getConfig');
+                % cfgi.CodeGenFolder = oldCodeGenFolder;
+                % cfgi.CacheFolder = oldCacheFolder;
+                % Simulink.fileGenControl('setConfig', 'config', cfgi)
+                Simulink.fileGenControl('reset');
+            end
         end
         
     end
