@@ -93,10 +93,10 @@ if terminate
         set_param(s,  "InputPortWidth", string(idx), "IndexParamArray", cellstr(idxRange(i)));
         
         inBlock = get_param(in, "Name");
-        l = add_line(mdl, inBlock + "/1", selector + "/1");
+        add_line(mdl, inBlock + "/1", selector + "/1");
         
         converter = get_param(ports(i), "Name");
-        l = add_line(mdl, selector + "/1", converter + "/1");
+        add_line(mdl, selector + "/1", converter + "/1");
     end
 end
 

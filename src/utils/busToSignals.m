@@ -26,20 +26,11 @@ for j = 1:numel(busElementOutput)
             nextBlock = "Convert" + portName + "/1";
         end
 
-        b = add_block("built-in/Outport", mdl + "/" + portName);
+        add_block("built-in/Outport", mdl + "/" + portName);
         add_line(mdl, nextBlock , portName + "/1");
     else
         busToSignals(children, mdl, selectorName + "/" + j, portName, selectorName + "_" + j)
     end
 end
 
-end
-
-function val = selectBusName(signal)
-
-if iscell(signal)
-    val = string(signal{1});
-else
-    val = string(signal);
-end
 end

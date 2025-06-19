@@ -28,6 +28,8 @@
 
 char ErrorMessage[1000];
 
+<<ParamGetMethods>>
+
 #if NUM_INPUT > 0
 typedef struct _MyModelInputs {
     <<DefineInputs>>

@@ -40,23 +40,30 @@ newConfig.Name = "CopiedConfig";
 attachConfigSet(wrapperName, newConfig);
 setActiveConfigSet(wrapperName, newConfig.Name);
 
+% Update the coder mappings
+%cm = coder.mapping.api.get(wrapperName,'EmbeddedCoderC');
+cm = coder.mapping.utils.create(wrapperName);
+if ~verLessThan("MATLAB", "9.9")
+    cm.setDataDefault("ModelParameterArguments", "StorageClass", "MultiInstance");
+end
+
 % Copy the data dictionaries
 dd = get_param(model, "DataDictionary");
 set_param(wrapperName, "DataDictionary", dd);
 
 % Add a model reference back to the model
 ref = wrapperName + "/mdl";
-b = add_block("built-in/ModelReference", ref);
-set_param(b, "ModelNameDialog", model) % Link to the original model
-set_param(b, "SimulationMode", "Normal") % Ensure we are not in rapid accelerator mode
+mdlRef = add_block("built-in/ModelReference", ref);
+set_param(mdlRef, "ModelNameDialog", model) % Link to the original model
+set_param(mdlRef, "SimulationMode", "Normal") % Ensure we are not in rapid accelerator mode
 
 % Update the model reference to set the model parameters
-p = get_param(b, "InstanceParameters");
+p = get_param(mdlRef, "InstanceParameters");
 for i = 1:numel(p)
     p(i).Value = '0';
     p(i).Argument = true;
 end
-set_param(b, "InstanceParameters", p);
+set_param(mdlRef, "InstanceParameters", p);
 
 %% Input
 % Find in the inports on the top level model. Work backwards from the
@@ -78,6 +85,10 @@ for i = 1:numel(inhs)
     inputSignals = get_param(inOutSignals.Outport, "SignalHierarchy");
 
     if isBus
+        
+        if isempty(inputSignals.BusObject)
+            error(inTypes + " definition not found")
+        end
         
         % define what needs creating - a bus creator that will be linked to
         % the first port of the reference model
@@ -164,8 +175,6 @@ for i = 1:numel(outh)
         signalName = inputSignals.SignalName; 
         set_param(l, "Name", signalName);
 
-
-
     else
 
         outInputSignals = get_param(outh(i), "PortHandles");
@@ -181,6 +190,32 @@ for i = 1:numel(outh)
 end
 
 Simulink.BlockDiagram.arrangeSystem(wrapperName);
+
+
+% Set the parameters in the wrapper
+ip = get_param(mdlRef, "InstanceParameters");
+
+if ~isempty(ip)
+    
+    mws = get_param(model, "ModelWorkspace");
+    p = mws.whos;
+    wws = get_param(wrapperName, "ModelWorkspace");
+    
+    ipNames = string({ip.Name});
+    for i= 1:numel(p)
+        name = p(i).name;
+        var = mws.getVariable(name);
+        assignin(wws, name, var);
+        
+        idx = (ipNames == name);
+        if any(idx)
+            ip(idx).Value = char(util.valToString(var.Value));
+        end
+    end
+
+    ipNew = arrayfun(@(x) renameStructField(x, {"Path"}, {"FullPath"}), ip);
+    set_param(mdlRef, "InstanceParameters", ipNew);
+end
 
 end
 

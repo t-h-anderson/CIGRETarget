@@ -21,7 +21,7 @@ classdef WithParallelFixture < matlab.unittest.TestCase
             testCase.addTeardown(@() delete(myCluster.Jobs));
             
             if nvp.PauseBeforeRun
-                keyboard
+                keyboard %#ok<KEYBOARDFUN>
             end
             
             f = parfeval(p, func, nOut);

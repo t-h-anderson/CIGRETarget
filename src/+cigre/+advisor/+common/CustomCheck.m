@@ -70,7 +70,7 @@ classdef CustomCheck < handle
             checkObj.setResultDetails(ElementResults);
         end
 
-        function reportResults(checkObj, model, vtype, violatingBlocks, description, statusPass, statusFail, recAction);
+        function reportResults(checkObj, model, vtype, violatingBlocks, description, statusPass, statusFail, recAction)
             
             % Check args
 

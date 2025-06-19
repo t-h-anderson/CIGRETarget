@@ -10,7 +10,8 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %ModelName = {"Test_StrtFunc"}
         %ModelName = {"Test_TopRef"}
         %ModelName = {"Test_BadNames"}
-        ModelName = {"Snap"}
+        %ModelName = {"Snap"}
+        ModelName = {"Test_CP"}
         %ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
         %ModelName = {"Test_BlockIO"}
         %ModelName = {"Test_SignalObject"}
@@ -23,7 +24,6 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %ModelName = {"NestedBus"}
         %ModelName = {"TestModel_meas"}
         %ModelName = {"Test_Enum"}
-        %ModelName = {"PEM_Electrolyzer"}
 
         %% Bits
         %Bits = struct("x64", "64", "x32", "32") % 32 bit run is not testable
@@ -38,6 +38,16 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %% Wrapper bus type
         %BusAs = struct("Ports", "Ports", "Vector", "Vector")
         BusAs = struct("Vector", "Vector")
+
+        %% Test each toolchain
+%         Toolchain = struct(...
+%             "VS2017", "Visual C++ 2017", ...
+%             "VS2019", "Visual C++ 2019", ...
+%             "VS2022", 'Visual C++ 2022', ...
+%             "MinGW", "MinGW")
+         
+        Toolchain = struct(...
+            "MinGW", "MinGW")
     end
     
     properties
@@ -47,7 +57,10 @@ classdef tGenerateCigre < test.util.WithParallelFixture
 
         Inputs
         Outputs
-        Parameters
+
+        SimulinkParameters % Can contains structs
+        CIGREParameters % Must be CIGRE data
+        
         
         SrcFolder
         
@@ -92,7 +105,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
     
     methods (TestClassTeardown)
         
-        function tearDown(testCase)
+        function tearDown(testCase) %#ok<MANU>
             bdclose("all")
             Simulink.data.dictionary.closeAll('-discard')
         end
@@ -120,7 +133,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
     
     methods (Test)
         
-        function tBuild(testCase, ModelName, Bits, Snapshot, BusAs)
+        function tBuild(testCase, ModelName, Bits, Snapshot, BusAs, Toolchain)
             
             testCase.loadData(ModelName);
 
@@ -128,14 +141,17 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             
             % Move to temp folder
             testCase.applyFixture(WorkingFolderFixture);
-            
-            cfg = Simulink.fileGenControl('getConfig');
-            cfgOriginal = cfg;
-            cfg.CodeGenFolder = fullfile(pwd);
-            Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir',true);
-            testCase.addTeardown(@() Simulink.fileGenControl('setConfig', 'config', cfgOriginal));
-            
-            % TODO: Switch the toolchain to 32/64
+            testCase.applyCodeGenFixture(fullfile(pwd));
+                       
+            % Switch the toolchain
+            % tc = cigre.install("Toolchain", Toolchain, "Type", "64");
+            %
+            % l = Simulink.data.DataDictionary("TestConfig.sldd");
+            % dd = Simulink.data.dictionary.open('TestConfig.sldd');
+            % ds = dd.getSection('Configurations');
+            % cf = ds.find('-class','Simulink.data.dictionary.Entry');
+            % cs = cf.getValue();
+            % set_param(cs, "Toolchain", tc);
             
             % Build the model
             here = pwd;
@@ -146,7 +162,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             
             testCase.defineInputsAndParameters(desc);
             
-            baseline = testCase.captureBaseline(desc.WrapperName); % Run the wrapper to easily support buses
+            baseline = testCase.captureBaseline(desc.CIGREInterfaceName); % Run the wrapper to easily support buses
             
             testCase.assertTrue(isfile(dll + ".dll"));
             
@@ -187,12 +203,8 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             here = pwd;
             cd(fixture.Folder);
             testCase.addTeardown(@() cd(here));
-            
-            cfg = Simulink.fileGenControl('getConfig');
-            cfgOriginal = cfg;
-            cfg.CodeGenFolder = fullfile(pwd);
-            Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir',true);
-            testCase.addTeardown(@() Simulink.fileGenControl('setConfig', 'config', cfgOriginal));
+
+            testCase.applyCodeGenFixture(fullfile(pwd));
             
             % Generate the code only
             desc = cigre.buildDLL(ModelName, "SkipBuild", true, "BusAs", BusAs);
@@ -202,7 +214,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             testCase.defineInputsAndParameters(desc);
             
             % Wrapper IO and baseline should match Simulink
-            baseline = testCase.captureBaseline(desc.WrapperName);
+            baseline = testCase.captureBaseline(desc.CIGREInterfaceName);
             
             % Build manually in Visual Studio following the instruction herein
             dll = testCase.doVSBuild(ModelName);
@@ -241,10 +253,10 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             fld = fld + fullfile(matlabroot, "extern", "include")+";";
             fld = fld + fullfile(matlabroot, "simulink", "include") + ";";
             fld = fld + fullfile(matlabroot, "rtw\c\src") + ";";
-            fld = fld + fullfile(pwd, modelName + "_iwrap_wrap_cigre_rtw");
-            %      clipboard("copy", fld);
+            fld = fld + fullfile(pwd, modelName + "_wrap_cigre_rtw");
+            clipboard("copy", fld);
             
-            keyboard
+            keyboard %#ok<KEYBOARDFUN>
             
         end
         
@@ -271,7 +283,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                     dt = eval(dt);
                 catch
                     try
-                        dt = util.findParam(mdlName, dt);
+                        [~, dt] = util.findParam(mdlName, dt);
                     catch
                         dt = 0.1;
                     end
@@ -327,34 +339,58 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             testCase.Inputs = input;
             
             %% Parameters
-            testCase.Parameters = struct("Name", {}, "Value", {});
+            testCase.SimulinkParameters = struct("Name", {}, "Value", {});
+            testCase.CIGREParameters = struct("Name", {}, "Value", {});
             
-            params = desc.Parameters;
-            for i = 1:numel(params)
-                c = params(i).BaseType;
+            simulinkParams = desc.Parameters;
+            cigreParams = simulinkParams.getLeaves();
+
+            simulinkNames = string.empty();
+            for i = 1:numel(cigreParams)
+                c = cigreParams(i).BaseType;
                 
-                value = i;
+                cigreVal = i;
                 
                 try
-                    val = cast(value, c);
+                    cigreVal = cast(cigreVal, c);
                 catch
                     % TODO: Not a Simulink.Parameter
-                    val = cast(value, c);
+                    cigreVal = cast(cigreVal, c);
                 end
-                testCase.Parameters(i) = struct("Name", params(i).GraphicalName, "Value", val);
+
+                cigreName = cigreParams(i).ExternalName; % e.g. a.b.c
+                testCase.CIGREParameters(i) = struct("Name", cigreName, "Value", cigreVal);
+                
+                % Now create or update the parameter for simulink
+                simulinkName = cigreParams(i).SimulinkName;
+                eval(simulinkName + " = cigreVal;");  % Hacky way to convert name "a.b.c" with value = val into the struct
+                simulinkName = extractBefore(simulinkName + ".", "."); % i.e. the "root" if it is a struct
+                simulinkNames = [simulinkNames, simulinkName];
+                
             end
-            
+
+            % Append any unique simulink names
+            names = unique(simulinkNames);
+            for i = 1:numel(names)
+                name = names(i);
+                testCase.SimulinkParameters(i) = struct("Name", name, "Value", util.valToString(eval(name)));
+            end
+
         end
         
         function baseline = captureBaseline(testCase, mdlName)
             
             %% Create an input object to match the input and parameter test data
             testCase.tempLoad(mdlName);
-            simIn = Simulink.SimulationInput(mdlName);
+            simIn = Simulink.SimulationInput(char(mdlName));
             
             % Inputs
             try
-                inDS = createInputDataset(mdlName);
+                if verLessThan("MATLAB", "25.1") %#ok<VERLESSMATLAB>
+                    inDS = createInputDataset(mdlName);
+                else
+                    inDS = createInputDataset(mdlName, "UpdateDiagram", false);
+                end
                 nInputs = numel(inDS.getElementNames());
             catch me
                 % errors if no inputs
@@ -368,8 +404,10 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             testCase.assertTrue(size(testCase.Inputs, 2) == nInputs, "Number of test inputs does not match model");
             
             if nInputs > 0
+                
                 for i = 1:nInputs
                     input = testCase.Inputs(:, i);
+                    
                     if istimetable(input)
                         vals = input.Variables;
                         if numel(size(vals)) > 2
@@ -389,29 +427,48 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             end
             
             % Parameters
-            % TODO: How do we access parameters?
-            mdlRefs = string(find_mdlrefs(mdlName, "AllLevels", true));
-            for i = 1:numel(mdlRefs)
-                mdlRef = mdlRefs(i);
-                testCase.tempLoad(mdlRef);
-                params = Simulink.findVars(mdlRef);
-                                
-                for j = 1:numel(params)
-                    name = params(j).Name;
-                    idx = (string({testCase.Parameters.Name}) == name);
-                    if ~any(idx)
-                        % Parameter not in input set
-                        continue
+            params = testCase.SimulinkParameters;
+            
+            % Model arguments
+            ip = get_param(simIn.ModelName + "/mdl", "InstanceParameters");
+            for i = 1:numel(params)
+                name = testCase.SimulinkParameters(i).Name;
+                val = testCase.SimulinkParameters(i).Value;
+                idx = (string({ip.Name}) == name);
+                if any(idx)
+                    ip(idx).Value = char(val);
+                else
+                    % In model workspace
+                    mdl = char(erase(mdlName, "_wrap"));
+                    param = util.findParam(mdl, name);
+                    if isa(param, "Simulink.data.dictionary.Entry")
+                        simIn = simIn.setVariable(name, eval(val));
+                    elseif isfield(param, "Value") || isprop(param, "Value")
+                        param.Value = eval(val);
+                        simIn = simIn.setVariable(name, param, "Workspace", mdl);
+                    else
+                        param = eval(value);
+                        simIn = simIn.setVariable(name, param, "Workspace", mdl);
                     end
-                    val = testCase.Parameters(idx).Value;
-                    simIn = setVariable(simIn, name, val, "Workspace", mdlRef);
+                    
                 end
             end
-
+            
+            if ~isempty(ip)
+                ipNew = arrayfun(@(x) renameStructField(x, 'Path', 'FullPath'), ip);
+                simIn = simIn.setBlockParameter(simIn.ModelName + "/mdl", "InstanceParameters", ipNew);
+            end
+            
+            % Simulation time
             simIn = setModelParameter(simIn, "StopTime", string(testCase.SimTime), "FixedStep", string(testCase.TimeStep));
             
             % Get the outputs
             results = sim(simIn);
+            if isempty(results.yout{1}.Values.Data)
+                % There is a potential bug in R2025a where results are not
+                % generated the first time the simulation is run
+                results = sim(simIn);
+            end
             
             baseline = extractData(results);
             
@@ -437,12 +494,12 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             end
             
             % Two data sets to check they work independently
-            inputs = testCase.Inputs;
+            inputs = retime(testCase.Inputs, 'regular', 'nearest', 'TimeStep', seconds(testCase.TimeStep));
             inputs = table2cell(timetable2table(inputs)); % Input timetable is *very* slow so convery to cell
             inputs = inputs(:,2:end);
 
             outputs = testCase.Outputs;
-            params = testCase.Parameters;
+            params = testCase.CIGREParameters;
 
             instance1 = cigre.dll.InterfaceInstance(inputs, outputs, params);
             if nvp.TwoData
@@ -486,7 +543,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 end
 
                 cigreDll.unload();
-                c = cigreDll.load();
+                c = cigreDll.load(); %#ok<NASGU>
 
                 instance1 = cigre.dll.InterfaceInstance(inputs, outputs, params, "IntStates", stateMemory1);
                 if nvp.TwoData
@@ -519,6 +576,30 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 testCase.addTeardown(@()close_system(mdlName, 0));
             end
             
+        end
+
+        function applyCodeGenFixture(testCase, pth)
+            cfg = Simulink.fileGenControl('getConfig');
+
+            oldCodeGenFolder = cfg.CodeGenFolder;
+            oldCacheFolder = cfg.CacheFolder;
+
+            cfg.CodeGenFolder = pth;
+            cfg.CacheFolder = pth;
+            Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir',true);
+
+            % Reset to what we hard before, rather then bruteforce using
+            % "reset"
+            testCase.addTeardown(@() resetCFG(oldCodeGenFolder, oldCacheFolder));
+            
+            function resetCFG(oldCodeGenFolder, oldCacheFolder)
+                % Path is relative... so hard to restore
+                % cfgi = Simulink.fileGenControl('getConfig');
+                % cfgi.CodeGenFolder = oldCodeGenFolder;
+                % cfgi.CacheFolder = oldCacheFolder;
+                % Simulink.fileGenControl('setConfig', 'config', cfgi)
+                Simulink.fileGenControl('reset');
+            end
         end
         
     end

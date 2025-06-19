@@ -23,7 +23,7 @@ for i = 1:numel(models)
         target = strrep(target, "models", "models_" + ver);
         mkdir(target);
 
-        [~, co] = util.loadSystem(mdl);
+        [~, co] = util.loadSystem(mdl); %#ok<ASGLU>
 
         Simulink.exportToVersion(mdl, fullfile(target, mdl), ver);
        
