@@ -3,8 +3,8 @@ classdef Variable
     %   Detailed explanation goes here
 
     properties
-        GraphicalName (:,1) string = ""
-        Name (:,1) string = ""
+        SimulinkName (:,1) string = ""
+        ExternalName (:,1) string = ""
         Type (:,1) string = ""
         Pointers (:,1) string = ""
         BaseType (:,1) string = ""
@@ -131,21 +131,26 @@ classdef Variable
 
         end
 
-        function objs = fromDataInterface(dis, modelName, nameroot, nvp)
+        % Output of external names allows us to easily keep track of what
+        % external names have been used in nested structs
+        function [objs, usedExternalNames] = fromDataInterface(dis, modelName, nameroot, nvp)
             arguments
                 dis
                 modelName (1,1) string = string(nan) % Required to find default param value
                 nameroot (1,:) string = string.empty % Allow nested parameter search
                 nvp.OverloadStorage (1,1) string = string(nan)
+                nvp.UsedExternalNames (1,:) string = string.empty(1,0)
             end
 
             objs = cigre.description.Variable.empty(1,0);
 
+            usedExternalNames = nvp.UsedExternalNames;
             for i = 1:numel(dis)
+
                 di = dis(i);
 
-                graphicalName = cigre.description.Variable.extractGraphicalName(di);
-                name = cigre.description.Variable.extractName(di);
+                simulinkName = cigre.description.Variable.extractSimulinkName(di);
+                externalName = cigre.description.Variable.extractExternalName(di, "NameRoot", nameroot);
                 type = cigre.description.Variable.extractType(di);
                 baseType = cigre.description.Variable.extractBaseType(di);
                 minVal = cigre.description.Variable.extract(di, "Min");
@@ -156,11 +161,12 @@ classdef Variable
                     storage = nvp.OverloadStorage;
                 end                    
 
-                paramName = strjoin([nameroot, graphicalName], ".");
+                paramName = strjoin([nameroot, simulinkName], ".");
                 defaultValues = cigre.description.Variable.extractDefaultParamValue(modelName, paramName);
 
                 % Determine if the data interface describes a parameter
                 % struct
+                subExternalNames = string.empty(1,0);
                 if ~isa(di.Type, "coder.descriptor.types.Scalar")
 
                     if isprop(di.Type, "BaseType")
@@ -175,7 +181,9 @@ classdef Variable
                         elements = typeObj.Elements;
                         % Pass the storage onto the children in the case of
                         % a struct
-                        sub = cigre.description.Variable.fromDataInterface(elements, modelName, [nameroot, graphicalName], "OverloadStorage", storage);
+                        [sub, subExternalNames] = cigre.description.Variable.fromDataInterface(elements, modelName, [nameroot, simulinkName], ...
+                            "OverloadStorage", storage, ...
+                            "UsedExternalNames", usedExternalNames);
                     else
                         sub = cigre.description.Variable.empty(1,0);
                     end
@@ -184,14 +192,20 @@ classdef Variable
                     sub = cigre.description.Variable.empty(1,0);
                 end
                 
+                % Adapt the names to allow indexing into structs and to
+                % avoid duplicate names
                 if ~isempty(nameroot)
                     % Nested parameter
-                    name = paramName;
+                    simulinkName = paramName;
                 end
 
+                usedExternalNames = [usedExternalNames, subExternalNames];
+                externalName = matlab.lang.makeUniqueStrings(externalName, usedExternalNames);
+                usedExternalNames = [usedExternalNames, externalName];
+
                 newObjs = cigre.description.Variable(...
-                    "GraphicalName", graphicalName, ...
-                    "Name", name, ...
+                    "SimulinkName", simulinkName, ...
+                    "ExternalName", externalName, ...
                     "Type", type, ...
                     "BaseType", baseType, ...
                     "Min", minVal, ...
@@ -206,30 +220,38 @@ classdef Variable
                 objs = [objs, newObjs];
             end
 
+            % Ensure external names are unique
+            ext = [objs.ExternalName];
+            ext = matlab.lang.makeUniqueStrings(ext);
+            ext = num2cell(ext);
+            [objs.ExternalName] = deal(ext{:});
+
+
         end
 
     end
 
     % Methods interacting on coder interface objects
     methods (Static)
-        function name = extractGraphicalName(interface)
+        function name = extractSimulinkName(interface)
             arguments
                 interface (1,1)
             end
 
-            if isprop(interface, "GraphicalName")
+            if isprop(interface, "SimulinkName")
                 name = string(interface.GraphicalName);
             else
-                name = cigre.description.Variable.extractName(interface);
+                name = cigre.description.Variable.extractExternalName(interface);
             end
 
             name = string(name);
 
         end
 
-        function name = extractName(interface)
+        function name = extractExternalName(interface, nvp)
             arguments
                 interface (1,1)
+                nvp.NameRoot (1,:) string = string.empty(1,0)
             end
 
             % Look at the implementation for the name
@@ -261,7 +283,7 @@ classdef Variable
                     type = type.BaseType;
                 end
 
-                if isprop(type, "name")
+                if isprop(type, "ExternalName")
                     name = type.name;
                 else
                     name = type.Name;
@@ -273,6 +295,8 @@ classdef Variable
             end
 
             name = string(name);
+
+            name = strjoin([nvp.NameRoot, name], "_");
 
         end
 

@@ -308,7 +308,7 @@ classdef ModelDescription < handle
             % Dealt with cetain fields of model struct explicitly
             name = string.empty(1,0);
             for i = 1:numel(id)
-                name(i) = cigre.description.Variable.extractName(id(i));
+                name(i) = cigre.description.Variable.extractSimulinkName(id(i));
             end
             idx = cellfun(@(x) x == "rt_errorStatus", name);
             idx = idx | cellfun(@(x) x == "timingBridge", name);
@@ -334,9 +334,9 @@ classdef ModelDescription < handle
             idx = cellfun(@(x) x == "", pointers);
             pointers(idx) = {"*"};
 
-            obj.InputData = cigre.description.Variable.create("Name", name(idxInput), "Type", type(idxInput), "Pointers", pointers(idxInput));
-            obj.OutputData = cigre.description.Variable.create("Name", name(idxOutput), "Type", type(idxOutput), "Pointers", pointers(idxOutput));
-            obj.InternalData = cigre.description.Variable.create("Name", name(idxInternal), "Type", type(idxInternal), "Pointers", pointers(idxInternal));
+            obj.InputData = cigre.description.Variable.create("SimulinkName", name(idxInput), "Type", type(idxInput), "Pointers", pointers(idxInput));
+            obj.OutputData = cigre.description.Variable.create("SimulinkName", name(idxOutput), "Type", type(idxOutput), "Pointers", pointers(idxOutput));
+            obj.InternalData = cigre.description.Variable.create("SimulinkName", name(idxInternal), "Type", type(idxInternal), "Pointers", pointers(idxInternal));
 
             obj.getRTMStruct();
         end
@@ -344,9 +344,9 @@ classdef ModelDescription < handle
         function getRTMStruct(obj)
 
             % Ignore Inputs, outputs and RTM
-            idx = find(endsWith([obj.InternalData.Name], "_M" + textBoundaryPattern), 1); % TODO: Make this more robust
+            idx = find(endsWith([obj.InternalData.SimulinkName], "_M" + textBoundaryPattern), 1); % TODO: Make this more robust
             if isempty(idx)
-                idx = find(contains([obj.InternalData.Name], "MODEL"), 1); % TODO: Make this more robust
+                idx = find(contains([obj.InternalData.SimulinkName], "MODEL"), 1); % TODO: Make this more robust
             end
 
             obj.RTMVarType = obj.InternalData(idx).Type;
@@ -360,14 +360,12 @@ classdef ModelDescription < handle
         function getFunctionInterface(obj, type)
             arguments
                 obj
-                type (1,1) string {mustBeMember(type, ["Init", "Initialise", "Step", "Terminate", "Start"])}
+                type (1,1) string {mustBeMember(type, ["Init", "Initialise", "Step", "Terminate"])}
             end
 
             switch type
                 case "Init"
                     obj.loadModelRefInitialiseFunctionInterface();
-                case "Start"
-                    obj.loadStartFunctionInterface();
                 case "Initialise"
                     obj.loadInitialiseFunctionInterface();
                 case "Step"
@@ -436,12 +434,12 @@ classdef ModelDescription < handle
             inputs = string.empty(1,0);
             types = string.empty(1,0);
             for i = 1:(args.Size)
-                inputs(i) = cigre.description.Variable.extractName(args(i));
+                inputs(i) = cigre.description.Variable.extractSimulinkName(args(i));
                 types(i) = cigre.description.Variable.extractType(args(i));
             end
 
             inputs = obj.translateNames(inputs, types);
-            inputs = cigre.description.Variable.create("Name", inputs, "Type",types);
+            inputs = cigre.description.Variable.create("SimulinkName", inputs, "Type",types);
 
 
         end
@@ -466,8 +464,8 @@ classdef ModelDescription < handle
 
         function [funcName, inputs] = getCodeInterfaceForModelRef(md, nvp)
             arguments
-                md
-                nvp.Type {mustBeMember(nvp.Type, ["Init", "Start", "Initialize"])}
+                md cigre.description.ModelDescription
+                nvp.Type {mustBeMember(nvp.Type, ["Init", "Initialize"])}
             end
 
             type = nvp.Type;
@@ -519,7 +517,7 @@ classdef ModelDescription < handle
                     args = args.toArray();
 
                     inputNames = string({args.Name});
-                    [inputTypes, pointers] = md.extractType(struct("Implementation", args));
+                    [inputTypes, pointers] = cigre.description.Variable.extractBaseType(struct("Implementation", args));
                 else
                     funcName = "";
                     inputNames = string.empty(1,0);
@@ -531,7 +529,7 @@ classdef ModelDescription < handle
 
             inputNames = md.translateNames(inputNames, inputTypes);
 
-            inputs = cigre.description.Variable.create("Name", inputNames, "Pointers", pointers, "Type", inputTypes);
+            inputs = cigre.description.Variable.create("SimulinkName", inputNames, "Pointers", pointers, "Type", inputTypes);
 
         end
 
@@ -575,7 +573,9 @@ classdef ModelDescription < handle
 
         function loadParameterInterface(obj)
             parameters = obj.ModelCodeDescriptor.getDataInterfaces("Parameters");
-            obj.Parameters = cigre.description.Variable.fromDataInterface(parameters, obj.ModelName);
+            pObj = cigre.description.Variable.fromDataInterface(parameters, obj.ModelName);
+
+            obj.Parameters = pObj;
         end
 
         function inputNames = translateNames(obj, inputNames, inputTypes)
@@ -588,17 +588,17 @@ classdef ModelDescription < handle
             % this could be quite fragile, this should be replaced
 
             knownTypes = string([obj.InternalData.Type obj.InputData.Type obj.OutputData.Type]);
-            knownNames = string([obj.InternalData.Name obj.InputData.Name obj.OutputData.Name]);
+            knownNames = string([obj.InternalData.SimulinkName obj.InputData.SimulinkName obj.OutputData.SimulinkName]);
 
             % Replace graphial names "rtx_"/"rty_" + graphical name with
             % the internal name
             inputNames = erase(inputNames, ["rty_", "rtx_"]);
-            graphicalNames = string([[obj.Inputs.GraphicalName], [obj.Outputs.GraphicalName]]);
-            names = string([[obj.Inputs.Name], [obj.Outputs.Name]]);
+            externalNames = string([[obj.Inputs.ExternalName], [obj.Outputs.ExternalName]]);
+            simulinkNames = string([[obj.Inputs.SimulinkName], [obj.Outputs.SimulinkName]]);
             for i = 1:numel(inputNames)
-                idx = ismember(graphicalNames, inputNames(i));
+                idx = ismember(externalNames, inputNames(i));
                 if any(idx)
-                    inputNames(i) = names(idx);
+                    inputNames(i) = simulinkNames(idx);
                 end
             end
 

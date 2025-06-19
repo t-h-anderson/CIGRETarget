@@ -145,8 +145,9 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             cfg = Simulink.fileGenControl('getConfig');
             oldCodeGenFolder = cfg.CodeGenFolder;
             cfg.CodeGenFolder = fullfile(pwd);
+            cfg.CacheFolder = fullfile(pwd);
             Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir',true);
-            testCase.addTeardown(@() resetCFG(oldCodeGenFolder));
+            testCase.addTeardown(@() resetCFG(oldCodeGenFolder, oldCacheFolder));
             
             function resetCFG(oldCodeGenFolder)
                 cfg = Simulink.fileGenControl('getConfig');

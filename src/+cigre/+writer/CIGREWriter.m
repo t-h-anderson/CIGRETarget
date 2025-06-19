@@ -46,7 +46,7 @@ classdef CIGREWriter
             for i = 1:numel(intStates)
                 intState = intStates(i);
 
-                name = intState.Name;
+                name = intState.SimulinkName;
                 type = intState.Type;
                 pointers = intState.Pointers;
                 internalMalloc = type + pointers + " " + name + cigreSuffix + " = heap_malloc(&instance->IntStates[0], (int32_t)sizeof(" + type + "));";
@@ -69,9 +69,9 @@ classdef CIGREWriter
                 + "    errorStatus[0] = '\0';" + newline ...
                 + "    <<RTMStructName>>->errorStatus = errorStatus;" + newline;
 
-            for i = 1:numel([modelDescriptions.RTMStruct.Name])
+            for i = 1:numel([modelDescriptions.RTMStruct.SimulinkName])
                 internalStatesMap = internalStatesMap + newline ...
-                    + "    " + "<<RTMStructName>>->" + modelDescriptions.RTMStruct(i).Name + " = " + modelDescriptions.RTMStruct(i).Name + ";" + newline;
+                    + "    " + "<<RTMStructName>>->" + modelDescriptions.RTMStruct(i).SimulinkName + " = " + modelDescriptions.RTMStruct(i).SimulinkName + ";" + newline;
             end
 
             results = strrep(results, "<<MapInternalStatesToModel>>", internalStatesMap);
@@ -87,13 +87,13 @@ classdef CIGREWriter
 
                 for i = 1:numel(modelArgParams)
                     modelArgParam = modelArgParams(i);
-                    pName = modelArgParam.Name;
-                    pGraphical = modelArgParam.GraphicalName;
-                    paramMap = " = " + "parameters->" + pGraphical + ";" + newline;
+                    pSimulink = modelArgParam.SimulinkName;
+                    pExternal = modelArgParam.ExternalName;
+                    paramMap = " = " + "parameters->" + pExternal + ";" + newline;
                     structName = erase(modelArgParam.StorageSpecifier, "ModelArgument:");
 
                     paramMaps = paramMaps + ...
-                        "<<RTMStructName>>->dwork->mdl_InstanceData.rtm." + structName + "->" + pName ... % Simulink structure
+                        "<<RTMStructName>>->dwork->mdl_InstanceData.rtm." + structName + "->" + pSimulink ... % Simulink structure
                         + paramMap; % CIGRE Memory
                 end
 
@@ -104,17 +104,17 @@ classdef CIGREWriter
             % Global params
             globalParams = params(~[params.IsModelArgument]);
             if ~isempty(globalParams)
-                warning("Global parameters found:" + strjoin([globalParams.Name], ", ") + "." + newline ...
+                warning("Global parameters found:" + strjoin([globalParams.SimulinkName], ", ") + "." + newline ...
                     + "DLL may be non-deterministic when called in parallel. Instead, try to define all parameters as model arguments");
             end
             
             for i = 1:numel(globalParams)
                 globalParam = globalParams(i);
-                pName = globalParam.Name;
-                pGraphical = globalParam.GraphicalName;
+                pSimulink = globalParam.SimulinkName;
+                pExternal = globalParam.ExternalName;
                 
                 paramMaps = paramMaps + ...
-                    pName + " = " + "parameters->" + pGraphical + ";" + newline;
+                    pSimulink + " = " + "parameters->" + pExternal + ";" + newline;
             end
             
             results = strrep(results, "<<MapParamsToModel>>", paramMaps);
@@ -123,17 +123,21 @@ classdef CIGREWriter
             backupStatesMap = "";
 
             for i = 1:numel(modelDescriptions.RTMStruct)
+
+                rtm_type = modelDescriptions.RTMStruct(i).Type;
+                rtm_name = modelDescriptions.RTMStruct(i).SimulinkName;
+
                 % DW_MyModel_wrap_T* dwork_backup;
                 backupStatesMap = backupStatesMap + newline ...
-                    + "    " + modelDescriptions.RTMStruct(i).Type + "* " + modelDescriptions.RTMStruct(i).Name + "_backup;";
+                    + "    " + rtm_type + "* " + rtm_name + "_backup;";
 
                 % dwork_backup = malloc(sizeof(DW_MyModel_wrap_T));
                 backupStatesMap = backupStatesMap + newline ...
-                    + "    " + modelDescriptions.RTMStruct(i).Name + "_backup = malloc(sizeof(" + modelDescriptions.RTMStruct(i).Type +"));";
+                    + "    " + rtm_name + "_backup = malloc(sizeof(" + rtm_type +"));";
 
                 % *dwork_backup = *dwork;
                 backupStatesMap = backupStatesMap + newline ...
-                    + "    *" + modelDescriptions.RTMStruct(i).Name + "_backup = *" + modelDescriptions.RTMStruct(i).Name + ";";
+                    + "    *" + rtm_name + "_backup = *" + rtm_name + ";";
             end
             results = strrep(results, "<<InternalStatesCache>>", backupStatesMap);
 
@@ -142,13 +146,15 @@ classdef CIGREWriter
 
             for i = 1:numel(modelDescriptions.RTMStruct)
 
+                rtm_name = modelDescriptions.RTMStruct(i).SimulinkName;
+
                 % *dwork = *dwork_backup;
                 restoreStatesMap = restoreStatesMap + newline ...
-                    + "    *" + modelDescriptions.RTMStruct(i).Name + " = *" + modelDescriptions.RTMStruct(i).Name + "_backup;";
+                    + "    *" + rtm_name + " = *" + rtm_name + "_backup;";
 
                 % dwork_backup = free(dworkbackup);
                 restoreStatesMap = restoreStatesMap + newline ...
-                    + "    free(" + modelDescriptions.RTMStruct(i).Name + "_backup);";
+                    + "    free(" + rtm_name + "_backup);";
 
             end
             results = strrep(results, "<<InternalStatesRestoreFromCache>>", restoreStatesMap);
@@ -156,7 +162,7 @@ classdef CIGREWriter
 
             % Replace IO struct names
             inputType = string([modelDescriptions.InputData.Type]);
-            inputName = string([modelDescriptions.InputData.Name]);
+            inputName = string([modelDescriptions.InputData.SimulinkName]);
             if isempty(inputType)
                 results = strrep(results, "<<InputUnpack>>", " // No inputs");
                 results = strrep(results, "<<ApplyInputData>>", " // No input data");
@@ -169,7 +175,7 @@ classdef CIGREWriter
             end
 
             outputType = string([modelDescriptions.OutputData.Type]);
-            outputName = [modelDescriptions.OutputData.Name];
+            outputName = [modelDescriptions.OutputData.SimulinkName];
             if isempty(outputType)
                 results = strrep(results, "<<OutputUnpack>>", " // No outputs");
                 results = strrep(results, "<<ApplyOutputData>>", " // No output data");
@@ -201,14 +207,14 @@ classdef CIGREWriter
             modelInitialize = modelDescriptions.InitializeName;
             results = strrep(results, "<<ModelInitialize>>", modelInitialize);
 
-            initialiseInputs = strjoin(string([modelDescriptions.InitialiseInputs.Name]) + cigreSuffix, ", ");
+            initialiseInputs = strjoin(string([modelDescriptions.InitialiseInputs.SimulinkName]) + cigreSuffix, ", ");
             results = strrep(results, "<<ModelInitialiseInputs>>", initialiseInputs);
            
             % Replace step
             modelStep = modelDescriptions.StepName;
             results = strrep(results, "<<ModelStep>>", modelStep);
 
-            stepInputs = strjoin(string([modelDescriptions.StepInputs.Name]) + cigreSuffix, ", ");
+            stepInputs = strjoin(string([modelDescriptions.StepInputs.SimulinkName]) + cigreSuffix, ", ");
             results = strrep(results, "<<ModelStepInputs>>", stepInputs);
 
             %% RTM Struct
@@ -238,14 +244,14 @@ classdef CIGREWriter
             results = readFromFile("TemplateWrapper.h");
 
             % CIGRE Inputs
-            inputNames = string([modelDescriptions.Inputs.Name]');
+            inputNames = string([modelDescriptions.Inputs.SimulinkName]');
             inputTypes = [modelDescriptions.Inputs.Type]';
             inputDims = cellfun(@(x) string(prod(x)), {modelDescriptions.Inputs.Dimensions})';
 
             inputTypes = util.TranslateTypes.translateType(inputTypes, "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
 
             % CIGRE Outputs
-            outputNames = string([modelDescriptions.Outputs.Name]');
+            outputNames = string([modelDescriptions.Outputs.SimulinkName]');
             outputTypes = [modelDescriptions.Outputs.Type]';
 
             outputTypes = util.TranslateTypes.translateType(outputTypes, "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
@@ -266,7 +272,7 @@ classdef CIGREWriter
             results = strrep(results, "<<ParamGetMethods>>", "");
 
             % Parameters
-            parameterNames = string([modelDescriptions.CIGREParameters.GraphicalName]');
+            parameterNames = string([modelDescriptions.CIGREParameters.ExternalName]');
             parameterTypes = [modelDescriptions.CIGREParameters.Type]';
             parameterMin = {modelDescriptions.CIGREParameters.Min}';
             parameterMax = {modelDescriptions.CIGREParameters.Max}';
