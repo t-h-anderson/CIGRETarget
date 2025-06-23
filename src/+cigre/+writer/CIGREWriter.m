@@ -131,9 +131,9 @@ classdef CIGREWriter
                 pSimulink = globalParam.SimulinkName;
                 pExternal = globalParam.ExternalName;
                 
-% Iterate through arrays to provide all elements as
+                    % Iterate through arrays to provide all elements as
                     % input
-                    vars = prod(modelArgParams(i).Dimensions);
+                    vars = prod(globalParams(i).Dimensions);
 
                     for k = 1:vars
 
@@ -464,7 +464,7 @@ classdef CIGREWriter
                     paramMax = string(double(parameterMax{i}));
                     paramDefI = strrep(paramDefI, "<<ParamMax>>", paramMax);
 
-                    paramDefault = util.valToString(defValues(k));
+                    paramDefault = string(double(defValues(k)));
                     paramDefI_k = strrep(paramDefI, "<<ParamDefaultVal>>", paramDefault);
 
                     paramDef(end+1) = paramDefI_k;

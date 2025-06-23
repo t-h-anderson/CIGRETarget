@@ -12,7 +12,7 @@ if ~isscalar(s)
     end
 
     str = "[";
-    for i = 1:size(s, 2)
+    for i = 1:size(s, 1)
         str = str + strjoin([p{i,:}], ", ");
         
         if i < size(s, 2)
