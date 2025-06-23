@@ -12,6 +12,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %ModelName = {"Test_BadNames"}
         %ModelName = {"Snap"}
         ModelName = {"Test_CP"}
+        %ModelName = {"CGC_control_system_top"}
         %ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
         %ModelName = {"Test_BlockIO"}
         %ModelName = {"Test_SignalObject"}
@@ -280,11 +281,14 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             dt = get_param(mdlName, "FixedStep");
             if ~isnumeric(dt)
                 try
-                    dt = eval(dt);
-                catch
                     try
-                        [~, dt] = util.findParam(mdlName, dt);
+                        dt = eval(dt);
                     catch
+                        dt =  evalin('base', dt);
+                    end
+                catch
+                    [~, dt] = util.findParam(mdlName, dt);
+                    if dt == 0
                         dt = 0.1;
                     end
                 end
@@ -349,7 +353,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             for i = 1:numel(cigreParams)
                 c = cigreParams(i).BaseType;
                 
-                cigreVal = i;
+                cigreVal = cigreParams(i).DefaultValue;
                 
                 try
                     cigreVal = cast(cigreVal, c);
@@ -452,6 +456,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                     end
                     
                 end
+
             end
             
             if ~isempty(ip)

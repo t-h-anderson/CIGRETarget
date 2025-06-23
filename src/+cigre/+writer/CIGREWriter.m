@@ -89,12 +89,30 @@ classdef CIGREWriter
                     modelArgParam = modelArgParams(i);
                     pSimulink = modelArgParam.SimulinkName;
                     pExternal = modelArgParam.ExternalName;
-                    paramMap = " = " + "parameters->" + pExternal + ";" + newline;
+                    
                     structName = erase(modelArgParam.StorageSpecifier, "ModelArgument:");
 
-                    paramMaps = paramMaps + ...
-                        "<<RTMStructName>>->dwork->mdl_InstanceData.rtm." + structName + "->" + pSimulink ... % Simulink structure
-                        + paramMap; % CIGRE Memory
+                    % Iterate through arrays to provide all elements as
+                    % input
+                    vars = prod(modelArgParams(i).Dimensions);
+
+                    for k = 1:vars
+
+                        if vars == 1
+                            % Scalar
+                            access = "";
+                            paramMap = " = " + "parameters->" + pExternal + ";" + newline;
+                        else
+                            % Matrix
+                            access = "[" + (k - 1) + "]";
+                            paramMap = " = " + "parameters->" + pExternal + "_" + k + ";" + newline;
+                        end
+
+                        paramMaps = paramMaps + ...
+                            "<<RTMStructName>>->dwork->mdl_InstanceData.rtm." + structName + "->" + pSimulink + access ... % Simulink structure
+                            + paramMap; % CIGRE Memory
+
+                    end
                 end
 
             else
@@ -113,8 +131,26 @@ classdef CIGREWriter
                 pSimulink = globalParam.SimulinkName;
                 pExternal = globalParam.ExternalName;
                 
-                paramMaps = paramMaps + ...
-                    pSimulink + " = " + "parameters->" + pExternal + ";" + newline;
+% Iterate through arrays to provide all elements as
+                    % input
+                    vars = prod(modelArgParams(i).Dimensions);
+
+                    for k = 1:vars
+
+                        if vars == 1
+                            % Scalar
+                             access = "";
+                            paramMap = "parameters->" + pExternal + ";" + newline;
+                        else
+                            % Matrix
+                            access = "[" + (k - 1) + "]";
+                            paramMap = "parameters->" + pExternal + "_" + k + ";" + newline;
+                        end
+
+                        paramMaps = paramMaps +...
+                            (pSimulink + access) + " = " + paramMap;
+                    end
+                
             end
             
             results = strrep(results, "<<MapParamsToModel>>", paramMaps);
@@ -277,6 +313,7 @@ classdef CIGREWriter
             parameterMin = {modelDescriptions.CIGREParameters.Min}';
             parameterMax = {modelDescriptions.CIGREParameters.Max}';
             parameterDefaultVal = {modelDescriptions.CIGREParameters.DefaultValue}';
+            numParameters = sum(cellfun(@(x) numel(x), parameterDefaultVal));
 
             parameterTypes = util.TranslateTypes.translateType(parameterTypes, "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
 
@@ -373,7 +410,6 @@ classdef CIGREWriter
             results = strrep(results, "<<OutputDefinition>>", outputDef);
 
             %% Replace Parameter Definition
-            numParameters = numel(parameterNames);
             results = strrep(results, "<<NumParam>>", string(numParameters));
 
             parameterTemplate = ...
@@ -396,36 +432,70 @@ classdef CIGREWriter
             externalParamNames = matlab.lang.makeUniqueStrings(parameterNames, 1:numel(parameterNames), modelDescriptions.MaxExternalIdentifier);
 
             paramDef = string.empty();
+            idx = -1;
             for i = 1:numel(parameterNames)
-                paramDefI = parameterTemplate;
-                paramDefI = strrep(paramDefI, "<<Num>>", string(i-1));
-                paramDefI = strrep(paramDefI, "<<ParamName>>", externalParamNames(i));
-                paramDefI = strrep(paramDefI, "<<ParamDefinition>>", parameterNames(i));
-                paramDefI = strrep(paramDefI, "<<ParamType>>", parameterTypes(i));
 
-                valType = strrep(parameterTypes(i), "_T", "_Val");
-                valType{1,1}(1) = upper(valType{1,1}(1));
+                defValues = parameterDefaultVal{i};
 
-                paramDefI = strrep(paramDefI, "<<ValType>>", valType);
+                for k = 1:numel(defValues)
+                    
+                    idx = idx + 1;
+                    if k == 1
+                        suffix = "";
+                    else
+                        suffix = "_" + string(k);
+                    end
 
-                paramMin = string(double(parameterMin{i}));
-                paramDefI = strrep(paramDefI, "<<ParamMin>>", paramMin);
+                    paramDefI = parameterTemplate;
 
-                paramMax = string(double(parameterMax{i}));
-                paramDefI = strrep(paramDefI, "<<ParamMax>>", paramMax);
+                    paramDefI = strrep(paramDefI, "<<Num>>", string(idx));
+                    paramDefI = strrep(paramDefI, "<<ParamName>>", externalParamNames(i) + suffix);
+                    paramDefI = strrep(paramDefI, "<<ParamDefinition>>", parameterNames(i));
+                    paramDefI = strrep(paramDefI, "<<ParamType>>", parameterTypes(i));
 
-                paramDefault = string(double(parameterDefaultVal{i}));
-                paramDefI = strrep(paramDefI, "<<ParamDefaultVal>>", paramDefault);
+                    valType = strrep(parameterTypes(i), "_T", "_Val");
+                    valType{1,1}(1) = upper(valType{1,1}(1));
 
-                paramDef(i) = paramDefI;
+                    paramDefI = strrep(paramDefI, "<<ValType>>", valType);
+
+                    paramMin = string(double(parameterMin{i}));
+                    paramDefI = strrep(paramDefI, "<<ParamMin>>", paramMin);
+
+                    paramMax = string(double(parameterMax{i}));
+                    paramDefI = strrep(paramDefI, "<<ParamMax>>", paramMax);
+
+                    paramDefault = util.valToString(defValues(k));
+                    paramDefI_k = strrep(paramDefI, "<<ParamDefaultVal>>", paramDefault);
+
+                    paramDef(end+1) = paramDefI_k;
+                end
             end
 
             paramDef = strjoin(paramDef, "," + newline);
 
             results = strrep(results, "<<ParameterDefinitions>>", paramDef);
 
-            %% Replace define outputs
-            defineParameters = parameterTypes + " " + parameterNames + ";";
+            %% Replace define parameters
+            defineParameters = string.empty(1,0);
+            for i = 1:numel(parameterNames)
+
+                defValues = parameterDefaultVal{i};
+
+                for k = 1:numel(defValues)
+                    
+                    idx = idx + 1;
+                    if isscalar(defValues)
+                        % Scalar
+                        suffix = "";
+                    else
+                        % Matrix
+                        suffix = "_" + string(k);
+                    end
+
+                    defineParameters(end+1) = parameterTypes(i) + " " + parameterNames(i) + suffix + ";";
+                end
+            end
+            
             defineParameters = strjoin(defineParameters, newline);
             results = strrep(results, "<<DefineParameters>>", defineParameters);
 

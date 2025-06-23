@@ -11,7 +11,7 @@ classdef Variable
         Dimensions = [NaN, NaN]
         Min (:,1) = NaN
         Max (:,1) = NaN
-        DefaultValue (:,1) = NaN
+        DefaultValue = NaN
 
         StorageSpecifier (1,1) string = ""
         GetMethod (1,1) string = ""
@@ -140,6 +140,7 @@ classdef Variable
                 nameroot (1,:) string = string.empty % Allow nested parameter search
                 nvp.OverloadStorage (1,1) string = string(nan)
                 nvp.UsedExternalNames (1,:) string = string.empty(1,0)
+                nvp.DefaultParamValue (1,:) = [] 
             end
 
             objs = cigre.description.Variable.empty(1,0);
@@ -179,6 +180,7 @@ classdef Variable
                     % struct
                     if isprop(typeObj, "Elements")
                         elements = typeObj.Elements;
+                        
                         % Pass the storage onto the children in the case of
                         % a struct
                         [sub, subExternalNames] = cigre.description.Variable.fromDataInterface(elements, modelName, [nameroot, simulinkName], ...
@@ -436,7 +438,17 @@ classdef Variable
             else
 
                 try
-                    [~, value] = util.findParam(modelName, paramName);
+                    try
+                        [~, value] = util.findParam(modelName, paramName);
+                    catch
+                        % Try to extract from a struct
+                        p = extractBefore(paramName + ".", ".");
+                        [~, value] = util.findParam(modelName, p);
+                        f = strsplit(paramName, ".");
+                        for i = 2:numel(f)
+                            value = value.(f(i));
+                        end
+                    end
                 catch
                     value = failedValue; % Not found
                 end
