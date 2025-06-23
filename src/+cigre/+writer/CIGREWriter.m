@@ -467,7 +467,7 @@ classdef CIGREWriter
             results = strrep(results, "<<NumIntStatesNeeded>>", string(numIntStates));
 
             %% SampleTime
-            results = strrep(results, "<<SampleTime>>", string(modelDescriptions.SampleTime));
+            results = strrep(results, "<<SampleTime>>", sprintf('%.17e', modelDescriptions.SampleTime));
 
             %% RTM Struct
             results = strrep(results, "<<RTMType>>", modelDescriptions.RTMVarType);
