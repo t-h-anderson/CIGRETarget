@@ -14,7 +14,7 @@ __declspec(dllexport) int32_T Model_FirstCall(IEEE_Cigre_DLLInterface_Instance* 
 	else {
 		logout("####################### Model_FirstCall Time > 0, assuming snapshot\n");
 		// Get the IO from the instance
-		MyModelParameters* parameters = (MyModelParameters*)instance->Parameters;
+        <<ParamUnpack>>
         <<InputUnpack>>
         <<OutputUnpack>>
 
@@ -68,7 +68,7 @@ __declspec(dllexport) int32_T __cdecl Model_Initialize(IEEE_Cigre_DLLInterface_I
 	*/
 
 	logout("####################### Model_Initialize ##############\n");
-    MyModelParameters* parameters = (MyModelParameters*)instance->Parameters;
+    <<ParamUnpack>>
 
 	/*
 	// Note that the initial conditions for all models are determined by the main calling program
@@ -123,7 +123,7 @@ __declspec(dllexport) int32_T __cdecl Model_Outputs(IEEE_Cigre_DLLInterface_Inst
     */
 
     // Get the IO from the instance
-    MyModelParameters* parameters = (MyModelParameters*)instance->Parameters;
+    <<ParamUnpack>>
     <<InputUnpack>>
     <<OutputUnpack>>
     

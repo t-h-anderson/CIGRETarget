@@ -25,8 +25,8 @@ for j = 1:numel(busElementOutput)
 
     portName = toName + "_" + me.Name;
 
-    if ~contains(me.DataType, "Bus: ")
-        sigs(end+1) = add_block("simulink/Quick Insert/Signal Attributes/Cast To Single", mdl + "/" + portName);
+    if ~contains(me.DataType, "Bus:")
+        sigs(end+1) = add_block("simulink/Quick Insert/Signal Attributes/Cast To Single", mdl + "/" + portName); %#ok<AGROW>
         add_line(mdl, selectorName + "/" + j, portName + "/1");
         
         if all(element.Dimensions ~= 1)
@@ -39,7 +39,7 @@ for j = 1:numel(busElementOutput)
         bus = loadBus(mdl, me.DataType);
 
         s = busToVector(bus, mdl, selectorName + "/" + j, portName, selectorName + "_" + j);
-        sigs = [sigs, s];
+        sigs = [sigs, s]; %#ok<AGROW>
     end
 end
 

@@ -58,7 +58,7 @@ classdef Variable
             if any(~idx)
                 notLeaves = objs(~idx);
                 next = [notLeaves.NestedVariable];
-                leaves = [leaves, next.getLeaves];
+                leaves = [leaves, [next.getLeaves]];
             end
         end
     end
@@ -146,6 +146,8 @@ classdef Variable
             objs = cigre.description.Variable.empty(1,0);
 
             usedExternalNames = nvp.UsedExternalNames;
+            
+            
             for i = 1:numel(dis)
 
                 di = dis(i);
@@ -180,7 +182,11 @@ classdef Variable
                     % struct
                     if isprop(typeObj, "Elements")
                         elements = typeObj.Elements;
-                        
+                        try
+                            elements = elements.toArray();
+                        catch
+                            % Not a sequence
+                        end
                         % Pass the storage onto the children in the case of
                         % a struct
                         [sub, subExternalNames] = cigre.description.Variable.fromDataInterface(elements, modelName, [nameroot, simulinkName], ...
@@ -223,7 +229,7 @@ classdef Variable
             end
 
             % Ensure external names are unique
-            ext = [objs.ExternalName];
+            ext = string([objs.ExternalName]);
             ext = matlab.lang.makeUniqueStrings(ext);
             ext = num2cell(ext);
             [objs.ExternalName] = deal(ext{:});
