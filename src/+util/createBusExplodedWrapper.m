@@ -77,8 +77,8 @@ for i = 1:numel(inhs)
 
     % Determine if the port is a non-virtual bus
     inTypes = string(get_param(inh, "OutDataTypeStr"));
-    isBus = contains(inTypes, "Bus: ");
-    isEnum = contains(inTypes, "Enum: ");
+    isBus = contains(inTypes, "Bus:");
+    isEnum = contains(inTypes, "Enum:");
 
     % Port is a bus, so need to be exploded
     inOutSignals = get_param(inh, "PortHandles");
@@ -138,8 +138,8 @@ for i = 1:numel(outh)
 
     outTypes = string(get_param(outh(i), "OutDataTypeStr"));
 
-    isBus = contains(outTypes, "Bus: ");
-    isEnum = contains(outTypes, "Enum: ");
+    isBus = contains(outTypes, "Bus:");
+    isEnum = contains(outTypes, "Enum:");
 
     name = get_param(outh(i), "Name");
 

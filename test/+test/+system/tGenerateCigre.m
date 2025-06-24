@@ -11,7 +11,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %ModelName = {"Test_TopRef"}
         %ModelName = {"Test_BadNames"}
         %ModelName = {"Snap"}
-        ModelName = {"Test_CP"}
+        %ModelName = {"Test_CP"}
         %ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
         %ModelName = {"Test_BlockIO"}
         %ModelName = {"Test_SignalObject"}
@@ -21,7 +21,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %ModelName = struct("Test_MIMO", "Test_MIMO")
         %ModelName = {"Test_FastRef"}
         %ModelName = {"Test_VectorIO"}
-        %ModelName = {"NestedBus"}
+        ModelName = {"NestedBus"}
         %ModelName = {"TestModel_meas"}
         %ModelName = {"Test_Enum"}
 
@@ -590,7 +590,11 @@ classdef tGenerateCigre < test.util.WithParallelFixture
 
             cfg.CodeGenFolder = pth;
             cfg.CacheFolder = pth;
-            Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir',true);
+            try
+                Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir',true);
+            catch
+                warning("Set codegen and cache folder failed, likely due to interrupted previous build.")
+            end
 
             % Reset to what we hard before, rather then bruteforce using
             % "reset"

@@ -13,7 +13,7 @@ for j = 1:numel(busElements)
 
     portName = fromName + "_" + busElements(j).Name;
 
-    if ~contains(busElements(j).DataType, "Bus: ")
+    if ~contains(busElements(j).DataType, "Bus:")
 
     % Add the in port with name in - originalName_busElementName
         in = add_block("built-in/Inport", mdl + "/" + portName);

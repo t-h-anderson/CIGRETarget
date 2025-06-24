@@ -50,6 +50,8 @@ classdef CIGREWriter
                 type = intState.Type;
                 pointers = intState.Pointers;
                 internalMalloc = type + pointers + " " + name + cigreSuffix + " = heap_malloc(&instance->IntStates[0], (int32_t)sizeof(" + type + "));";
+                
+                % TODO: Remove the variable creation if not required, e.g. ExtU
                 internalRestore = type + pointers + " " + name + cigreSuffix + " = (" + type + pointers + ")heap_get_address(&instance->IntStates[0], " + idx + ");";
                 idx = idx + 1;
 
@@ -222,7 +224,14 @@ classdef CIGREWriter
                 results = strrep(results, "<<ApplyOutputData>>", "*outputs = *<<OutputName>>;");
                 results = strrep(results, "<<OutputName>>", outputName);
             end
-
+            
+            numParameters = modelDescriptions.NumCigreParameters;
+            if numParameters == 0
+                results = strrep(results, "<<ParamUnpack>>", " // No parameters");
+            else
+                results = strrep(results, "<<ParamUnpack>>", "MyModelParameters* parameters = (MyModelParameters*)instance->Parameters;");
+            end
+            
             %% Parameter get
             params = modelDescriptions.Parameters;
             getIdx = (string([params.StorageSpecifier]) == "GetSet");
@@ -313,7 +322,7 @@ classdef CIGREWriter
             parameterMin = {modelDescriptions.CIGREParameters.Min}';
             parameterMax = {modelDescriptions.CIGREParameters.Max}';
             parameterDefaultVal = {modelDescriptions.CIGREParameters.DefaultValue}';
-            numParameters = sum(cellfun(@(x) numel(x), parameterDefaultVal));
+            numParameters = modelDescriptions.NumCigreParameters;
 
             parameterTypes = util.TranslateTypes.translateType(parameterTypes, "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
 

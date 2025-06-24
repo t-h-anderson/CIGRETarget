@@ -95,6 +95,7 @@ classdef ModelDescription < handle
 
         % The leaves of any nested parameters
         CIGREParameters
+        NumCigreParameters % Extra for structs and arrays
     end
 
     properties (Access = protected)
@@ -688,6 +689,11 @@ classdef ModelDescription < handle
 
         function value = get.CIGREParameters(obj)
             value = obj.Parameters.getLeaves();
+        end
+        
+        function value = get.NumCigreParameters(obj)
+            parameterDefaultVal = {obj.CIGREParameters.DefaultValue}';
+            value = sum(cellfun(@(x) numel(x), parameterDefaultVal));
         end
 
         function delete(obj)

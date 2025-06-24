@@ -223,7 +223,7 @@ classdef Variable
             end
 
             % Ensure external names are unique
-            ext = [objs.ExternalName];
+            ext = string([objs.ExternalName]);
             ext = matlab.lang.makeUniqueStrings(ext);
             ext = num2cell(ext);
             [objs.ExternalName] = deal(ext{:});

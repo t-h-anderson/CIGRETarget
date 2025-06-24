@@ -2,7 +2,7 @@ function bus = loadBus(model,name)
 
 [~, cuo] = util.loadSystem(model); %#ok<ASGLU>
 
-name = erase(name, "Bus: ");
+name = erase(name, "Bus:");
 
 try
     bus = Simulink.data.evalinGlobal(model, name);

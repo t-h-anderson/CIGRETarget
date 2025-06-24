@@ -33,7 +33,7 @@ for j = 1:numel(busElements)
     element = busDef.Elements(j);
     portName = fromName + "_" + busElements(j).Name;
     
-    if ~contains(me.DataType, "Bus: ")
+    if ~contains(me.DataType, "Bus:")
         % Add the in port with name in - originalName_busElementName
 
         ports(end+1) = add_block("simulink/Quick Insert/Signal Attributes/Cast", mdl + "/" + portName);
