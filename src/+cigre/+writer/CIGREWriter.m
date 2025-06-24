@@ -80,11 +80,10 @@ classdef CIGREWriter
 
             % Load Parameters
             paramMaps = "";
-            params = modelDescriptions.Parameters;
-            params = params.getLeaves();
-            
+            cigreParams = modelDescriptions.CIGREParameters;
+                        
             % Model arguments
-            modelArgParams = params([params.IsModelArgument]);
+            modelArgParams = cigreParams([cigreParams.IsModelArgument]);
             if numel(modelArgParams) > 0
 
                 for i = 1:numel(modelArgParams)
@@ -93,28 +92,14 @@ classdef CIGREWriter
                     pExternal = modelArgParam.ExternalName;
                     
                     structName = erase(modelArgParam.StorageSpecifier, "ModelArgument:");
+                    
+                    % Matrix
+                    paramMap = " = " + "parameters->" + pExternal + ";" + newline;
+                    
+                    paramMaps = paramMaps + ...
+                        "<<RTMStructName>>->dwork->mdl_InstanceData.rtm." + structName + "->" + pSimulink ... % Simulink structure
+                        + paramMap; % CIGRE Memory
 
-                    % Iterate through arrays to provide all elements as
-                    % input
-                    vars = prod(modelArgParams(i).Dimensions);
-
-                    for k = 1:vars
-
-                        if vars == 1
-                            % Scalar
-                            access = "";
-                            paramMap = " = " + "parameters->" + pExternal + ";" + newline;
-                        else
-                            % Matrix
-                            access = "[" + (k - 1) + "]";
-                            paramMap = " = " + "parameters->" + pExternal + "_" + k + ";" + newline;
-                        end
-
-                        paramMaps = paramMaps + ...
-                            "<<RTMStructName>>->dwork->mdl_InstanceData.rtm." + structName + "->" + pSimulink + access ... % Simulink structure
-                            + paramMap; % CIGRE Memory
-
-                    end
                 end
 
             else
@@ -122,7 +107,7 @@ classdef CIGREWriter
             end
             
             % Global params
-            globalParams = params(~[params.IsModelArgument]);
+            globalParams = cigreParams(~[cigreParams.IsModelArgument]);
             if ~isempty(globalParams)
                 warning("Global parameters found:" + strjoin([globalParams.SimulinkName], ", ") + "." + newline ...
                     + "DLL may be non-deterministic when called in parallel. Instead, try to define all parameters as model arguments");
@@ -133,25 +118,11 @@ classdef CIGREWriter
                 pSimulink = globalParam.SimulinkName;
                 pExternal = globalParam.ExternalName;
                 
-                    % Iterate through arrays to provide all elements as
-                    % input
-                    vars = prod(globalParams(i).Dimensions);
-
-                    for k = 1:vars
-
-                        if vars == 1
-                            % Scalar
-                             access = "";
-                            paramMap = "parameters->" + pExternal + ";" + newline;
-                        else
-                            % Matrix
-                            access = "[" + (k - 1) + "]";
-                            paramMap = "parameters->" + pExternal + "_" + k + ";" + newline;
-                        end
-
-                        paramMaps = paramMaps +...
-                            (pSimulink + access) + " = " + paramMap;
-                    end
+                
+                paramMap = "parameters->" + pExternal + ";" + newline;
+                
+                paramMaps = paramMaps +...
+                    (pSimulink + access) + " = " + paramMap;
                 
             end
             
@@ -233,9 +204,9 @@ classdef CIGREWriter
             end
             
             %% Parameter get
-            params = modelDescriptions.Parameters;
-            getIdx = (string([params.StorageSpecifier]) == "GetSet");
-            getParams = params(getIdx);
+            cigreParams = modelDescriptions.Parameters;
+            getIdx = (string([cigreParams.StorageSpecifier]) == "GetSet");
+            getParams = cigreParams(getIdx);
             for i = 1:numel(getParams)
                 getFn = getParams(i).GetMethod;
                 type = "void";
@@ -317,14 +288,14 @@ classdef CIGREWriter
             results = strrep(results, "<<ParamGetMethods>>", "");
 
             % Parameters
-            parameterNames = string([modelDescriptions.CIGREParameters.ExternalName]');
-            parameterTypes = [modelDescriptions.CIGREParameters.Type]';
+            cigreParamNames = string([modelDescriptions.CIGREParameters.ExternalName]');
+            cigreParamTypes = [modelDescriptions.CIGREParameters.Type]';
             parameterMin = {modelDescriptions.CIGREParameters.Min}';
             parameterMax = {modelDescriptions.CIGREParameters.Max}';
-            parameterDefaultVal = {modelDescriptions.CIGREParameters.DefaultValue}';
-            numParameters = modelDescriptions.NumCigreParameters;
+            cigreParamDefaultVal = {modelDescriptions.CIGREParameters.DefaultValue}';
+            numCigreParameters = modelDescriptions.NumCigreParameters;
 
-            parameterTypes = util.TranslateTypes.translateType(parameterTypes, "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
+            cigreParamTypes = util.TranslateTypes.translateType(cigreParamTypes, "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
 
             isHeader = isfile("./slprj/ert/_sharedutils/model_reference_types.h");
             if isHeader
@@ -419,7 +390,7 @@ classdef CIGREWriter
             results = strrep(results, "<<OutputDefinition>>", outputDef);
 
             %% Replace Parameter Definition
-            results = strrep(results, "<<NumParam>>", string(numParameters));
+            results = strrep(results, "<<NumParam>>", string(numCigreParameters));
 
             parameterTemplate = ...
                 ["[<<Num>>] = {", ...
@@ -437,47 +408,32 @@ classdef CIGREWriter
 
             parameterTemplate = strjoin(parameterTemplate, newline);
 
-            % PSCAD has limited identifier length
-            externalParamNames = matlab.lang.makeUniqueStrings(parameterNames, 1:numel(parameterNames), modelDescriptions.MaxExternalIdentifier);
-
             paramDef = string.empty();
-            idx = -1;
-            for i = 1:numel(parameterNames)
+            for i = 1:numel(cigreParamNames)
 
-                defValues = parameterDefaultVal{i};
-
-                for k = 1:numel(defValues)
-                    
-                    idx = idx + 1;
-                    if k == 1
-                        suffix = "";
-                    else
-                        suffix = "_" + string(k);
-                    end
-
-                    paramDefI = parameterTemplate;
-
-                    paramDefI = strrep(paramDefI, "<<Num>>", string(idx));
-                    paramDefI = strrep(paramDefI, "<<ParamName>>", externalParamNames(i) + suffix);
-                    paramDefI = strrep(paramDefI, "<<ParamDefinition>>", parameterNames(i));
-                    paramDefI = strrep(paramDefI, "<<ParamType>>", parameterTypes(i));
-
-                    valType = strrep(parameterTypes(i), "_T", "_Val");
-                    valType{1,1}(1) = upper(valType{1,1}(1));
-
-                    paramDefI = strrep(paramDefI, "<<ValType>>", valType);
-
-                    paramMin = string(double(parameterMin{i}));
-                    paramDefI = strrep(paramDefI, "<<ParamMin>>", paramMin);
-
-                    paramMax = string(double(parameterMax{i}));
-                    paramDefI = strrep(paramDefI, "<<ParamMax>>", paramMax);
-
-                    paramDefault = string(double(defValues(k)));
-                    paramDefI_k = strrep(paramDefI, "<<ParamDefaultVal>>", paramDefault);
-
-                    paramDef(end+1) = paramDefI_k;
-                end
+                paramDefI = parameterTemplate;
+                
+                paramDefI = strrep(paramDefI, "<<Num>>", string(i-1));
+                paramDefI = strrep(paramDefI, "<<ParamName>>", cigreParamNames(i));
+                paramDefI = strrep(paramDefI, "<<ParamDefinition>>", cigreParamNames(i));
+                paramDefI = strrep(paramDefI, "<<ParamType>>", cigreParamTypes(i));
+                
+                valType = strrep(cigreParamTypes(i), "_T", "_Val");
+                valType{1,1}(1) = upper(valType{1,1}(1));
+                
+                paramDefI = strrep(paramDefI, "<<ValType>>", valType);
+                
+                paramMin = string(double(parameterMin{i}));
+                paramDefI = strrep(paramDefI, "<<ParamMin>>", paramMin);
+                
+                paramMax = string(double(parameterMax{i}));
+                paramDefI = strrep(paramDefI, "<<ParamMax>>", paramMax);
+                
+                paramDefault = string(double(cigreParamDefaultVal{i}));
+                paramDefI_k = strrep(paramDefI, "<<ParamDefaultVal>>", paramDefault);
+                
+                paramDef(end+1) = paramDefI_k;
+                
             end
 
             paramDef = strjoin(paramDef, "," + newline);
@@ -486,23 +442,11 @@ classdef CIGREWriter
 
             %% Replace define parameters
             defineParameters = string.empty(1,0);
-            for i = 1:numel(parameterNames)
+            for i = 1:numel(cigreParamNames)
 
-                defValues = parameterDefaultVal{i};
-
-                for k = 1:numel(defValues)
-                    
-                    idx = idx + 1;
-                    if isscalar(defValues)
-                        % Scalar
-                        suffix = "";
-                    else
-                        % Matrix
-                        suffix = "_" + string(k);
-                    end
-
-                    defineParameters(end+1) = parameterTypes(i) + " " + parameterNames(i) + suffix + ";";
-                end
+                defValues = cigreParamDefaultVal{i};
+                defineParameters(end+1) = cigreParamTypes(i) + " " + cigreParamNames(i) + ";";
+                
             end
             
             defineParameters = strjoin(defineParameters, newline);
@@ -539,7 +483,7 @@ classdef CIGREWriter
             results = strrep(results, "<<NoOutputs>>", string(numOutputs));
 
             %% NoParams
-            results = strrep(results, "<<NoParams>>", string(numParameters));
+            results = strrep(results, "<<NoParams>>", string(numCigreParameters));
 
             %% Int states needed
             numIntStates = heapSize(modelDescriptions); % What value does this need to be?

@@ -11,7 +11,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %ModelName = {"Test_TopRef"}
         %ModelName = {"Test_BadNames"}
         %ModelName = {"Snap"}
-        %ModelName = {"Test_CP"}
+        ModelName = {"Test_CP"}
         %ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
         %ModelName = {"Test_BlockIO"}
         %ModelName = {"Test_SignalObject"}
@@ -21,7 +21,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %ModelName = struct("Test_MIMO", "Test_MIMO")
         %ModelName = {"Test_FastRef"}
         %ModelName = {"Test_VectorIO"}
-        ModelName = {"NestedBus"}
+        %ModelName = {"NestedBus"}
         %ModelName = {"TestModel_meas"}
         %ModelName = {"Test_Enum"}
 
@@ -254,7 +254,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             fld = fld + fullfile(matlabroot, "simulink", "include") + ";";
             fld = fld + fullfile(matlabroot, "rtw\c\src") + ";";
             fld = fld + fullfile(pwd, modelName + "_wrap_cigre_rtw");
-            clipboard("copy", fld);
+            %clipboard("copy", fld);
             
             keyboard %#ok<KEYBOARDFUN>
             
@@ -346,37 +346,40 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             testCase.CIGREParameters = struct("Name", {}, "Value", {});
             
             simulinkParams = desc.Parameters;
-            cigreParams = simulinkParams.getLeaves();
-
-            simulinkNames = string.empty();
-            for i = 1:numel(cigreParams)
-                c = cigreParams(i).BaseType;
+            for i = 1:numel(simulinkParams)
+                simulinkParam = simulinkParams(i);
+                simulinkName = simulinkParam.SimulinkName;
+                                
+                % Convert data type to base type
+                c = simulinkParam.BaseType;
+                simulinkVal = simulinkParam.DefaultValue;
+                try
+                    simulinkVal = cast(simulinkVal, c);
+                catch
+                    % Not castable, perhaps a struct
+                end
                 
-                cigreVal = cigreParams(i).DefaultValue;
+                % Get Simulink Parameter for baseline test
+                testCase.SimulinkParameters(i) = struct("Name", simulinkName, "Value", simulinkVal);
+            end
+            
+            % Get CIGRE parameter for dll test
+            cigreParams = desc.CIGREParameters;
+            for j = 1:numel(cigreParams)
+                cigreParam = cigreParams(j);
+                cigreName = cigreParam.ExternalName; % e.g. a.b.c
                 
+                c = cigreParam.BaseType;
+                cigreVal = cigreParam.DefaultValue;
                 try
                     cigreVal = cast(cigreVal, c);
                 catch
-                    % TODO: Not a Simulink.Parameter
-                    cigreVal = cast(cigreVal, c);
+                    % Not castable
+                    warning("Could not case CIGRE parameter " + cigreName + " to type " + c);
                 end
-
-                cigreName = cigreParams(i).ExternalName; % e.g. a.b.c
-                testCase.CIGREParameters(i) = struct("Name", cigreName, "Value", cigreVal);
                 
-                % Now create or update the parameter for simulink
-                simulinkName = cigreParams(i).SimulinkName;
-                eval(simulinkName + " = cigreVal;");  % Hacky way to convert name "a.b.c" with value = val into the struct
-                simulinkName = extractBefore(simulinkName + ".", "."); % i.e. the "root" if it is a struct
-                simulinkNames = [simulinkNames, simulinkName];
+                testCase.CIGREParameters(end+1) = struct("Name", cigreName, "Value", cigreVal);
                 
-            end
-
-            % Append any unique simulink names
-            names = unique(simulinkNames);
-            for i = 1:numel(names)
-                name = names(i);
-                testCase.SimulinkParameters(i) = struct("Name", name, "Value", util.valToString(eval(name)));
             end
 
         end
@@ -437,9 +440,10 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             for i = 1:numel(params)
                 name = testCase.SimulinkParameters(i).Name;
                 val = testCase.SimulinkParameters(i).Value;
+                val = char(util.valToString(val)); % Parameter value needs to be a sring on the input object
                 idx = (string({ip.Name}) == name);
                 if any(idx)
-                    ip(idx).Value = char(val);
+                    ip(idx).Value = val;
                 else
                     % In model workspace
                     mdl = char(erase(mdlName, "_wrap"));

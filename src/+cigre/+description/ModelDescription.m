@@ -688,7 +688,25 @@ classdef ModelDescription < handle
         end
 
         function value = get.CIGREParameters(obj)
-            value = obj.Parameters.getLeaves();
+            leaves = obj.Parameters.getLeaves();
+            value = leaves([]);
+            
+            names = string.empty(1,0);
+            for i = 1:numel(leaves)
+                leaf = leaves(i);
+                nData = numel(leaf.DefaultValue);
+                for j = 1:nData
+                   thisParam = leaf;
+                   thisParam.DefaultValue = leaf.DefaultValue(j);
+                   thisParam.ExternalName = matlab.lang.makeUniqueStrings(leaf.ExternalName, names);
+                   thisParam.Dimensions = 1;
+                   if nData > 1
+                       thisParam.SimulinkName = thisParam.SimulinkName + "[" + (j-1) + "]";
+                   end
+                   names = [names, thisParam.ExternalName]; %#ok<AGROW>
+                   value(end+1) = thisParam; %#ok<AGROW>
+                end
+            end
         end
         
         function value = get.NumCigreParameters(obj)

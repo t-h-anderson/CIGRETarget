@@ -2,9 +2,7 @@ function baseline = extractData(results)
 
 
 if verLessThan("MATLAB", "9.9")
-    
-    t = seconds(results.tout);
-    
+     
     try
         y = results.yout;
     catch
@@ -14,6 +12,7 @@ if verLessThan("MATLAB", "9.9")
     
     tt = {};
     for i = 1:(y.numElements)
+        t = seconds(y{i}.Values.Time);
         yvals = y{i}.Values.Data;
         
         % Ensure that first dimension is time. Needed for matrix IO
@@ -25,8 +24,6 @@ if verLessThan("MATLAB", "9.9")
         
         thisName = string(y{i}.BlockPath.convertToCell);
         [~, thisName] = fileparts(thisName);
-        
-        t = seconds(y{i}.Values.Time);
         
         tt{i} = timetable(t, yvals, 'VariableNames', thisName);
     end
