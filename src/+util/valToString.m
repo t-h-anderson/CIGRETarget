@@ -1,5 +1,30 @@
 function str = valToString(s)
 
+if ~isscalar(s)
+    sz = size(s);
+    if numel(sz) > 2
+        error("Tensors not supported");
+    end
+
+    p = cell(sz);
+    for i = 1:numel(s)
+        p{i} = util.valToString(s(i));
+    end
+
+    str = "[";
+    for i = 1:size(s, 1)
+        str = str + strjoin([p{i,:}], ", ");
+        
+        if i < size(s, 2)
+            str = str + "; ";
+        end
+    end
+    str = str + "]";
+        
+
+    return
+end
+
 str = "";
 if isstruct(s)
     str = "struct(";

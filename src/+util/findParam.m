@@ -28,8 +28,8 @@ switch where.SourceType
         param = getVariable(mw, paramPath(1));
         value = param.Value;
     case "base workspace"
-        param = [];
-        value = failedValue; % Not supported
+        param = evalin('base', param);
+        value = param.Value;
     otherwise
         % Try in a data dictionary
         sldd = where.Source;

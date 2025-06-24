@@ -213,7 +213,7 @@ classdef ModelDescription < handle
                     error("Step size 'auto' not supported");
                 end
 
-                obj.SampleTime = evalin('base', step); % TODO: How do we eval this like the model?
+                obj.SampleTime = sprintf("%.17e", evalin('base', step)); % TODO: How do we eval this like the model?
             catch
                 error("ModelDescription:StepSizeNotCalculated", "Step size " + step + " could not be evaluated");
             end
