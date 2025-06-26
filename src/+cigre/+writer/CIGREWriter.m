@@ -122,7 +122,7 @@ classdef CIGREWriter
                 paramMap = "parameters->" + pExternal + ";" + newline;
                 
                 paramMaps = paramMaps +...
-                    (pSimulink + access) + " = " + paramMap;
+                    pSimulink + " = " + paramMap;
                 
             end
             
