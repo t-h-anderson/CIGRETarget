@@ -15,11 +15,10 @@ for i = 1:numel(files)
         file = files(i).name;
         
         tc = load(fullfile(pth, file)).tc;
-        name = tc.Name;
         bits = string(extractBetween(file, " x", ".mat"));
         
         configs(i)                       = coder.make.ToolchainInfoRegistry;
-        configs(i).Name                  = name;
+        configs(i).Name                  = tc;
         configs(i).FileName              = fullfile(pth, file);
         configs(i).Platform              =  {'win64'};
         
