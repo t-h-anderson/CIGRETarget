@@ -1,4 +1,4 @@
-function [ name ] = minGWDLLToolchain( compilerVersion, type )
+function toolchainObjectHandle = minGWDLLToolchain( compilerVersion, type )
 arguments
     compilerVersion (1,1) string {mustBeMember(compilerVersion, { 'MinGW'})}
     type (1,1) string {mustBeMember(type, ["32", "64"])}

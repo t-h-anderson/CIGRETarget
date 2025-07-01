@@ -18,7 +18,7 @@ for i = 1:numel(files)
         bits = string(extractBetween(file, " x", ".mat"));
         
         configs(i)                       = coder.make.ToolchainInfoRegistry;
-        configs(i).Name                  = tc;
+        configs(i).Name                  = tc.Name;
         configs(i).FileName              = fullfile(pth, file);
         configs(i).Platform              =  {'win64'};
         
