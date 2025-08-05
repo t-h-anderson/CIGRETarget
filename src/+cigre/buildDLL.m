@@ -7,6 +7,7 @@ arguments
     nvp.BusAs (1,1) string {mustBeMember(nvp.BusAs, ["Ports", "Vector"])} = "Vector"
     nvp.Verbose (1,1) logical = true
     nvp.WrapSuffix (1,1) string = "_wrap"
+    nvp.VectorDataType (1,1) string = "single"
 end
 
 % Load the model and ensure the correct target is selected
@@ -27,10 +28,10 @@ end
 
 % Produce an intermediate wrapper to deal with buses
 if nvp.PreserveWrapper
-    wrapper = cigre.internal.cigreWrap(model, "BusAs", nvp.BusAs, "NameSuffix", wrapSuffix);
+    wrapper = cigre.internal.cigreWrap(model, "BusAs", nvp.BusAs, "NameSuffix", wrapSuffix, "VectorDataType", nvp.VectorDataType);
     cWrap = [];
 else 
-    [wrapper, cWrap] = cigre.internal.cigreWrap(model, "BusAs", nvp.BusAs, "NameSuffix", wrapSuffix); 
+    [wrapper, cWrap] = cigre.internal.cigreWrap(model, "BusAs", nvp.BusAs, "NameSuffix", wrapSuffix, "VectorDataType", nvp.VectorDataType); 
 end
 
 cigre.internal.build(wrapper);

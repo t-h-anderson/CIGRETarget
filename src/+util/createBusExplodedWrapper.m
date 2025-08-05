@@ -3,6 +3,7 @@ arguments
     model (1,1) string
     nvp.BusAs (1,1) string {mustBeMember(nvp.BusAs, ["Ports", "Vector"])} = "Ports"
     nvp.NameSuffix (1,1) string = "_wrap"
+    nvp.VectorDataType (1,1) string = "single"
 end
 
 % Ensure the model is loaded, if not, close after we leave the explode
@@ -101,7 +102,7 @@ for i = 1:numel(inhs)
                 % Add a bus creator (recursive)
                 signalsToBus(inputSignals, wrapperName, fromName, toName, creatorName);
             otherwise
-                vectorToBus(inputSignals, wrapperName, fromName, toName, creatorName, 0, true);
+                vectorToBus(inputSignals, wrapperName, fromName, toName, creatorName, 0, true, "CastTo", nvp.VectorDataType);
         end
     elseif isEnum
 
