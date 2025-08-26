@@ -1,4 +1,4 @@
-function [ports, idx, idxRange] = vectorToBus(signalInput, mdl, fromName, toName, creatorName, idx, terminate)
+function [ports, idx, idxRange] = vectorToBus(signalInput, mdl, fromName, toName, creatorName, idx, terminate, nvp)
 arguments
     signalInput
     mdl
@@ -7,6 +7,7 @@ arguments
     creatorName
     idx = 0
     terminate (1,1) logical = false
+    nvp.CastTo (1,1) string = "single"
 end
 
 busDef = loadBus(mdl, signalInput.BusObject);
@@ -72,7 +73,7 @@ for j = 1:numel(busElements)
         elementCreatorName = creatorName + "_" + j;
         elementToName = creatorName + "/" + j;
 
-        [p, idx, idxRanges] = vectorToBus(signalInput.Children(j), mdl, portName, elementToName, elementCreatorName, idx);
+        [p, idx, idxRanges] = vectorToBus(signalInput.Children(j), mdl, portName, elementToName, elementCreatorName, idx, "CastTo", nvp.CastTo);
         ports = [ports, p];
         idxRange = [idxRange, idxRanges];
     end
@@ -81,10 +82,10 @@ end
 
 % input
 set_param(busCreator, "OutDataTypeStr", "Bus: " + signalInput.BusObject);
-
+castTo = nvp.CastTo;
 if terminate
     in = add_block("built-in/Inport", mdl + "/" + fromName);
-    set_param(in, "OutDataTypeStr", "single");
+    set_param(in, "OutDataTypeStr", castTo);
 
     for i = 1:numel(ports)
         s = add_block("simulink/Signal Routing/Selector", mdl + "/" + portName + "select" , "MakeNameUnique", 'on');

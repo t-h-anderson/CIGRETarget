@@ -1,7 +1,5 @@
 #include "<<CigreHeader>>"
 
-#pragma pack(push, 1)
-
 <<InitializeOnly>>
 
 // ----------------------------------------------------------------
