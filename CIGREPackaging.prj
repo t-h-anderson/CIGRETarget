@@ -1,13 +1,13 @@
 <deployment-project plugin="plugin.toolbox" plugin-version="1.0">
-  <configuration file="Z:\Work\CIGRE\cigre-target\CIGREPackaging.prj" location="Z:\Work\CIGRE\cigre-target" name="CIGREPackaging" target="target.toolbox" target-name="Package Toolbox">
+  <configuration file="C:\Users\toma\Documents\CIGRETarget\CIGREPackaging.prj" location="C:\Users\toma\Documents\CIGRETarget" name="CIGREPackaging" target="target.toolbox" target-name="Package Toolbox">
     <param.appname>Simulink to CIGRE Export Tool</param.appname>
-    <param.authnamewatermark />
-    <param.email />
-    <param.company />
+    <param.authnamewatermark>Tom Anderson</param.authnamewatermark>
+    <param.email>toma@mathworks.com</param.email>
+    <param.company>MathWorks</param.company>
     <param.summary />
     <param.description>Enables developers to create CIGRE compatible DLLs from Simulink models</param.description>
-    <param.screenshot />
-    <param.version>1.0</param.version>
+    <param.screenshot>${PROJECT_ROOT}\src\resources\Logo.png</param.screenshot>
+    <param.version>1.2</param.version>
     <param.output>${PROJECT_ROOT}\Simulink to CIGRE Export Tool.mltbx</param.output>
     <param.products.name />
     <param.products.id />
@@ -74,12 +74,7 @@ work</param.exclude.filters>
     <param.additional.sw.mac.url />
     <param.additional.sw.linux.url />
     <unset>
-      <param.authnamewatermark />
-      <param.email />
-      <param.company />
       <param.summary />
-      <param.screenshot />
-      <param.version />
       <param.output />
       <param.products.name />
       <param.products.id />
@@ -114,27 +109,27 @@ work</param.exclude.filters>
     <fileset.rootfiles>
       <file>${PROJECT_ROOT}\.gitattributes</file>
       <file>${PROJECT_ROOT}\.gitignore</file>
+      <file>${PROJECT_ROOT}\CIGRE.mlproj</file>
       <file>${PROJECT_ROOT}\doc</file>
       <file>${PROJECT_ROOT}\gitlab-ci.yml</file>
       <file>${PROJECT_ROOT}\README.md</file>
       <file>${PROJECT_ROOT}\resources</file>
       <file>${PROJECT_ROOT}\src</file>
       <file>${PROJECT_ROOT}\test</file>
-      <file>${PROJECT_ROOT}\test.m</file>
     </fileset.rootfiles>
     <fileset.depfun.included />
     <fileset.depfun.excluded />
     <fileset.package />
     <build-deliverables>
-      <file location="${PROJECT_ROOT}" name="Simulink to CIGRE Export Tool.mltbx" optional="false">Z:\Work\CIGRE\cigre-target\Simulink to CIGRE Export Tool.mltbx</file>
+      <file location="${PROJECT_ROOT}" name="Simulink to CIGRE Export Tool.mltbx" optional="false">C:\Users\toma\Documents\CIGRETarget\Simulink to CIGRE Export Tool.mltbx</file>
     </build-deliverables>
     <workflow />
     <matlab>
-      <root>Z:\Program Files\MATLAB\R2023b</root>
+      <root>C:\Program Files\MATLAB\R2024b</root>
       <toolboxes>
         <toolbox name="matlabcoder" />
         <toolbox name="embeddedcoder" />
-        <toolbox name="neuralnetwork" />
+        <toolbox name="fixedpoint" />
       </toolboxes>
       <toolbox>
         <matlabcoder>
@@ -147,9 +142,9 @@ work</param.exclude.filters>
         </embeddedcoder>
       </toolbox>
       <toolbox>
-        <neuralnetwork>
+        <fixedpoint>
           <enabled>true</enabled>
-        </neuralnetwork>
+        </fixedpoint>
       </toolbox>
     </matlab>
     <platform>
