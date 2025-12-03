@@ -307,17 +307,19 @@ classdef ModelDescription < handle
             id = codeInfo.InternalData;
 
             % Dealt with cetain fields of model struct explicitly
-            name = string.empty(1,0);
+            slname = string.empty(1,0);
+            externalName = string.empty(1,0);
             for i = 1:numel(id)
-                name(i) = cigre.description.Variable.extractSimulinkName(id(i));
+                slname(i) = cigre.description.Variable.extractSimulinkName(id(i));
+                externalName(i) = cigre.description.Variable.extractExternalName(id(i));
             end
-            idx = cellfun(@(x) x == "rt_errorStatus", name);
-            idx = idx | cellfun(@(x) x == "timingBridge", name);
-            idx = idx | cellfun(@(x) contains(x, "mdlref_TID"), name);
+            idx = cellfun(@(x) x == "rt_errorStatus", externalName);
+            idx = idx | cellfun(@(x) x == "timingBridge", externalName);
+            idx = idx | cellfun(@(x) contains(x, "mdlref_TID"), externalName);
             id(idx) = [];
 
             % Ensure we don't have any name clases
-            name = obj.avoidReservedName(name);
+            externalName = obj.avoidReservedName(externalName);
 
             type = string.empty(1,0);
             pointers = string.empty(1,0);
@@ -335,9 +337,9 @@ classdef ModelDescription < handle
             idx = cellfun(@(x) x == "", pointers);
             pointers(idx) = {"*"};
 
-            obj.InputData = cigre.description.Variable.create("SimulinkName", name(idxInput), "Type", type(idxInput), "Pointers", pointers(idxInput));
-            obj.OutputData = cigre.description.Variable.create("SimulinkName", name(idxOutput), "Type", type(idxOutput), "Pointers", pointers(idxOutput));
-            obj.InternalData = cigre.description.Variable.create("SimulinkName", name(idxInternal), "Type", type(idxInternal), "Pointers", pointers(idxInternal));
+            obj.InputData = cigre.description.Variable.create("SimulinkName", slname(idxInput), "ExternalName", externalName(idxInput), "Type", type(idxInput), "Pointers", pointers(idxInput));
+            obj.OutputData = cigre.description.Variable.create("SimulinkName", slname(idxOutput), "ExternalName", externalName(idxOutput), "Type", type(idxOutput), "Pointers", pointers(idxOutput));
+            obj.InternalData = cigre.description.Variable.create("SimulinkName", slname(idxInternal), "ExternalName", externalName(idxInternal), "Type", type(idxInternal), "Pointers", pointers(idxInternal));
 
             obj.getRTMStruct();
         end
@@ -347,7 +349,7 @@ classdef ModelDescription < handle
             % Ignore Inputs, outputs and RTM
             idx = find(endsWith([obj.InternalData.SimulinkName], "_M" + textBoundaryPattern), 1); % TODO: Make this more robust
             if isempty(idx)
-                idx = find(contains([obj.InternalData.SimulinkName], "MODEL"), 1); % TODO: Make this more robust
+                idx = find(contains([obj.InternalData.SimulinkName], "MODEL", "IgnoreCase", true), 1); % TODO: Make this more robust
             end
 
             obj.RTMVarType = obj.InternalData(idx).Type;

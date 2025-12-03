@@ -39,6 +39,10 @@ classdef Variable
                     obj.(f) = val;
                 end
             end
+            
+            if all(obj.ExternalName == "")
+                obj.ExternalName = matlab.lang.makeValidName(obj.SimulinkName);
+            end
 
         end
 
