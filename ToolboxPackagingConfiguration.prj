@@ -1,0 +1,471 @@
+<deployment-project plugin="plugin.toolbox" plugin-version="1.0">
+  <configuration file="C:\Users\toma\Documents\CIGRETarget\ToolboxPackagingConfiguration.prj" location="C:\Users\toma\Documents\CIGRETarget" name="ToolboxPackagingConfiguration" target="target.toolbox" target-name="Package Toolbox">
+    <param.appname>CIGRE</param.appname>
+    <param.authnamewatermark />
+    <param.email />
+    <param.company />
+    <param.summary />
+    <param.description />
+    <param.screenshot />
+    <param.version>1.0</param.version>
+    <param.output>${PROJECT_ROOT}\CIGRE.mltbx</param.output>
+    <param.products.name />
+    <param.products.id />
+    <param.products.version />
+    <param.platforms />
+    <param.guid>7f1f273c-0bd0-461c-a92b-1681ad1801c5</param.guid>
+    <param.exclude.filters>% List files contained in your toolbox folder that you would like to exclude
+% from packaging.  Excludes should be listed relative to the toolbox folder.
+% Some examples of how to specify excludes are provided below:
+%
+% A single file in the toolbox folder:
+% .svn
+%
+% A single file in a subfolder of the toolbox folder:
+% example/.svn
+%
+% All files in a subfolder of the toolbox folder:
+% example/*
+%
+% All files of a certain name in all subfolders of the toolbox folder:
+% **/.svn
+%
+% All files matching a pattern in all subfolders of the toolbox folder:
+% **/*.bak
+%
+resources/project/*
+.SimulinkProject/*
+_SimulinkProject/*
+resources/.Project/*
+resources/_Project/*
+**/*.prj
+**/.git
+CIGRE.mlproj
+doc/CIGRE Target Doc.pdf
+Simulink to CIGRE Export Tool.mltbx
+src/CIGRESource/.vs
+src/CIGRESource/.vs/Test_CP_CIGRE
+src/CIGRESource/.vs/Test_CP_CIGRE/FileContentIndex
+src/CIGRESource/.vs/Test_CP_CIGRE/FileContentIndex/e33fb32f-0ba2-4e19-9731-64f53d395878.vsidx
+src/CIGRESource/.vs/Test_CP_CIGRE/v17
+src/CIGRESource/.vs/Test_CP_CIGRE/v17/.suo
+src/CIGRESource/.vs/Test_CP_CIGRE/v17/Browse.VC.db
+src/CIGRESource/.vs/Test_CP_CIGRE/v17/ipch
+src/CIGRESource/.vs/Test_CP_CIGRE/v17/ipch/AutoPCH
+src/CIGRESource/.vs/Test_CP_CIGRE/v17/ipch/AutoPCH/74381ed8ac8f4447
+src/CIGRESource/.vs/Test_CP_CIGRE/v17/ipch/AutoPCH/74381ed8ac8f4447/CIGRE_DEFAULTS.ipch
+src/CIGRESource/Test_CP_CIGRE.sln
+src/CIGRESource/Test_CP_CIGRE.vcxproj
+src/CIGRESource/Test_CP_CIGRE.vcxproj.filters
+src/CIGRESource/Test_CP_CIGRE.vcxproj.user
+src/toolchain/CIGRE DLL Toolchain MinGW x32.mat
+src/toolchain/CIGRE DLL Toolchain MinGW x64.mat
+src/toolchain/CIGRE DLL Toolchain VS2019 x32.mat
+src/toolchain/CIGRE DLL Toolchain VS2019 x64.mat
+src/utils/busToSignals.asv
+test/models/busModels/NestedBus.slxc
+test/models/busModels/slprj
+test/models/busModels/slprj/sim
+test/models/busModels/slprj/sim/varcache
+test/models/busModels/slprj/sim/varcache/NestedBus
+test/models/busModels/slprj/sim/varcache/NestedBus/checksumOfCache.mat
+test/models/busModels/slprj/sim/varcache/NestedBus/tmwinternal
+test/models/busModels/slprj/sim/varcache/NestedBus/tmwinternal/simulink_cache.xml
+test/models/busModels/slprj/sim/varcache/NestedBus/varInfo.mat
+test/VS_Build
+test/VS_Build/VSBuild_NestedBus
+test/VS_Build/VSBuild_NestedBus/NestedBus.slxc
+test/VS_Build/VSBuild_NestedBus/NestedBus_CIGRE.dll
+test/VS_Build/VSBuild_NestedBus/NestedBus_CIGRE.h
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap.exp
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap.lib
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap.pdb
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap.slx
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap.slxc
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/buildInfo.mat
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/CIGRE_Defaults.obj
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/codedescriptor.dmr
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/codeInfo.mat
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/compileInfo.mat
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/defines.txt
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/ert_main.c
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/ert_main.obj
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/heap.obj
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/modelsources.txt
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/NestedBus_CIGRE.obj
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/NestedBus_wrap.bat
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/NestedBus_wrap.c
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/NestedBus_wrap.h
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/NestedBus_wrap.mk
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/NestedBus_wrap.obj
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/NestedBus_wrap.rsp
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/NestedBus_wrap_comp.rsp
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/NestedBus_wrap_private.h
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/NestedBus_wrap_ref.rsp
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/NestedBus_wrap_types.h
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/rtw_proj.tmw
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/tmwinternal
+test/VS_Build/VSBuild_NestedBus/NestedBus_wrap_cigre_rtw/tmwinternal/simulink_cache.xml
+test/VS_Build/VSBuild_NestedBus/slprj
+test/VS_Build/VSBuild_NestedBus/slprj/cigre
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/buildInfo.mat
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/checksummap.mat
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/compileInfo.mat
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rt_defines.h
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rt_nonfinite.c
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rt_nonfinite.h
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rt_nonfinite.obj
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rtGetInf.c
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rtGetInf.h
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rtGetInf.obj
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rtGetNaN.c
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rtGetNaN.h
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rtGetNaN.obj
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rtw_proj.tmw
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rtwshared.bat
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rtwshared.lib
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rtwshared.mk
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rtwshared.rsp
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rtwshared_comp.rsp
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rtwshared_ref.rsp
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rtwtypes.h
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/rtwtypeschksum.mat
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/_sharedutils/shared_file.dmr
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/buildInfo.mat
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/codedescriptor.dmr
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/compileInfo.mat
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/defines.txt
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/modelsources.txt
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/NestedBus.bat
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/NestedBus.c
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/NestedBus.h
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/NestedBus.mk
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/NestedBus.obj
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/NestedBus.rsp
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/NestedBus_comp.rsp
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/NestedBus_mr_codeInfo.mat
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/NestedBus_private.h
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/NestedBus_ref.rsp
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/NestedBus_rtwlib.lib
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/NestedBus_types.h
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/rtw_proj.tmw
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/tmwinternal
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/tmwinternal/binfo_mdlref.mat
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/tmwinternal/minfo_mdlref.mat
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/tmwinternal/ModelRefCompileInfo.xml
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/tmwinternal/simulink_cache.xml
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus/tmwinternal/tr
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus_CIGRE.c
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus_CIGRE.h
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus_wrap
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus_wrap/tmwinternal
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus_wrap/tmwinternal/binfo.mat
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus_wrap/tmwinternal/CompileInfo.xml
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus_wrap/tmwinternal/minfo.mat
+test/VS_Build/VSBuild_NestedBus/slprj/cigre/NestedBus_wrap/tmwinternal/tr
+test/VS_Build/VSBuild_NestedBus/slprj/sim
+test/VS_Build/VSBuild_NestedBus/slprj/sim/varcache
+test/VS_Build/VSBuild_NestedBus/slprj/sim/varcache/NestedBus
+test/VS_Build/VSBuild_NestedBus/slprj/sim/varcache/NestedBus/checksumOfCache.mat
+test/VS_Build/VSBuild_NestedBus/slprj/sim/varcache/NestedBus/tmwinternal
+test/VS_Build/VSBuild_NestedBus/slprj/sim/varcache/NestedBus/tmwinternal/simulink_cache.xml
+test/VS_Build/VSBuild_NestedBus/slprj/sim/varcache/NestedBus/varInfo.mat
+test/VS_Build/VSBuild_NestedBus/slprj/sim/varcache/NestedBus_wrap
+test/VS_Build/VSBuild_NestedBus/slprj/sim/varcache/NestedBus_wrap/checksumOfCache.mat
+test/VS_Build/VSBuild_NestedBus/slprj/sim/varcache/NestedBus_wrap/tmwinternal
+test/VS_Build/VSBuild_NestedBus/slprj/sim/varcache/NestedBus_wrap/tmwinternal/simulink_cache.xml
+test/VS_Build/VSBuild_NestedBus/slprj/sim/varcache/NestedBus_wrap/varInfo.mat
+test/VS_Build/VSBuild_NestedBus/slprj/sl_proj.tmw
+test/VS_Build/VSBuild_Test_CP
+test/VS_Build/VSBuild_Test_CP/.vs
+test/VS_Build/VSBuild_Test_CP/.vs/Test_CP_CIGRE
+test/VS_Build/VSBuild_Test_CP/.vs/Test_CP_CIGRE/FileContentIndex
+test/VS_Build/VSBuild_Test_CP/.vs/Test_CP_CIGRE/FileContentIndex/0f5c9f60-0bf5-400e-8079-209aa52bb7ca.vsidx
+test/VS_Build/VSBuild_Test_CP/.vs/Test_CP_CIGRE/FileContentIndex/59909203-895e-4506-8f4a-c0c427813936.vsidx
+test/VS_Build/VSBuild_Test_CP/.vs/Test_CP_CIGRE/v17
+test/VS_Build/VSBuild_Test_CP/.vs/Test_CP_CIGRE/v17/.suo
+test/VS_Build/VSBuild_Test_CP/.vs/Test_CP_CIGRE/v17/Browse.VC.db
+test/VS_Build/VSBuild_Test_CP/.vs/Test_CP_CIGRE/v17/ipch
+test/VS_Build/VSBuild_Test_CP/.vs/Test_CP_CIGRE/v17/ipch/AutoPCH
+test/VS_Build/VSBuild_Test_CP/.vs/Test_CP_CIGRE/v17/ipch/AutoPCH/3c23404e5e389646
+test/VS_Build/VSBuild_Test_CP/.vs/Test_CP_CIGRE/v17/ipch/AutoPCH/3c23404e5e389646/CIGRE_DEFAULTS.ipch
+test/VS_Build/VSBuild_Test_CP/.vs/Test_CP_CIGRE/v17/ipch/AutoPCH/684d11ac88c647be
+test/VS_Build/VSBuild_Test_CP/.vs/Test_CP_CIGRE/v17/ipch/AutoPCH/684d11ac88c647be/TEST_CP_CIGRE.ipch
+test/VS_Build/VSBuild_Test_CP/.vs/Test_CP_CIGRE/v17/ipch/AutoPCH/ecca430bb0e6e059
+test/VS_Build/VSBuild_Test_CP/.vs/Test_CP_CIGRE/v17/ipch/AutoPCH/ecca430bb0e6e059/TEST_CP_WRAP.ipch
+test/VS_Build/VSBuild_Test_CP/RefSub.slxc
+test/VS_Build/VSBuild_Test_CP/slprj
+test/VS_Build/VSBuild_Test_CP/slprj/cigre
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/_sharedutils
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/_sharedutils/checksummap.mat
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/_sharedutils/model_reference_types.h
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/_sharedutils/rt_defines.h
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/_sharedutils/rtwtypes.h
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/_sharedutils/rtwtypeschksum.mat
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/_sharedutils/shared_file.dmr
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/buildInfo.mat
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/codedescriptor.dmr
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/compileInfo.mat
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/defines.txt
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/modelsources.txt
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/RefSub.bat
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/RefSub.c
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/RefSub.h
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/RefSub.mk
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/RefSub.obj
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/RefSub.rsp
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/RefSub_comp.rsp
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/RefSub_mr_codeInfo.mat
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/RefSub_private.h
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/RefSub_ref.rsp
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/RefSub_rtwlib.lib
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/RefSub_types.h
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/rtw_proj.tmw
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/tmwinternal
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/tmwinternal/binfo_mdlref.mat
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/tmwinternal/minfo_mdlref.mat
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/tmwinternal/ModelRefCompileInfo.xml
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/tmwinternal/simulink_cache.xml
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/RefSub/tmwinternal/tr
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/buildInfo.mat
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/codedescriptor.dmr
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/compileInfo.mat
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/defines.txt
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/modelsources.txt
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/rtw_proj.tmw
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/Test_CP.bat
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/Test_CP.c
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/Test_CP.h
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/Test_CP.mk
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/Test_CP.obj
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/Test_CP.rsp
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/Test_CP_comp.rsp
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/Test_CP_mr_codeInfo.mat
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/Test_CP_private.h
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/Test_CP_ref.rsp
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/Test_CP_rtwlib.lib
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/Test_CP_types.h
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/tmwinternal
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/tmwinternal/binfo_mdlref.mat
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/tmwinternal/minfo_mdlref.mat
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/tmwinternal/ModelRefCompileInfo.xml
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/tmwinternal/simulink_cache.xml
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP/tmwinternal/tr
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP_CIGRE.c
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP_CIGRE.h
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP_wrap
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP_wrap/tmwinternal
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP_wrap/tmwinternal/binfo.mat
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP_wrap/tmwinternal/CompileInfo.xml
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP_wrap/tmwinternal/minfo.mat
+test/VS_Build/VSBuild_Test_CP/slprj/cigre/Test_CP_wrap/tmwinternal/tr
+test/VS_Build/VSBuild_Test_CP/slprj/sim
+test/VS_Build/VSBuild_Test_CP/slprj/sim/varcache
+test/VS_Build/VSBuild_Test_CP/slprj/sim/varcache/RefSub
+test/VS_Build/VSBuild_Test_CP/slprj/sim/varcache/RefSub/checksumOfCache.mat
+test/VS_Build/VSBuild_Test_CP/slprj/sim/varcache/RefSub/tmwinternal
+test/VS_Build/VSBuild_Test_CP/slprj/sim/varcache/RefSub/tmwinternal/simulink_cache.xml
+test/VS_Build/VSBuild_Test_CP/slprj/sim/varcache/RefSub/varInfo.mat
+test/VS_Build/VSBuild_Test_CP/slprj/sim/varcache/Test_CP
+test/VS_Build/VSBuild_Test_CP/slprj/sim/varcache/Test_CP/checksumOfCache.mat
+test/VS_Build/VSBuild_Test_CP/slprj/sim/varcache/Test_CP/tmwinternal
+test/VS_Build/VSBuild_Test_CP/slprj/sim/varcache/Test_CP/tmwinternal/simulink_cache.xml
+test/VS_Build/VSBuild_Test_CP/slprj/sim/varcache/Test_CP/varInfo.mat
+test/VS_Build/VSBuild_Test_CP/slprj/sl_proj.tmw
+test/VS_Build/VSBuild_Test_CP/Test_CP.slxc
+test/VS_Build/VSBuild_Test_CP/Test_CP_CIGRE.dll
+test/VS_Build/VSBuild_Test_CP/Test_CP_CIGRE.h
+test/VS_Build/VSBuild_Test_CP/Test_CP_CIGRE.sln
+test/VS_Build/VSBuild_Test_CP/Test_CP_CIGRE.vcxproj
+test/VS_Build/VSBuild_Test_CP/Test_CP_CIGRE.vcxproj.filters
+test/VS_Build/VSBuild_Test_CP/Test_CP_CIGRE.vcxproj.user
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap.exp
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap.lib
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap.pdb
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap.slx
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap.slxc
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/build_exception.mat
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/buildInfo.mat
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/CIGRE_Defaults.obj
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/codedescriptor.dmr
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/codeInfo.mat
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/compileInfo.mat
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/defines.txt
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/ert_main.c
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/ert_main.obj
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/heap.obj
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/modelsources.txt
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/rtw_proj.tmw
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/Test_CP_CIGRE.obj
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/Test_CP_wrap.bat
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/Test_CP_wrap.c
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/Test_CP_wrap.h
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/Test_CP_wrap.mk
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/Test_CP_wrap.obj
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/Test_CP_wrap.rsp
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/Test_CP_wrap_comp.rsp
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/Test_CP_wrap_private.h
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/Test_CP_wrap_ref.rsp
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/Test_CP_wrap_types.h
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/tmwinternal
+test/VS_Build/VSBuild_Test_CP/Test_CP_wrap_cigre_rtw/tmwinternal/simulink_cache.xml
+test/VS_Build/VSBuild_Test_CP/x64
+test/VS_Build/VSBuild_Test_CP/x64/Debug
+test/VS_Build/VSBuild_Test_CP/x64/Debug/CIGRE_Defaults.obj
+test/VS_Build/VSBuild_Test_CP/x64/Debug/ert_main.obj
+test/VS_Build/VSBuild_Test_CP/x64/Debug/heap.obj
+test/VS_Build/VSBuild_Test_CP/x64/Debug/RefSub.obj
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP.obj
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.dll
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.dll.recipe
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.exp
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.ilk
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.lib
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.log
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.obj
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.pdb
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.tlog
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.tlog/CL.command.1.tlog
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.tlog/Cl.items.tlog
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.tlog/CL.read.1.tlog
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.tlog/CL.write.1.tlog
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.tlog/link.command.1.tlog
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.tlog/link.read.1.tlog
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.tlog/link.write.1.tlog
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.tlog/link.write.2u.tlog
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.tlog/Test_CP_CIGRE.lastbuildstate
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_CIGRE.vcxproj.FileListAbsolute.txt
+test/VS_Build/VSBuild_Test_CP/x64/Debug/Test_CP_wrap.obj
+test/VS_Build/VSBuild_Test_CP/x64/Debug/vc143.idb
+test/VS_Build/VSBuild_Test_CP/x64/Debug/vc143.pdb
+ToolboxPackagingConfiguration.prj</param.exclude.filters>
+    <param.exclude.pcodedmfiles>true</param.exclude.pcodedmfiles>
+    <param.examples />
+    <param.demosxml />
+    <param.apps />
+    <param.registered.apps />
+    <param.docs />
+    <param.getting.started.guide />
+    <param.matlabpath.excludes />
+    <param.javaclasspath.excludes />
+    <param.exported.on.package>false</param.exported.on.package>
+    <param.required.addons />
+    <param.matlab.project.id>b23b5f0a-0953-46ef-be5c-fd67cb1fa5a6</param.matlab.project.id>
+    <param.matlab.project.name>CIGRE</param.matlab.project.name>
+    <param.release.start />
+    <param.release.end />
+    <param.release.current.only>false</param.release.current.only>
+    <param.compatiblity.windows>true</param.compatiblity.windows>
+    <param.compatiblity.macos>true</param.compatiblity.macos>
+    <param.compatiblity.linux>true</param.compatiblity.linux>
+    <param.compatiblity.matlabonline>true</param.compatiblity.matlabonline>
+    <param.installation.map />
+    <param.additional.sw.names />
+    <param.additional.sw.licenses />
+    <param.additional.sw.win.url />
+    <param.additional.sw.mac.url />
+    <param.additional.sw.linux.url />
+    <unset>
+      <param.authnamewatermark />
+      <param.email />
+      <param.company />
+      <param.summary />
+      <param.description />
+      <param.screenshot />
+      <param.version />
+      <param.output />
+      <param.products.name />
+      <param.products.id />
+      <param.products.version />
+      <param.platforms />
+      <param.exclude.pcodedmfiles />
+      <param.examples />
+      <param.demosxml />
+      <param.apps />
+      <param.registered.apps />
+      <param.docs />
+      <param.getting.started.guide />
+      <param.matlabpath.excludes />
+      <param.javaclasspath.excludes />
+      <param.exported.on.package />
+      <param.required.addons />
+      <param.release.start />
+      <param.release.end />
+      <param.release.current.only />
+      <param.compatiblity.windows />
+      <param.compatiblity.macos />
+      <param.compatiblity.linux />
+      <param.compatiblity.matlabonline />
+      <param.installation.map />
+      <param.additional.sw.names />
+      <param.additional.sw.licenses />
+      <param.additional.sw.win.url />
+      <param.additional.sw.mac.url />
+      <param.additional.sw.linux.url />
+    </unset>
+    <fileset.rootdir>
+      <file>${PROJECT_ROOT}</file>
+    </fileset.rootdir>
+    <fileset.rootfiles>
+      <file>${PROJECT_ROOT}\.git</file>
+      <file>${PROJECT_ROOT}\.gitattributes</file>
+      <file>${PROJECT_ROOT}\.gitignore</file>
+      <file>${PROJECT_ROOT}\CIGRE.mlproj</file>
+      <file>${PROJECT_ROOT}\CIGRE.prj</file>
+      <file>${PROJECT_ROOT}\CIGREPackaging.prj</file>
+      <file>${PROJECT_ROOT}\doc</file>
+      <file>${PROJECT_ROOT}\gitlab-ci.yml</file>
+      <file>${PROJECT_ROOT}\README.md</file>
+      <file>${PROJECT_ROOT}\resources</file>
+      <file>${PROJECT_ROOT}\Simulink to CIGRE Export Tool.mltbx</file>
+      <file>${PROJECT_ROOT}\src</file>
+      <file>${PROJECT_ROOT}\test</file>
+      <file>${PROJECT_ROOT}\ToolboxPackagingConfiguration.prj</file>
+    </fileset.rootfiles>
+    <fileset.depfun.included />
+    <fileset.depfun.excluded />
+    <fileset.package />
+    <build-deliverables>
+      <file location="${PROJECT_ROOT}" name="CIGRE.mltbx" optional="false">C:\Users\toma\Documents\CIGRETarget\CIGRE.mltbx</file>
+    </build-deliverables>
+    <workflow />
+    <matlab>
+      <root>C:\Program Files\MATLAB\R2019b</root>
+      <toolboxes>
+        <toolbox name="matlabcoder" />
+        <toolbox name="embeddedcoder" />
+      </toolboxes>
+      <toolbox>
+        <matlabcoder>
+          <enabled>true</enabled>
+        </matlabcoder>
+      </toolbox>
+      <toolbox>
+        <embeddedcoder>
+          <enabled>true</enabled>
+        </embeddedcoder>
+      </toolbox>
+    </matlab>
+    <platform>
+      <unix>false</unix>
+      <mac>false</mac>
+      <windows>true</windows>
+      <win2k>false</win2k>
+      <winxp>false</winxp>
+      <vista>false</vista>
+      <linux>false</linux>
+      <solaris>false</solaris>
+      <osver>10.0</osver>
+      <os32>false</os32>
+      <os64>true</os64>
+      <arch>win64</arch>
+      <matlab>true</matlab>
+    </platform>
+  </configuration>
+</deployment-project>

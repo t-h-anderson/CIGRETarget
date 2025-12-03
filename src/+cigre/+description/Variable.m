@@ -246,7 +246,7 @@ classdef Variable
                 interface (1,1)
             end
 
-            if isprop(interface, "SimulinkName")
+            if isprop(interface, "GraphicalName")
                 name = string(interface.GraphicalName);
             else
                 name = cigre.description.Variable.extractExternalName(interface);
