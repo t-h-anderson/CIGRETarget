@@ -12,7 +12,11 @@ classdef WithParallelFixture < matlab.unittest.TestCase
 
             delete(gcp('nocreate'));
             p = parpool(1); % backgroundPool doesn't support dll loading
-            myCluster = parcluster('Processes');
+            try
+                myCluster = parcluster('Processes');
+            catch
+                myCluster = parcluster('local');
+            end
 
             state = warning("query", "parallel:cluster:LocalWorkerCrash").state;
             warning("off", "parallel:cluster:LocalWorkerCrash");
