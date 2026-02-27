@@ -121,14 +121,10 @@ classdef ModelDescription < handle
         end
 
         function clearCodeDescriptorObjects(obj)
-            % Do this after analysis otherwise the file will be locked
+            % Delete after analysis to release any file locks held by code descriptor objects
             delete(obj.CIGREInterfaceDescriptor_);
             delete(obj.ModelCodeDescriptor_);
-            delete(obj.CIGREInterfaceDescriptor_);
-
             delete(obj.CIGREInterfaceCodeInfo_);
-            delete(obj.CIGREInterfaceCodeInfo_);
-
         end
 
         function analyse(obj)
@@ -203,7 +199,7 @@ classdef ModelDescription < handle
             obj.ModifiedOn = get_param(model, "LastModifiedDate");
             obj.CreatedBy = get_param(model, "Creator");
             obj.CreatedOn = get_param(model, "Created");
-            obj.CreatedOn = get_param(model, "Description");
+            obj.Description = get_param(model, "Description");
             obj.ModelModifiedComment = get_param(model, "ModifiedComment");
             obj.ModelModifiedHistory = get_param(model, "ModifiedHistory");
             obj.ModelVersion = get_param(model, "ModelVersion");
@@ -346,10 +342,15 @@ classdef ModelDescription < handle
 
         function getRTMStruct(obj)
 
-            % Ignore Inputs, outputs and RTM
-            idx = find(endsWith([obj.InternalData.SimulinkName], "_M" + textBoundaryPattern), 1); % TODO: Make this more robust
+            idx = find(endsWith(internalNames, "_M" + textBoundary), 1);
             if isempty(idx)
-                idx = find(contains([obj.InternalData.SimulinkName], "MODEL", "IgnoreCase", true), 1); % TODO: Make this more robust
+                idx = find(contains(internalNames, "MODEL", "IgnoreCase", true), 1);
+            end
+
+            if isempty(idx)
+                error("CIGRE:ModelDescription:RTMStructNotFound", ...
+                    "Could not identify the Real-Time Model struct in the internal data for model '%s'. " + ...
+                    "Expected a variable ending in '_M' or containing 'MODEL'.", obj.ModelName);
             end
 
             obj.RTMVarType = obj.InternalData(idx).Type;
