@@ -102,22 +102,22 @@ switch hookMethod
         if contains(modelName, "_wrap")
 
             wrapperName = modelName;
-            modelName = erase(wrapperName, "_wrap");
+            modelName = erase(wrapperName, "_wrap" + textBoundary);
 
             here = Simulink.fileGenControl('getConfig').CodeGenFolder; % TODO: This isn't good for testing. Inject location?
             buildDir = fullfile(here, "slprj", "cigre");
 
-            % Remove the stale rtwtypes
+            % Replace generated rtwtypes.h with the CIGRE-compatible version to resolve type conflicts
             replacement = fullfile(cigreRoot, "src", "CIGRESource", "rtwtypes.h");
             rtwTypes = fullfile(buildDir, "_sharedutils");
             copyfile(replacement, rtwTypes)
 
-            % Create the dll
             try
                 desc = cigre.description.ModelDescription.analyseModel(modelName, wrapperName);
             catch me
                 error("Error building model description: " + me.message)
             end
+
             writer = cigre.writer.CIGREWriter;
 
             try
@@ -126,9 +126,9 @@ switch hookMethod
                 error("Error writing dll source: " + me.message)
             end
 
+            % Custom CIGRE code
             inc = string(buildInfo.getIncludePaths(false))';
-            inc = [inc; fullfile(cigreRoot, "src", "CIGRESource"); buildDir]; % Custom CIGRE code
-
+            inc = [inc; fullfile(cigreRoot, "src", "CIGRESource"); buildDir];
             buildInfo.addIncludePaths(inc);
 
             % Add custom source code needed for DLL
@@ -144,28 +144,24 @@ switch hookMethod
         % Called after make process is complete. All arguments are valid at
         % this stage.
 
-        if contains(modelName, "_wrap")
+        if endsWith(modelName, "_wrap")
 
             wrapperName = modelName;
-            modelName = erase(wrapperName, "_wrap");
+            modelName = erase(wrapperName, "_wrap" + textBoundary);
 
-            % Build in code gen folder
-            here = Simulink.fileGenControl('getConfig').CodeGenFolder; % TODO: This isn't good for testing. Inject location?
-            cgf = here;
+            here = Simulink.fileGenControl('getConfig').CodeGenFolder;
             
-            dll = fullfile(cgf, wrapperName + ".dll");
-
+            dll = fullfile(here, wrapperName + ".dll");
             dllDeploy = fullfile(here, modelName + "_CIGRE.dll");
             copyfile(dll, dllDeploy);
             delete(dll);
 
-            [~, dll] = fileparts(dllDeploy);
-            headerDeploy = fullfile(here, dll + ".h");
-            header = fullfile(cgf, "slprj", "cigre",  modelName + "_CIGRE" + ".h");
-
+            [~, deployedDllName] = fileparts(dllDeploy);
+            headerDeploy = fullfile(here, deployedDllName + ".h");
+            header = fullfile(here, "slprj", "cigre", modelName + "_CIGRE.h");
             copyfile(header, headerDeploy);
 
-            disp("CIGRE compatible DLL created for model " + modelName + ". This can be found " + here);
+            disp("CIGRE compatible DLL created for model " + modelName + ". This can be found in " + here + ".");
 
         end
 
