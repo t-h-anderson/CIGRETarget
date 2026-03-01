@@ -1,7 +1,7 @@
 function [desc, dll, c] = buildDLL(modelIn, nvp)
 arguments
     modelIn (1,1) string
-    nvp.SkipBuild (1,1) logical = false
+    nvp.SkipBuild (1,1) logical = false % 
     nvp.PreserveWrapper (1,1) logical = true
     nvp.CodeGenFolder (1,1) string = Simulink.fileGenControl('getConfig').CodeGenFolder
     nvp.BusAs (1,1) string {mustBeMember(nvp.BusAs, ["Ports", "Vector"])} = "Vector"
@@ -27,7 +27,7 @@ if contains(model, wrapSuffix)
     error("Wrap suffix " + wrapSuffix + " clashes with the model " + model);   
 end
  
-% Produce an intermediate wrapper to deal with buses
+% Produce a wrapper to deal with buses
 if nvp.PreserveWrapper
     wrapper = cigre.internal.cigreWrap(model, "BusAs", nvp.BusAs, "NameSuffix", wrapSuffix, "VectorDataType", nvp.VectorDataType);
     cWrap = [];
@@ -46,26 +46,13 @@ cfg.CodeGenFolder = codeGenFolder;
 Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir', true);
 
 % Wrap the build call to allow code generation without compilation, e.g. for manual Visual Studio builds
-if ~nvp.SkipBuild
-    cigre.internal.build(wrapper);
-end
-
-if ~ismissing(nvp.ParameterConfigFile)
-    paramConfig = cigre.config.ParameterConfiguration.fromFile(nvp.ParameterConfigFile);
-else
-    paramConfig = cigre.config.ParameterConfiguration();
-end
-
-desc = cigre.description.ModelDescription.analyseModel(model, wrapper, "CodeGenFolder", codeGenFolder);
-
-writer = cigre.writer.CIGREWriter();
-desc.writeDLLSource(writer, "ParameterConfig", paramConfig);
+cigre.internal.build(wrapper);
            
 dll = model + "_CIGRE";
 c = [];
 
 if nvp.Verbose
-    disp("CIGRE compatible DLL created for model " + model + ". This can be found " + here);
+    disp("CIGRE compatible DLL created for model " + model + ". This can be found " + codeGenFolder);
 end
 
 % Output cleanup objects if requests to stop auto cleanup of wrapper
