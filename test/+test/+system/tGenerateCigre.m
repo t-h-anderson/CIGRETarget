@@ -660,7 +660,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             elseif ~isempty(dotPos)
                 % Nested struct field e.g. "ps.p1" or "ps.psi.psi1"
                 fieldPath    = extractAfter(cigreSimulinkName, ".");
-                currentValue = tGenerateCigre.setNestedField(currentValue, fieldPath, effectiveDefault);
+                currentValue = test.system.tGenerateCigre.setNestedField(currentValue, fieldPath, effectiveDefault);
             else
                 % Simple scalar
                 currentValue = cast(effectiveDefault, class(currentValue));
@@ -683,7 +683,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             else
                 head = extractBefore(fieldPath, dotPos(1));
                 tail = extractAfter(fieldPath, dotPos(1));
-                s.(head) = tGenerateCigre.setNestedField(s.(head), tail, value);
+                s.(head) = test.system.tGenerateCigre.setNestedField(s.(head), tail, value);
             end
         end
 
