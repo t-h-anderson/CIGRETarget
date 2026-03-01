@@ -1,4 +1,4 @@
-function cigre_make_rtw_hook(hookMethod,modelName,~,~,~,buildArgs,buildInfo)
+function cigre_make_rtw_hook(hookMethod,modelName,a,b,c,buildArgs,buildInfo)
 % ERT_MAKE_RTW_HOOK - This is the standard ERT hook file for the build
 % process (make_rtw), and implements automatic configuration of the
 % models configuration parameters.  When the buildArgs option is specified
@@ -163,20 +163,24 @@ switch hookMethod
 
             wrapperName = modelName;
             modelName = erase(wrapperName, "_wrap" + textBoundary);
-
             here = Simulink.fileGenControl('getConfig').CodeGenFolder;
-            
+
             dll = fullfile(here, wrapperName + ".dll");
-            dllDeploy = fullfile(here, modelName + "_CIGRE.dll");
-            copyfile(dll, dllDeploy);
-            delete(dll);
 
-            [~, deployedDllName] = fileparts(dllDeploy);
-            headerDeploy = fullfile(here, deployedDllName + ".h");
-            header = fullfile(here, "slprj", "cigre", modelName + "_CIGRE.h");
-            copyfile(header, headerDeploy);
+            if isfile(dll)
+                % May not exist if build skipped
+                dllDeploy = fullfile(here, modelName + "_CIGRE.dll");
+                copyfile(dll, dllDeploy);
+                delete(dll);
 
-            disp("CIGRE compatible DLL created for model " + modelName + ". This can be found in " + here + ".");
+                [~, deployedDllName] = fileparts(dllDeploy);
+                headerDeploy = fullfile(here, deployedDllName + ".h");
+                header = fullfile(here, "slprj", "cigre", modelName + "_CIGRE.h");
+                copyfile(header, headerDeploy);
+
+                disp("CIGRE compatible DLL created for model " + modelName + ". This can be found in " + here + ".");
+
+            end
 
         end
 

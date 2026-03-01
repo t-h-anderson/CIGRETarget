@@ -99,7 +99,7 @@ classdef ParameterConfiguration
                 allParams (1,:) cigre.description.Variable
             end
 
-            isVisibleMask = arrayfun(@(p) obj.isVisible(p.ExternalName), allParams);
+            isVisibleMask = arrayfun(@(p) obj.isVisible(p.SimulinkName), allParams);
 
             visibleParams = allParams(isVisibleMask);
             hiddenParams  = allParams(~isVisibleMask);

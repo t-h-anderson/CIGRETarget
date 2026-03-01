@@ -11,11 +11,11 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %ModelName = {"Test_TopRef"}
         %ModelName = {"Test_BadNames"}
         %ModelName = {"Snap"}
-        %ModelName = {"Test_CP"}
+        ModelName = {"Test_CP"}
         %ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
         %ModelName = {"Test_BlockIO"}
         %ModelName = {"Test_SignalObject"}
-        ModelName = {"Test_ParamModel"}
+        %ModelName = {"Test_ParamModel"}
         %ModelName = {"Test_MultiInput"}
         %ModelName = {"Test_MultiOutput"}
         %ModelName = struct("Test_MIMO", "Test_MIMO")
@@ -205,8 +205,17 @@ classdef tGenerateCigre < test.util.WithParallelFixture
 
             testCase.applyCodeGenFixture(fullfile(pwd));
             
+            % Look for a parameter config file alongside the model, using which() to
+            % locate it after the TestClassSetup has copied models to the working folder
+            modelPath    = which(ModelName + ".slx");
+            configPath   = fullfile(fileparts(modelPath), "ParameterConfig.xlsx");
+            buildArgs    = {};
+            if isfile(configPath)
+                buildArgs = {"ParameterConfigFile", configPath};
+            end
+
             % Generate the code only
-            desc = cigre.buildDLL(ModelName, "SkipBuild", true, "BusAs", BusAs);
+            desc = cigre.buildDLL(ModelName, "SkipBuild", true, "BusAs", BusAs, buildArgs{:});
             
             testCase.ModelDescription = desc;
             
