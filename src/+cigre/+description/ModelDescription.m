@@ -110,14 +110,14 @@ classdef ModelDescription < handle
             arguments
                 modelName (1,1) string
                 nvp.CIGREInterfaceName (1,1) string = string(missing)
+                nvp.CodeGenFolder (1,1) string = Simulink.fileGenControl('getConfig').CodeGenFolder
+                nvp.WorkFolder (1,1) string = Simulink.fileGenControl('getConfig').CacheFolder
             end
 
             obj.ModelName = modelName;
             obj.CIGREInterfaceName = nvp.CIGREInterfaceName;
-
-            cfg = Simulink.fileGenControl('getConfig');
-            obj.CodeGenFolder = cfg.CodeGenFolder;
-            obj.WorkFolder = cfg.CacheFolder;
+            obj.CodeGenFolder = nvp.CodeGenFolder;
+            obj.WorkFolder = nvp.WorkFolder;
         end
 
         function clearCodeDescriptorObjects(obj)
@@ -169,15 +169,14 @@ classdef ModelDescription < handle
 
         function writeDLLSource(obj, writer)
             arguments
-                obj (1,1)
+                obj (1,1) cigre.description.ModelDescription
                 writer (1,1) cigre.writer.CIGREWriter
             end
 
             [dllText, cFile] = writer.writeDLL(obj);
             [headerText, hFile] = writer.writeHeader(obj);
 
-            here = Simulink.fileGenControl('getConfig').CodeGenFolder; % TODO: This isn't good for testing. Inject location?
-            buildDir = fullfile(here, "slprj", "cigre");
+            buildDir = fullfile(obj.CodeGenFolder, "slprj", "cigre");
 
             writeToFile(dllText, fullfile(buildDir, cFile));
             writeToFile(headerText, fullfile(buildDir, hFile));
@@ -658,9 +657,8 @@ classdef ModelDescription < handle
             if ~isempty(obj.CIGREInterfaceCodeInfo_) && isvalid(obj.CIGREInterfaceCodeInfo_)
                 val = obj.CIGREInterfaceCodeInfo_;
             else
-                here = Simulink.fileGenControl('getConfig').CodeGenFolder;
-                codeInfo =  fullfile(here, obj.CIGREInterfaceName + "_cigre_rtw", "codeInfo.mat");
-                val = load(codeInfo).codeInfo;
+                codeInfoPath = fullfile(obj.CodeGenFolder, obj.CIGREInterfaceName + "_cigre_rtw", "codeInfo.mat");
+                val = load(codeInfoPath).codeInfo;
                 obj.CIGREInterfaceCodeInfo_ = val;
             end
 
@@ -725,15 +723,17 @@ classdef ModelDescription < handle
 
     methods (Static)
 
-        function desc = analyseModel(model, cigreWrapper)
+        function desc = analyseModel(model, cigreWrapper, nvp)
             arguments
                 model (1,1) string
                 cigreWrapper (1,1) string = cigre.internal.cigreWrap(model)
+                nvp.CodeGenFolder (1,1) string = Simulink.fileGenControl('getConfig').CodeGenFolder
             end
 
-            desc = cigre.description.ModelDescription(model,"CIGREInterfaceName", cigreWrapper);
+            desc = cigre.description.ModelDescription(model, ...
+                "CIGREInterfaceName", cigreWrapper, ...
+                "CodeGenFolder", nvp.CodeGenFolder);
             desc.analyse();
-
         end
 
         % Local functions
