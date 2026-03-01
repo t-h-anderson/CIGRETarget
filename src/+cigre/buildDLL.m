@@ -8,6 +8,7 @@ arguments
     nvp.Verbose (1,1) logical = true
     nvp.WrapSuffix (1,1) string = "_wrap"
     nvp.VectorDataType (1,1) string = "single"
+    nvp.ParameterConfigFile (1,1) string = NaN
 end
 
 % Load the model and ensure the correct target is selected
@@ -49,13 +50,22 @@ if ~nvp.SkipBuild
     cigre.internal.build(wrapper);
 end
 
+if ~ismissing(nvp.ParameterConfigFile)
+    paramConfig = cigre.config.ParameterConfiguration.fromFile(nvp.ParameterConfigFile);
+else
+    paramConfig = cigre.config.ParameterConfiguration();
+end
+
 desc = cigre.description.ModelDescription.analyseModel(model, wrapper, "CodeGenFolder", codeGenFolder);
+
+writer = cigre.writer.CIGREWriter();
+desc.writeDLLSource(writer, "ParameterConfig", paramConfig);
            
 dll = model + "_CIGRE";
 c = [];
 
 if nvp.Verbose
-    disp("CIGRE compatible DLL created for model " + model + ". This can be found in " + codeGenFolder + ".");
+    disp("CIGRE compatible DLL created for model " + model + ". This can be found " + here);
 end
 
 % Output cleanup objects if requests to stop auto cleanup of wrapper
