@@ -11,6 +11,7 @@ classdef CIGREWriter
             arguments
                 modelDescriptions (1,1) cigre.description.ModelDescription
                 nvp.DLLName = modelDescriptions.ModelName + "_CIGRE"
+                nvp.ParameterConfig (1,1) cigre.config.ParameterConfiguration = cigre.config.ParameterConfiguration()
             end
 
             cigreSuffix = modelDescriptions.CIGRESuffix; 
@@ -101,53 +102,60 @@ classdef CIGREWriter
             % Load Parameters
             paramMaps = "";
             cigreParams = modelDescriptions.CIGREParameters;
-                        
-            % Model arguments
-            modelArgParams = cigreParams([cigreParams.IsModelArgument]);
-            if numel(modelArgParams) > 0
 
-                for i = 1:numel(modelArgParams)
-                    modelArgParam = modelArgParams(i);
-                    pSimulink = modelArgParam.SimulinkName;
-                    pExternal = modelArgParam.ExternalName;
-                    
-                    structName = erase(modelArgParam.StorageSpecifier, "ModelArgument:");
-                    
-                    % Matrix
-                    paramMap = " = " + "parameters->" + pExternal + ";" + newline;
-                    
-                    paramMaps = paramMaps + ...
-                        "<<RTMStructName>>->dwork->mdl_InstanceData.rtm." + structName + "->" + pSimulink ... % Simulink structure
-                        + paramMap; % CIGRE Memory
+            % Separate visible and hidden parameters, applying any default overrides,
+            % so downstream code generation reflects the configuration correctly
+            [visibleParams, hiddenParams] = nvp.ParameterConfig.partitionParameters(cigreParams);
 
-                end
+            % Model argument parameters: visible ones are read from the CIGRE parameters
+            % struct; hidden ones are hardcoded as literals to exclude them from the interface
+            modelArgVisible = visibleParams([visibleParams.IsModelArgument]);
+            modelArgHidden  = hiddenParams([hiddenParams.IsModelArgument]);
 
-            else
-                paramMaps = paramMaps + "// No model argument parameters found" + newline + newline;
+            for i = 1:numel(modelArgVisible)
+                p = modelArgVisible(i);
+                structName = erase(p.StorageSpecifier, "ModelArgument:");
+                paramMaps = paramMaps + ...
+                    "<<RTMStructName>>->dwork->mdl_InstanceData.rtm." + structName + "->" + p.SimulinkName ...
+                    + " = parameters->" + p.ExternalName + ";" + newline;
             end
-            
-            % Global params
-            globalParams = cigreParams(~[cigreParams.IsModelArgument]);
-            if ~isempty(globalParams)
-                warning("Global parameters found:" + strjoin([globalParams.SimulinkName], ", ") + "." + newline ...
-                    + "DLL may be non-deterministic when called in parallel. Instead, try to define all parameters as model arguments");
+
+            for i = 1:numel(modelArgHidden)
+                p = modelArgHidden(i);
+                structName = erase(p.StorageSpecifier, "ModelArgument:");
+                paramMaps = paramMaps + ...
+                    "<<RTMStructName>>->dwork->mdl_InstanceData.rtm." + structName + "->" + p.SimulinkName ...
+                    + " = " + string(double(p.DefaultValue)) + ";" + newline;
             end
-            
-            for i = 1:numel(globalParams)
-                globalParam = globalParams(i);
-                pSimulink = globalParam.SimulinkName;
-                pExternal = globalParam.ExternalName;
-                
-                
-                paramMap = "parameters->" + pSimulink + ";" + newline;
-                
-                paramMaps = paramMaps +...
-                    pExternal + " = " + paramMap;
-                
+
+            if isempty(modelArgVisible) && isempty(modelArgHidden)
+                paramMaps = paramMaps + "// No model argument parameters found" + newline;
             end
-            
+
+            % Global parameters: visible ones are read from the struct; hidden ones use
+            % literal defaults. A warning is thrown because global params risk
+            % non-determinism when the DLL is called in parallel
+            globalVisible = visibleParams(~[visibleParams.IsModelArgument]);
+            globalHidden  = hiddenParams(~[hiddenParams.IsModelArgument]);
+
+            if ~isempty(globalVisible) || ~isempty(globalHidden)
+                warning("CIGRE:CIGREWriter:GlobalParameters", ...
+                    "Global parameters found: %s. DLL may be non-deterministic when called in parallel.", ...
+                    strjoin([globalVisible.SimulinkName, globalHidden.SimulinkName], ", "));
+            end
+
+            for i = 1:numel(globalVisible)
+                p = globalVisible(i);
+                paramMaps = paramMaps + p.SimulinkName + " = parameters->" + p.ExternalName + ";" + newline;
+            end
+
+            for i = 1:numel(globalHidden)
+                p = globalHidden(i);
+                paramMaps = paramMaps + p.SimulinkName + " = " + string(double(p.DefaultValue)) + ";" + newline;
+            end
+
             results = strrep(results, "<<MapParamsToModel>>", paramMaps);
-           
+
             %% Cache internal states
             backupStatesMap = "";
 
@@ -272,6 +280,7 @@ classdef CIGREWriter
             arguments
                 modelDescriptions cigre.description.ModelDescription
                 nvp.DLLName = modelDescriptions.ModelName + "_CIGRE"
+                nvp.ParameterConfig (1,1) cigre.config.ParameterConfiguration = cigre.config.ParameterConfiguration()
             end
 
             model = modelDescriptions.ModelName;
@@ -308,12 +317,15 @@ classdef CIGREWriter
             results = strrep(results, "<<ParamGetMethods>>", "");
 
             % Parameters
-            cigreParamNames = string([modelDescriptions.CIGREParameters.SimulinkName]');
-            cigreParamTypes = [modelDescriptions.CIGREParameters.Type]';
-            parameterMin = {modelDescriptions.CIGREParameters.Min}';
-            parameterMax = {modelDescriptions.CIGREParameters.Max}';
-            cigreParamDefaultVal = {modelDescriptions.CIGREParameters.DefaultValue}';
-            numCigreParameters = modelDescriptions.NumCigreParameters;
+            allParams = modelDescriptions.CIGREParameters;
+            [visibleParams, ~] = nvp.ParameterConfig.partitionParameters(allParams);
+
+            cigreParamNames      = string([visibleParams.SimulinkName]');
+            cigreParamTypes      = [visibleParams.Type]';
+            parameterMin         = {visibleParams.Min}';
+            parameterMax         = {visibleParams.Max}';
+            cigreParamDefaultVal = {visibleParams.DefaultValue}';
+            numCigreParameters   = numel(cigreParamNames);
 
             cigreParamTypes = util.TranslateTypes.translateType(cigreParamTypes, "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
 

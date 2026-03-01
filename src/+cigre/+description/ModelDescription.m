@@ -167,14 +167,15 @@ classdef ModelDescription < handle
             obj.clearCodeDescriptorObjects();
         end
 
-        function writeDLLSource(obj, writer)
+        function writeDLLSource(obj, writer, nvp)
             arguments
                 obj (1,1) cigre.description.ModelDescription
                 writer (1,1) cigre.writer.CIGREWriter
+                nvp.ParameterConfig (1,1) cigre.config.ParameterConfiguration = cigre.config.ParameterConfiguration()
             end
 
-            [dllText, cFile] = writer.writeDLL(obj);
-            [headerText, hFile] = writer.writeHeader(obj);
+            [dllText, cFile] = writer.writeDLL(obj, "ParameterConfig", nvp.ParameterConfig);
+            [headerText, hFile] = writer.writeHeader(obj, "ParameterConfig", nvp.ParameterConfig);
 
             buildDir = fullfile(obj.CodeGenFolder, "slprj", "cigre");
 
@@ -324,6 +325,7 @@ classdef ModelDescription < handle
 
         function getRTMStruct(obj)
 
+            internalNames = string({obj.InternalData.SimulinkName});
             idx = find(endsWith(internalNames, "_M" + textBoundary), 1);
             if isempty(idx)
                 idx = find(contains(internalNames, "MODEL", "IgnoreCase", true), 1);
