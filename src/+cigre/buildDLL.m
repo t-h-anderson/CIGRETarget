@@ -34,19 +34,22 @@ else
     [wrapper, cWrap] = cigre.internal.cigreWrap(model, "BusAs", nvp.BusAs, "NameSuffix", wrapSuffix, "VectorDataType", nvp.VectorDataType); 
 end
 
+% Set the global codegen folder before build - Simulink's build system reads
+% this from global state and it cannot be passed directly
+codeGenFolder = nvp.CodeGenFolder;
+if ~isfolder(codeGenFolder)
+    mkdir(codeGenFolder);
+end
+cfg = Simulink.fileGenControl('getConfig');
+cfg.CodeGenFolder = codeGenFolder;
+Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir', true);
+
 cigre.internal.build(wrapper);
 
-desc = cigre.description.ModelDescription.analyseModel(model, wrapper);
+desc = cigre.description.ModelDescription.analyseModel(model, wrapper, "CodeGenFolder", codeGenFolder);
            
 dll = model + "_CIGRE";
 c = [];
-
-% % Move the generated dll and header to the right place
-cgf = nvp.CodeGenFolder;
-here = cgf;
-if ~isfolder(here)
-    mkdir(here);
-end
 
 if nvp.Verbose
     disp("CIGRE compatible DLL created for model " + model + ". This can be found " + here);
