@@ -30,7 +30,7 @@ else
     cWrap = [];
 end
 
-% Copt the config set from the model to the wrapper
+% Copy the config set from the model to the wrapper
 config = getActiveConfigSet(model);
 if ~isa(config, 'Simulink.ConfigSet')
     % If the config is a reference, break the link so we can customise
