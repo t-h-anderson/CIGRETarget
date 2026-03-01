@@ -135,7 +135,7 @@ classdef ModelDescription < handle
 
             cCodeDescriptor = onCleanup(@() obj.clearCodeDescriptorObjects());
 
-            % Get metadata from the model - no interraction with build
+            % Get metadata from the model - no interaction with build
             % objects
             obj.getModelMetadata();
 
@@ -279,29 +279,12 @@ classdef ModelDescription < handle
         end
 
         function loadInternalData(obj)
-            %
-            % % Code Descriptor
-            % codeDescObj = obj.ModelCodeDescriptor;
-            % internal = codeDescObj.getDataInterfaces("InternalData");
-            %
-            % type = arrayfun(@(x) string(x.Implementation.BaseRegion.Type.Identifier), internal);
-            % [~, idx] = unique(type, "stable");
-            % type = num2cell(type(idx));
-            %
-            % try
-            %     name = arrayfun(@(x) string(x.Implementation.BaseRegion.ElementIdentifier), internal, "UniformOutput", false);
-            %     name = name(idx);
-            % catch
-            %     % This fails in 2020a
-            %     name = "internalState" + (1:numel(type));
-            % end
-
             % Code info
             codeInfo = obj.CIGREInterfaceCodeInfo;
 
             id = codeInfo.InternalData;
 
-            % Dealt with cetain fields of model struct explicitly
+            % Dealt with certain fields of model struct explicitly
             slname = string.empty(1,0);
             externalName = string.empty(1,0);
             for i = 1:numel(id)
@@ -313,7 +296,7 @@ classdef ModelDescription < handle
             idx = idx | cellfun(@(x) contains(x, "mdlref_TID"), externalName);
             id(idx) = [];
 
-            % Ensure we don't have any name clases
+            % Ensure we don't have any name classes
             externalName = obj.avoidReservedName(externalName);
 
             type = string.empty(1,0);
@@ -614,7 +597,7 @@ classdef ModelDescription < handle
                 if sum(idx) == 1
                     inputNames(i) = knownNames(idx);
                 else
-                    % warning(inputTypes(i) + " not a know type");
+                    warning(inputTypes(i) + " not a known type");
                 end
             end
 

@@ -1,6 +1,6 @@
 function [desc, dll, c] = buildDLL(modelIn, nvp)
 arguments
-    modelIn
+    modelIn (1,1) string
     nvp.SkipBuild (1,1) logical = false
     nvp.PreserveWrapper (1,1) logical = true
     nvp.CodeGenFolder (1,1) string = Simulink.fileGenControl('getConfig').CodeGenFolder
@@ -25,7 +25,7 @@ wrapSuffix = nvp.WrapSuffix;
 if contains(model, wrapSuffix)
     error("Wrap suffix " + wrapSuffix + " clashes with the model " + model);   
 end
-
+ 
 % Produce an intermediate wrapper to deal with buses
 if nvp.PreserveWrapper
     wrapper = cigre.internal.cigreWrap(model, "BusAs", nvp.BusAs, "NameSuffix", wrapSuffix, "VectorDataType", nvp.VectorDataType);
