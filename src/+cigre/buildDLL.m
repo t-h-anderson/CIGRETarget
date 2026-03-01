@@ -45,8 +45,28 @@ cfg = Simulink.fileGenControl('getConfig');
 cfg.CodeGenFolder = codeGenFolder;
 Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir', true);
 
-% Wrap the build call to allow code generation without compilation, e.g. for manual Visual Studio builds
-cigre.internal.build(wrapper);
+
+% Write build context so the cigre_make_rtw_hook can access options
+buildContext.ParameterConfigFile = nvp.ParameterConfigFile;
+contextPath = fullfile(codeGenFolder, "cigre_build_context.mat");
+save(contextPath, "-struct", "buildContext");
+cleanupContext = onCleanup(@() deleteIfExists(contextPath));
+
+if ~nvp.SkipBuild
+    cigre.internal.build(wrapper);
+else
+    % Generate code without compiling, so the hook still fires and
+    % produces the CIGRE source, but make is not invoked
+    cigre.internal.buildCodeOnly(wrapper);
+end
+
+% Analyse the model after the build so buildDLL can return the description.
+% The hook has already run analyseModel internally, but ModelDescription is
+% a handle object and cannot be passed through the build system boundary,
+% so a second call is necessary here.
+desc = cigre.description.ModelDescription.analyseModel(model, wrapper, ...
+    "CodeGenFolder", codeGenFolder);
+
            
 dll = model + "_CIGRE";
 c = [];
@@ -60,3 +80,10 @@ if nargout > 2
     c = {cModel, cWrap};
 end
 
+end
+
+function deleteIfExists(path)
+    if isfile(path)
+        delete(path);
+    end
+end

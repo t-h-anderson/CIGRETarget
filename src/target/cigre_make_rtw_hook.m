@@ -107,10 +107,26 @@ switch hookMethod
             here = Simulink.fileGenControl('getConfig').CodeGenFolder; % TODO: This isn't good for testing. Inject location?
             buildDir = fullfile(here, "slprj", "cigre");
 
-            % Replace generated rtwtypes.h with the CIGRE-compatible version to resolve type conflicts
+            % Replace generated rtwtypes.h with the CIGRE-compatible version
+            % to resolve type conflicts at link time
             replacement = fullfile(cigreRoot, "src", "CIGRESource", "rtwtypes.h");
             rtwTypes = fullfile(buildDir, "_sharedutils");
             copyfile(replacement, rtwTypes)
+
+            % Load any build options passed from buildDLL via the context file.
+            % The hook has no direct parameter channel from user code, so
+            % buildDLL writes this file before invoking the build.
+            paramConfig = cigre.config.ParameterConfiguration();
+            contextPath = fullfile(here, "cigre_build_context.mat");
+            if isfile(contextPath)
+                buildContext = load(contextPath);
+                if isfield(buildContext, "ParameterConfigFile") ...
+                        && ~ismissing(buildContext.ParameterConfigFile) ...
+                        && isfile(buildContext.ParameterConfigFile)
+                    paramConfig = cigre.config.ParameterConfiguration.fromFile(...
+                        buildContext.ParameterConfigFile);
+                end
+            end
 
             try
                 desc = cigre.description.ModelDescription.analyseModel(modelName, wrapperName);
@@ -121,23 +137,22 @@ switch hookMethod
             writer = cigre.writer.CIGREWriter;
 
             try
-                desc.writeDLLSource(writer);
+                desc.writeDLLSource(writer, "ParameterConfig", paramConfig);
             catch me
-                error("Error writing dll source: " + me.message)
+                error("Error writing DLL source: " + me.message)
             end
 
-            % Custom CIGRE code
+            % Add CIGRE-specific include paths
             inc = string(buildInfo.getIncludePaths(false))';
             inc = [inc; fullfile(cigreRoot, "src", "CIGRESource"); buildDir];
             buildInfo.addIncludePaths(inc);
 
-            % Add custom source code needed for DLL
+            % Add CIGRE-specific source files required for the DLL
             src = [fullfile(buildDir, modelName + "_CIGRE.c"), ...
-                fullfile(cigreRoot, "src", "CIGRESource", "heap.c"),  ...
+                fullfile(cigreRoot, "src", "CIGRESource", "heap.c"), ...
                 fullfile(cigreRoot, "src", "CIGRESource", "CIGRE_Defaults.c")];
-
             buildInfo.addSourceFiles(src);
-                  
+
         end
 
     case 'after_make'
