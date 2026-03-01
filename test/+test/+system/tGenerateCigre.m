@@ -15,13 +15,12 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
         %ModelName = {"Test_BlockIO"}
         %ModelName = {"Test_SignalObject"}
-        %ModelName = {"Test_ParamModel"}
+        ModelName = {"Test_ParamModel"}
         %ModelName = {"Test_MultiInput"}
         %ModelName = {"Test_MultiOutput"}
         %ModelName = struct("Test_MIMO", "Test_MIMO")
         %ModelName = {"Test_FastRef"}
         %ModelName = {"Test_VectorIO"}
-        ModelName = {"Test_Model"}
         %ModelName = {"TestModel_meas"}
         %ModelName = {"Test_Enum"}
 
