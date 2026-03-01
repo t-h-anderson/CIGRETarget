@@ -99,7 +99,7 @@ switch hookMethod
         % arguments are valid at this stage
 
         % TODO: Can we make this more robust?
-        if contains(modelName, "_wrap")
+        if endsWith(modelName, "_wrap")
 
             wrapperName = modelName;
             modelName = erase(wrapperName, "_wrap" + textBoundary);
