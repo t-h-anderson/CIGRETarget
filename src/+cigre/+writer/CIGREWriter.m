@@ -320,7 +320,8 @@ classdef CIGREWriter
             allParams = modelDescriptions.CIGREParameters;
             [visibleParams, ~] = nvp.ParameterConfig.partitionParameters(allParams);
 
-            cigreParamNames      = string([visibleParams.SimulinkName]');
+            cigreParamNames      = string([visibleParams.ExternalName]');
+            simulinkParamNames      = string([visibleParams.SimulinkName]');
             cigreParamTypes      = [visibleParams.Type]';
             parameterMin         = {visibleParams.Min}';
             parameterMax         = {visibleParams.Max}';
@@ -447,7 +448,7 @@ classdef CIGREWriter
                 
                 paramDefI = strrep(paramDefI, "<<Num>>", string(i-1));
                 paramDefI = strrep(paramDefI, "<<ParamName>>", cigreParamNames(i));
-                paramDefI = strrep(paramDefI, "<<ParamDefinition>>", cigreParamNames(i));
+                paramDefI = strrep(paramDefI, "<<ParamDefinition>>", simulinkParamNames(i));
                 paramDefI = strrep(paramDefI, "<<ParamType>>", cigreParamTypes(i));
                 
                 valType = strrep(cigreParamTypes(i), "_T", "_Val");

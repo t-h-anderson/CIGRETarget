@@ -58,15 +58,15 @@ classdef ParameterConfiguration
             obj.Parameters = nvp.Parameters;
         end
 
-        function visible = isVisible(obj, externalName)
+        function visible = isVisible(obj, simulinkName)
             % Parameters absent from the config are treated as visible by default,
             % so the config acts as a selective opt-out rather than an allowlist
             arguments
                 obj (1,1)
-                externalName (1,1) string
+                simulinkName (1,1) string
             end
 
-            idx = obj.findIndex(externalName);
+            idx = obj.findIndex(simulinkName);
             if isempty(idx)
                 visible = true;
             else
@@ -74,16 +74,16 @@ classdef ParameterConfiguration
             end
         end
 
-        function value = effectiveDefault(obj, externalName, modelDefault)
+        function value = effectiveDefault(obj, simulinkName, modelDefault)
             % Return the override default if configured, otherwise fall back
             % to the model default so hidden parameters always have a concrete value
             arguments
                 obj (1,1)
-                externalName (1,1) string
+                simulinkName (1,1) string
                 modelDefault (1,1) double
             end
 
-            idx = obj.findIndex(externalName);
+            idx = obj.findIndex(simulinkName);
             if ~isempty(idx) && obj.Parameters(idx).hasOverrideDefault()
                 value = obj.Parameters(idx).OverrideDefault;
             else
@@ -108,12 +108,12 @@ classdef ParameterConfiguration
             % into the config for each parameter individually
             for i = 1:numel(visibleParams)
                 visibleParams(i).DefaultValue = obj.effectiveDefault(...
-                    visibleParams(i).ExternalName, visibleParams(i).DefaultValue);
+                    visibleParams(i).SimulinkName, visibleParams(i).DefaultValue);
             end
 
             for i = 1:numel(hiddenParams)
                 hiddenParams(i).DefaultValue = obj.effectiveDefault(...
-                    hiddenParams(i).ExternalName, hiddenParams(i).DefaultValue);
+                    hiddenParams(i).SimulinkName, hiddenParams(i).DefaultValue);
             end
         end
 
@@ -127,7 +127,7 @@ classdef ParameterConfiguration
                 allParams (1,:) cigre.description.Variable
             end
 
-            modelNames  = string([allParams.ExternalName]);
+            modelNames  = string([allParams.SimulinkName]);
             configNames = string([obj.Parameters.Name]);
 
             missingFromConfig    = modelNames(~ismember(modelNames, configNames));
@@ -138,15 +138,15 @@ classdef ParameterConfiguration
 
     methods (Access = private)
 
-        function idx = findIndex(obj, externalName)
+        function idx = findIndex(obj, simulinkName)
             % Return the index of a named parameter in the config array,
             % or empty if it is not present
             arguments
                 obj (1,1)
-                externalName (1,1) string
+                simulinkName (1,1) string
             end
 
-            idx = find(string({obj.Parameters.Name}) == externalName, 1);
+            idx = find(string({obj.Parameters.Name}) == simulinkName, 1);
         end
 
     end
