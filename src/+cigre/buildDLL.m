@@ -44,7 +44,10 @@ cfg = Simulink.fileGenControl('getConfig');
 cfg.CodeGenFolder = codeGenFolder;
 Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir', true);
 
-cigre.internal.build(wrapper);
+% Wrap the build call to allow code generation without compilation, e.g. for manual Visual Studio builds
+if ~nvp.SkipBuild
+    cigre.internal.build(wrapper);
+end
 
 desc = cigre.description.ModelDescription.analyseModel(model, wrapper, "CodeGenFolder", codeGenFolder);
            
@@ -52,7 +55,7 @@ dll = model + "_CIGRE";
 c = [];
 
 if nvp.Verbose
-    disp("CIGRE compatible DLL created for model " + model + ". This can be found " + here);
+    disp("CIGRE compatible DLL created for model " + model + ". This can be found in " + codeGenFolder + ".");
 end
 
 % Output cleanup objects if requests to stop auto cleanup of wrapper
