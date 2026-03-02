@@ -10,13 +10,20 @@ classdef DataMap
 
     methods
         function obj = DataMap(data, words, dataType, sizes, dims)
-           if nargin > 0
-                obj.Data = data;
-                obj.Words = words;
-                obj.DataType = dataType;
-                obj.Sizes = sizes;
-                obj.Dims = dims;
+            arguments
+                data = []
+                words (1,:) = []
+                dataType (1,:) string = string.empty
+                sizes (1,:) double = []
+                dims (1,:) cell = {}
             end
+
+            obj.Data = data;
+            obj.Words = words;
+            obj.DataType = dataType;
+            obj.Sizes = sizes;
+            obj.Dims = dims;
+
         end
 
         function obj = wordsToData(obj, nvp)
@@ -34,38 +41,38 @@ classdef DataMap
             data = cell(1, nWords);
             pos = 1;
 
-            for j = 1:nWords
+            for iWord = 1:nWords
 
-                szData = sizes(j);
-                sz = szData * prod(dims{j});
+                wordByteSize = sizes(iWord);
+                totalBytes = wordByteSize * prod(dims{iWord});
 
-                szMem = max(szData, nvp.Packing);
+                szMem = max(wordByteSize, nvp.Packing);
 
                 pad = mod(szMem - mod(pos-1, szMem), szMem);
 
                 pos = pos + pad;
 
-                this = words(pos:(pos+sz-1));
+                this = words(pos:(pos+totalBytes-1));
 
-                pos = pos + sz;
+                pos = pos + totalBytes;
 
-                dt = dataTypes(j);
-                if dt == "logical"
+                dataType = dataTypes(iWord);
+                if dataType == "logical"
                     var = (this ~= 0);
                 else
-                    var = typecast(this, dt);
+                    var = typecast(this, dataType);
                 end
 
-                d = dims{j};
-                d = num2cell(d);
+                dimensions = dims{iWord};
+                dimensions = num2cell(dimensions);
 
                 % Remove any padding
-                nVal = prod([d{:}]);
+                nVal = prod([dimensions{:}]);
                 var = var(1:nVal);
 
-                var = reshape(var, d{:});
+                var = reshape(var, dimensions{:});
                 
-                data{j} = var;
+                data{iWord} = var;
             end
 
             obj.Data = data;

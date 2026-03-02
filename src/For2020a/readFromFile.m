@@ -3,10 +3,9 @@ function lines = readFromFile(file)
 if verLessThan("MATLAB", "9.9")
     fid = fopen(file, 'r');
     if fid == -1
-        % fopen failed
+        % Return empty string so callers can handle missing files without errors
         lines = "";
     else
-        % fopen successful
         lines = string.empty(0,1);
         tline = fgetl(fid);
         while ischar(tline)
