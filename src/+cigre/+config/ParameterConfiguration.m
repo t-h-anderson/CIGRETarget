@@ -25,12 +25,13 @@ classdef ParameterConfiguration
 
             configs = cell(1,numel(raw));
             for i = 1:height(raw)
-                nvpArgs = {"Name", raw.Name(i), "IsVisible", logical(raw.IsVisible(i))};
+                nvpArgs = struct("Name", raw.Name(i), "IsVisible", logical(raw.IsVisible(i)));
 
                 if hasOverrideColumn && ~ismissing(raw.OverrideDefault(i))
-                    nvpArgs = [nvpArgs, {"OverrideDefault", raw.OverrideDefault(i)}]; %#ok<AGROW>
+                    nvpArgs.OverrideDefault = raw.OverrideDefault(i);
                 end
 
+                nvpArgs = namedargs2cell(nvpArgs);
                 configs{i} = cigre.config.ParameterConfig(nvpArgs{:});
             end
 

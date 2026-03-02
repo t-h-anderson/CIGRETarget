@@ -56,9 +56,7 @@ classdef CustomCheck < handle
             ElementResults = ModelAdvisor.ResultDetail;
             ElementResults.Description = description;
             if verLessThan("MATLAB", "23.2")
-                if pass
-
-                else
+                if ~pass
                     ElementResults.IsViolation = true;
                 end
             else

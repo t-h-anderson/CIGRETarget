@@ -1,4 +1,4 @@
-function cigre_make_rtw_hook(hookMethod,modelName,a,b,c,buildArgs,buildInfo)
+function cigre_make_rtw_hook(hookMethod, modelName,~, ~, ~, buildArgs, buildInfo)
 % ERT_MAKE_RTW_HOOK - This is the standard ERT hook file for the build
 % process (make_rtw), and implements automatic configuration of the
 % models configuration parameters.  When the buildArgs option is specified
@@ -20,13 +20,13 @@ function cigre_make_rtw_hook(hookMethod,modelName,a,b,c,buildArgs,buildInfo)
 % modelName:
 %   Name of model.  Valid for all stages.
 %
-% rtwroot:
+% rtwroot (~):
 %   Reserved.
 %
-% templateMakefile:
+% templateMakefile (~):
 %   Name of template makefile.  Valid for stages 'before_make' and 'exit'.
 %
-% buildOpts:
+% buildOpts (~):
 %   Valid for stages 'before_make' and 'exit', a MATLAB structure
 %   containing fields
 %
@@ -98,13 +98,25 @@ switch hookMethod
         % off make process (assuming code generation only is not selected.)  All
         % arguments are valid at this stage
 
-        % TODO: Can we make this more robust?
-        if endsWith(modelName, "_wrap")
+        here = Simulink.fileGenControl('getConfig').CodeGenFolder;
+        contextPath = fullfile(here, "cigre_build_context.mat");
+        if isfile(contextPath)
+            buildContext = load(contextPath);
+        else
+            buildContext = struct();
+        end
+
+        if isfield(buildContext, "WrapSuffix")
+            wrapSuffix = buildContext.WrapSuffix;
+        else
+            wrapSuffix = "_wrap"; % default
+        end
+
+        if endsWith(modelName, wrapSuffix)
 
             wrapperName = modelName;
-            modelName = erase(wrapperName, "_wrap" + textBoundary);
+            modelName = erase(wrapperName, wrapSuffix + textBoundary);
 
-            here = Simulink.fileGenControl('getConfig').CodeGenFolder; % TODO: This isn't good for testing. Inject location?
             buildDir = fullfile(here, "slprj", "cigre");
 
             % Replace generated rtwtypes.h with the CIGRE-compatible version
@@ -117,15 +129,11 @@ switch hookMethod
             % The hook has no direct parameter channel from user code, so
             % buildDLL writes this file before invoking the build.
             paramConfig = cigre.config.ParameterConfiguration();
-            contextPath = fullfile(here, "cigre_build_context.mat");
-            if isfile(contextPath)
-                buildContext = load(contextPath);
-                if isfield(buildContext, "ParameterConfigFile") ...
-                        && ~ismissing(buildContext.ParameterConfigFile) ...
-                        && isfile(buildContext.ParameterConfigFile)
-                    paramConfig = cigre.config.ParameterConfiguration.fromFile(...
-                        buildContext.ParameterConfigFile);
-                end
+            if isfield(buildContext, "ParameterConfigFile") ...
+                    && ~ismissing(buildContext.ParameterConfigFile) ...
+                    && isfile(buildContext.ParameterConfigFile)
+                paramConfig = cigre.config.ParameterConfiguration.fromFile(...
+                    buildContext.ParameterConfigFile);
             end
 
             try
