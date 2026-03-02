@@ -1,8 +1,15 @@
 function signalsToBus(signalInput, mdl, fromName, toName, creatorName)
+arguments
+    signalInput (1,1) string
+    mdl (1,1) string
+    fromName (1,1) string
+    toName (1,1) string
+    creatorName (1,1) string
+end
 
 % Add the bus creator with an input for each signal
 
-busDef = loadBus(mdl, signalInput.BusObject);
+busDef = util.sl.loadBus(mdl, signalInput.BusObject);
 
 busElements = busDef.Elements;
 busCreator = add_block("built-in/BusCreator", mdl + "/" + creatorName);

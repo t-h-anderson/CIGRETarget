@@ -1,4 +1,8 @@
 function bus = loadBus(model,name)
+arguments
+    model (1,1) string 
+    name (1,1) string
+end
 
 [~, cuo] = util.loadSystem(model); %#ok<ASGLU>
 

@@ -1,15 +1,15 @@
 function sigs = busToVector(busOutput, mdl, fromName, toName, selectorName, terminate)
 arguments
-    busOutput
-    mdl
-    fromName
-    toName
-    selectorName
+    busOutput (1,1) string
+    mdl (1,1) string
+    fromName (1,1) string
+    toName (1,1) string
+    selectorName (1,1) string
     terminate (1,1) logical = false
 end
 sigs = [];
 
-busDef = loadBus(mdl, busOutput.Description);
+busDef = util.sl.loadBus(mdl, busOutput.Description);
 
 busElementOutput = busOutput.Elements;
 b = add_block("built-in/BusSelector", mdl + "/" + selectorName);
@@ -36,7 +36,7 @@ for j = 1:numel(busElementOutput)
         
     else
 
-        bus = loadBus(mdl, me.DataType);
+        bus = util.sl.loadBus(mdl, me.DataType);
 
         s = busToVector(bus, mdl, selectorName + "/" + j, portName, selectorName + "_" + j);
         sigs = [sigs, s]; %#ok<AGROW>

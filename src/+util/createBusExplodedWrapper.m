@@ -100,9 +100,9 @@ for i = 1:numel(inhs)
         switch nvp.BusAs
             case "Ports"
                 % Add a bus creator (recursive)
-                signalsToBus(inputSignals, wrapperName, fromName, toName, creatorName);
+                util.sl.signalsToBus(inputSignals, wrapperName, fromName, toName, creatorName);
             otherwise
-                vectorToBus(inputSignals, wrapperName, fromName, toName, creatorName, 0, true, "CastTo", nvp.VectorDataType);
+                util.sl.vectorToBus(inputSignals, wrapperName, fromName, toName, creatorName, 0, true, "CastTo", nvp.VectorDataType);
         end
     elseif isEnum
 
@@ -146,7 +146,7 @@ for i = 1:numel(outh)
 
     if isBus
 
-        bus = loadBus(model, outTypes);
+        bus = util.sl.loadBus(model, outTypes);
 
         selectorName = "selector" + i;
         toName = name;
@@ -155,9 +155,9 @@ for i = 1:numel(outh)
         switch nvp.BusAs
             case "Ports"
                 % Add a bus creator (recursive)
-                busToSignals(bus, wrapperName, fromName, toName, selectorName);
+                util.sl.busToSignals(bus, wrapperName, fromName, toName, selectorName);
             otherwise
-                busToVector(bus, wrapperName, fromName, toName, selectorName, true);
+                util.sl.busToVector(bus, wrapperName, fromName, toName, selectorName, true);
         end
 
     elseif isEnum
@@ -192,7 +192,6 @@ end
 
 Simulink.BlockDiagram.arrangeSystem(wrapperName);
 
-
 % Set the parameters in the wrapper
 ip = get_param(mdlRef, "InstanceParameters");
 
@@ -203,7 +202,7 @@ if ~isempty(ip)
     wws = get_param(wrapperName, "ModelWorkspace");
     
     ipNames = string({ip.Name});
-    for i= 1:numel(p)
+    for i = 1:numel(p)
         name = p(i).name;
         var = mws.getVariable(name);
         assignin(wws, name, var);
@@ -221,6 +220,9 @@ end
 end
 
 function name = cleanName(name)
+arguments
+    name (1,1) string
+end
 
 name = strrep(name, "/", "//"); % Allow slashes in the name
 
