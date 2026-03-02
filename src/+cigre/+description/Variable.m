@@ -361,16 +361,18 @@ classdef Variable
                 interface (1,1)
             end
 
-            try
-                % TODO: why so many try catches?
-                value = interface.Type.Dimensions.toArray();
-            catch
-                try
-                    value = interface.Type.Dimensions;
-                catch
-                    value = [1,1];
+            value = [1,1];
+            if isprop(interface, "Type")
+                type = interface.Type;
+                if isprop(type, "Dimensions")
+                    dims = type.Dimensions;
+                    if ismethod(dims, "toArray")
+                        dims = dims.toArray();
+                    end
+                    value = dims;
                 end
             end
+            
         end
 
         function limitVal = extract(interface, lim)

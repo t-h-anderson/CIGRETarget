@@ -124,7 +124,7 @@ if libisloaded(dllName)
     try
         unloadlibrary(dllName)
     catch me
-        display(me.message)
+        disp("Warning: failed to unload library '" + dllName + "': " + me.message)
     end
 end
 end
