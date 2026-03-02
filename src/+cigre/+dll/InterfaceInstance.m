@@ -12,6 +12,10 @@ classdef InterfaceInstance <handle
         StateMemory (1,1)
     end
 
+    properties (Constant)
+        IntStateBufferSize = 100000; % Pre-allocated int32 state buffer
+    end
+
     methods
         function obj = InterfaceInstance(inputs, outputs, parameters, nvp)
             % The s return value is needed as data.Value comes back as
@@ -26,14 +30,13 @@ classdef InterfaceInstance <handle
 
             obj.InputData = inputs;
 
-            if isfield(nvp, "IntStates")
-                obj.IsInitialised = true;
-            else
-                obj.IsInitialised = false;
-                nvp.IntStates (1,1) = libpointer('int32Ptr', zeros(1,100000));
+            isSnapshot = ~isempty(nvp.IntStates);
+            obj.IsInitialised = isSnapshot;
+            if ~isSnapshot
+                nvp.IntStates = libpointer('int32Ptr', zeros(1, cigre.dll.InterfaceInstance.IntStateBufferSize));
             end
 
-            intstate4model = nvp.IntStates;
+            intStateData = nvp.IntStates;
 
             %% Input
             inMap = cigre.dll.DataMap.create(inputs);
@@ -73,7 +76,7 @@ classdef InterfaceInstance <handle
                 "SimTool_EMT_RMS_Mode", 1, ...
                 "LastErrorMessage", [], ...
                 "LastGeneralMessage", [], ...
-                "IntStates", intstate4model, ...
+                "IntStates", intStateData, ...
                 "FloatStates", [], ...
                 "DoubleStates", [] ...
                 );
@@ -86,7 +89,7 @@ classdef InterfaceInstance <handle
             obj.ParamMap = paramMap;
             obj.Instance = data;
             obj.Struct = s;
-            obj.StateMemory = intstate4model;
+            obj.StateMemory = intStateData;
         end
 
         function updateInputs(obj, input, nvp)

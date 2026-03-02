@@ -459,6 +459,7 @@ classdef Variable
                         end
                     end
                 catch
+                    warning("Parameter " + paramName + " not found. Using default value: " + failedValue);
                     value = failedValue; % Not found
                 end
 
