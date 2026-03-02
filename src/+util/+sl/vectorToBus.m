@@ -1,16 +1,16 @@
 function [ports, idx, idxRange] = vectorToBus(signalInput, mdl, fromName, toName, creatorName, idx, terminate, nvp)
 arguments
-    signalInput
-    mdl
-    fromName
-    toName
-    creatorName
-    idx = 0
+    signalInput (1,1) string
+    mdl (1,1) string
+    fromName (1,1) string
+    toName (1,1) string
+    creatorName (1,1) string
+    idx (1,1) double = 0
     terminate (1,1) logical = false
     nvp.CastTo (1,1) string = "single"
 end
 
-busDef = loadBus(mdl, signalInput.BusObject);
+busDef = util.sl.loadBus(mdl, signalInput.BusObject);
 
 if isempty(busDef)
     error("Bus definition not found")

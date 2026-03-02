@@ -650,27 +650,15 @@ classdef ModelDescription < handle
         end
 
         function value = get.HasTimingBridge(obj)
-            if contains(obj.TimingBridgeCode, "timingBridge")
-                value = true;
-            else
-                value = false;
-            end
+            value = contains(obj.TimingBridgeCode, "timingBridge");
         end
 
         function value = get.HasInitFunction(obj)
-            if obj.ModelRefInitialiseName == ""
-                value = false;
-            else
-                value = true;
-            end
+            value = obj.ModelRefInitialiseName ~= "";
         end
 
         function value = get.HasRateScheduler(obj)
-            if obj.RateSchedulerCode == ""
-                value = false;
-            else
-                value = true;
-            end
+            value = obj.RateSchedulerCode ~= "";
         end
 
         function value = get.CIGREParameters(obj)
