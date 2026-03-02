@@ -24,7 +24,7 @@ classdef InterfaceInstance <handle
                 inputs
                 outputs
                 parameters
-                nvp.IntStates
+                nvp.IntStates = []
                 nvp.Time (1,1) double = 0 % Make non-zero if not first timestep
             end
 
