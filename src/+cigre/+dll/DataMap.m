@@ -84,22 +84,6 @@ classdef DataMap
 
     methods (Static)
 
-        % Try using "typecast"
-        %in = typecast(firstVal, "uint32");
-        %in = [in, secondVal] ; % May do some alignment for doubles, i.e. padding to make sure it fits. This is compiler dependent.
-        % Look at xcp toolbox. Has lots of examples
-
-        % Can run an initialise which returns this information
-        % address of input.myField - address of input input& - input.myField&
-        % capi or code descriptor - getCodeDescriptor, or add to cigre
-        % C code to get offsets, matlab code to ask for the data
-
-        % Can we add other functions?
-        % All inputs and outputs are in structure, not as separate
-        % parameters. Codegen options - interface. Make sure don't use
-        % custom storage class. Ignore storage classes, goes back to
-        % in/out structs. *codeDescriptorInterface*
-
         function obj = create(data, nvp)
             arguments
                 data
