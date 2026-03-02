@@ -20,7 +20,7 @@ for i = 1:numel(files)
         configs(i) = coder.make.ToolchainInfoRegistry;
         configs(i).Name = tc.Name;
         configs(i).FileName = fullfile(pth, file);
-        configs(i).Platform =  "win64";
+        configs(i).Platform =  {'win64'};
         
         switch bits
             case "32"
