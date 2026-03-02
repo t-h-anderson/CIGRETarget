@@ -47,6 +47,8 @@ Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir', true);
 
 
 % Write build context so the cigre_make_rtw_hook can access options
+buildContext = struct();
+buildContext.WrapSuffix = nvp.WrapSuffix;
 buildContext.ParameterConfigFile = nvp.ParameterConfigFile;
 contextPath = fullfile(codeGenFolder, "cigre_build_context.mat");
 save(contextPath, "-struct", "buildContext");

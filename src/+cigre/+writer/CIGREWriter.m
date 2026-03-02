@@ -476,10 +476,7 @@ classdef CIGREWriter
             %% Replace define parameters
             defineParameters = string.empty(1,0);
             for i = 1:numel(cigreParamNames)
-
-                defValues = cigreParamDefaultVal{i};
-                defineParameters(end+1) = cigreParamTypes(i) + " " + cigreParamNames(i) + ";";
-                
+                defineParameters(end+1) = cigreParamTypes(i) + " " + cigreParamNames(i) + ";"; %#ok<AGROW>
             end
             
             defineParameters = strjoin(defineParameters, newline);
