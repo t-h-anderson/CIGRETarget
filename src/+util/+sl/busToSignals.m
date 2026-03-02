@@ -1,4 +1,11 @@
 function busToSignals(busOutput, mdl, fromName, toName, selectorName)
+arguments
+    busOutput (1,1) string
+    mdl (1,1) string
+    fromName (1,1) string
+    toName (1,1) string
+    selectorName (1,1) string
+end
 
 b = add_block("built-in/BusSelector", mdl + "/" + selectorName);
 
@@ -12,7 +19,7 @@ for j = 1:numel(busElementOutput)
 
     portName = toName + "_" + busElementOutput(j).Name;
 
-    children = loadBus(mdl, busElementOutput(j).DataType);
+    children = util.sl.loadBus(mdl, busElementOutput(j).DataType);
     if isempty(children)
 
         nextBlock = selectorName + "/" + j;

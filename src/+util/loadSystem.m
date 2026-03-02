@@ -1,21 +1,17 @@
 function [mdlh, co] = loadSystem(model)
+arguments
+    model (1,1) string
+end
 
-try
-    if ~bdIsLoaded(model)
+if ~bdIsLoaded(model)
 
-        mdlh = load_system(model);
-        if nargout > 0
-            co = onCleanup(@()close_system(model, 0));
-        end
-    else
-        mdlh = get_param(model, "handle");
-        co = [];
+    mdlh = load_system(model);
+    if nargout > 0
+        co = onCleanup(@()close_system(model, 0));
     end
-catch me
-    mdlh = [];
+else
+    mdlh = get_param(model, "handle");
     co = [];
-    disp("Failed to open model " + model + ". " + me.message);
 end
 
 end
-

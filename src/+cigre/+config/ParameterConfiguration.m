@@ -23,7 +23,7 @@ classdef ParameterConfiguration
 
             hasOverrideColumn = ismember("OverrideDefault", string(raw.Properties.VariableNames));
 
-            configs = cigre.config.ParameterConfig.empty(1, 0);
+            configs = cell(1,numel(raw));
             for i = 1:height(raw)
                 nvpArgs = {"Name", raw.Name(i), "IsVisible", logical(raw.IsVisible(i))};
 
@@ -31,7 +31,12 @@ classdef ParameterConfiguration
                     nvpArgs = [nvpArgs, {"OverrideDefault", raw.OverrideDefault(i)}]; %#ok<AGROW>
                 end
 
-                configs(end+1) = cigre.config.ParameterConfig(nvpArgs{:}); %#ok<AGROW>
+                configs{i} = cigre.config.ParameterConfig(nvpArgs{:});
+            end
+
+            configs = [configs{:}];
+            if isempty(configs)
+                configs = cigre.config.ParameterConfig.empty(1, 0);
             end
 
             obj = cigre.config.ParameterConfiguration("Parameters", configs);

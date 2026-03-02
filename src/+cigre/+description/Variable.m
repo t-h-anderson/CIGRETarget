@@ -1,7 +1,4 @@
 classdef Variable
-    %VARIABLE Summary of this class goes here
-    %   Detailed explanation goes here
-
     properties
         SimulinkName (:,1) string = ""
         ExternalName (:,1) string = ""
