@@ -27,27 +27,39 @@ classdef TranslateTypes < handle
             end
 
             model = nvp.Model;
-            co = util.loadSystem(model); %#ok<NASGU>
+            try
+                co = util.loadSystem(model); %#ok<NASGU>
+            catch
+                model = string(nan);
+            end
 
 
-            if verLessThan("MATLAB", "9.14")
-
+            if verLessThan("MATLAB", "9.14") 
+                
                 cigreMap = containers.Map(util.TranslateTypes.StandardTypes, util.TranslateTypes.CigreTypes);
                 simulinkMap = containers.Map(util.TranslateTypes.StandardTypes, util.TranslateTypes.SimulinkTypes);
+
+            elseif ismissing(nvp.Model)
+
+                cigreMap = dictionary(util.TranslateTypes.StandardTypes, util.TranslateTypes.CigreTypes);
+                simulinkMap = dictionary(util.TranslateTypes.StandardTypes, util.TranslateTypes.SimulinkTypes);
 
             else
 
                 cigreMap = dictionary(util.TranslateTypes.StandardTypes, util.TranslateTypes.CigreTypes);
+                
+                model = nvp.Model;
+                co = util.loadSystem(model); %#ok<NASGU>
 
                 % Get correct replacement types
-                type = get_param(model, "DataTypeReplacement");
+                type = string(get_param(model, "DataTypeReplacement"));
                 switch type
-                    case 'CDataTypesFixedWidth'
+                    case "CDataTypesFixedWidth"
                         simulinkMap = dictionary(util.TranslateTypes.StandardTypes, util.TranslateTypes.AltSLTypes);
-                    case 'CoderTypedefs'
+                    case "CoderTypedefs"
                         simulinkMap = dictionary(util.TranslateTypes.StandardTypes, util.TranslateTypes.SimulinkTypes);
                     otherwise
-                        error("Type " + type + " not supported yet");
+                        error("CIGRE:TranslateTypes:UnknownDataTypeReplacement", "Type " + type + " not supported yet");
                 end
 
             end
@@ -87,9 +99,7 @@ classdef TranslateTypes < handle
 
             missingTypes = typeIn(~any(idx, 1));
             if ~isempty(missingTypes)
-                typeOut = typeIn;
-                warning("Type(s) '" + strjoin(missingTypes, ", ") + "' not found in supported " + nvp.From + " type list. If this is enum, check the port data type is not set to auto. This is not supported." );
-                return
+                error("CIGRE:TranslateTypes:UnknownType", "Type(s) '" + strjoin(missingTypes, ", ") + "' not found in supported " + nvp.From + " type list. If this is enum, check the port data type is not set to auto. This is not supported." );
             end
 
             firstIdxs = zeros(nTypesIn, 1);
