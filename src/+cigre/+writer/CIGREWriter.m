@@ -452,7 +452,7 @@ classdef CIGREWriter
                 paramDefI = strrep(paramDefI, "<<ParamType>>", cigreParamTypes(i));
                 
                 valType = strrep(cigreParamTypes(i), "_T", "_Val");
-                valType{1,1}(1) = upper(valType{1,1}(1));
+                valType = replaceBetween(valType, 1, 1, upper(extract(valType, 1)));
                 
                 paramDefI = strrep(paramDefI, "<<ValType>>", valType);
                 
