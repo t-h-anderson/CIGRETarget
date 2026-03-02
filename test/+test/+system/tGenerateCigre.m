@@ -323,7 +323,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                     c = inputs(i).BaseType;
 
                     d = inputs(i).Dimensions;
-                    if numel(d) == 1
+                    if isscalar(d)
                         d = [d, 1]; %#ok<AGROW>
                     end
                     thisVal = ones(d);
@@ -401,7 +401,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
 
             %% Create an input object to match the input and parameter test data
             testCase.tempLoad(mdlName);
-            simIn = Simulink.SimulationInput(char(mdlName));
+            simIn = Simulink.SimulationInput(mdlName);
 
             % Inputs
             try
@@ -453,13 +453,13 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             for i = 1:numel(params)
                 name = testCase.SimulinkParameters(i).Name;
                 val = testCase.SimulinkParameters(i).Value;
-                val = char(util.valToString(val)); % Parameter value needs to be a sring on the input object
+                val = char(util.valToString(val)); % Parameter value needs to be a char on the input object
                 idx = (string({ip.Name}) == name);
                 if any(idx)
                     ip(idx).Value = val;
                 else
                     % In model workspace
-                    mdl = char(erase(mdlName, "_wrap"));
+                    mdl = erase(mdlName, "_wrap");
                     param = util.findParam(mdl, name);
                     if isa(param, "Simulink.data.dictionary.Entry")
                         simIn = simIn.setVariable(name, eval(val));

@@ -1,23 +1,23 @@
-function bus = loadBus(model,name)
+function bus = loadBus(modelName, busName)
 arguments
-    model (1,1) string 
-    name (1,1) string
+    modelName (1,1) string 
+    busName (1,1) string
 end
 
-[~, cuo] = util.loadSystem(model); %#ok<ASGLU>
+[~, cuo] = util.loadSystem(modelName); %#ok<ASGLU>
 
-name = erase(name, "Bus:");
+% Allow search for e.g. "Bus:myBus", "Bus: myBus", or "myBus"
+busName = strtrim(erase(busName, "Bus:"));
 
 try
-    bus = Simulink.data.evalinGlobal(model, name);
-    bus.Description = name;
+    bus = Simulink.data.evalinGlobal(modelName, busName);
+    bus.Description = busName;
 catch
-    bus = [];
+    bus = Simulink.Bus.empty(1,0);
 end
 
-if numel(bus) ~= 1
+if isempty(bus)
     bus = Simulink.Bus.empty(1,0);
-    return
 end
 
 end
