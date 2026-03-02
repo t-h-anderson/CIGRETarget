@@ -19,7 +19,8 @@ if ~isscalar(val)
     for i = 1:size(val, 1)
         str = str + strjoin([p{i,:}], ", ");
         
-        if i < size(val, 2)
+        % Not the final row, so add a semicolon
+        if i < size(val, 1)
             str = str + "; ";
         end
     end
@@ -39,8 +40,8 @@ if isstruct(val)
 
         str = str + """" + f + """, ";
 
-        val = val.(f);
-        str = str + util.valToString(val);
+        fieldVal = val.(f);
+        str = str + util.valToString(fieldVal);
         
         if i ~= numel(fs)
             str = str + ", ";

@@ -121,7 +121,7 @@ classdef DataMap
 
             target = nvp.Target;
 
-            words = eval(nvp.Target + ".empty(1,0)");
+            words = cast([], nvp.Target);
             dataTypes = string.empty();
             sizes = zeros(numel(data), 1);
             dims = cell(size(data, 2),1);
@@ -168,7 +168,7 @@ classdef DataMap
                    
                     n = max(size(typecast(val, "int8")));
                     
-                    nTarget = max(size(typecast(eval(target + "(1)"), "int8")));
+                    nTarget = numel(typecast(cast(1, target), "int8"));
 
                     nPad = (nTarget - n)/n;
 

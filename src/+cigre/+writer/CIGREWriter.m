@@ -551,8 +551,8 @@ for i = 1:numel(intStates)
 end
 
 if isempty(heap) || ismissing(heap)
-    heap = 80000; % Make sure there is some heap...
-    warning("Heap calculation failed")
+    heap = "80000"; % Make sure there is some heap...
+    warning("CIGRE:heapSize:calculationFailed", "Heap calculation failed")
 end
 end
 
