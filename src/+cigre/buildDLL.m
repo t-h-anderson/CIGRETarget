@@ -8,7 +8,7 @@ arguments
     nvp.Verbose (1,1) logical = true
     nvp.WrapSuffix (1,1) string = "_wrap"
     nvp.VectorDataType (1,1) string = "single"
-    nvp.ParameterConfigFile (1,1) string = NaN
+    nvp.ParameterConfigFile (1,1) string = string(NaN)
 end
 
 % Load the model and ensure the correct target is selected
