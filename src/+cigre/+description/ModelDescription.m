@@ -39,7 +39,13 @@ classdef ModelDescription < handle
     end
 
     properties (Constant)
-        ReservedNames (1,:) string = ["inputs", "outputs"];
+        % Simulink code generator prefixes on output/input port argument names
+        SimulinkOutputPortPrefix (1,1) string = "rty_"
+        SimulinkInputPortPrefix (1,1) string = "rtx_"
+
+        % Patterns used to identify the RTM struct variable in InternalData
+        RtmVarSuffix (1,1) string = "_M"
+        RtmVarFallback (1,1) string = "MODEL"
     end
 
     % Build info properties
@@ -118,7 +124,7 @@ classdef ModelDescription < handle
         function analyse(obj, descriptor)
             arguments
                 obj
-                descriptor (1,1) cigre.description.CodeDescriptor
+                descriptor (1,1) cigre.description.ICodeDescriptor
             end
             % Populate this description from the given CodeDescriptor. The
             % descriptor owns all Simulink/coder/file I/O
@@ -189,9 +195,9 @@ classdef ModelDescription < handle
 
         function getRTMStruct(obj)
             internalNames = string({obj.InternalData.SimulinkName});
-            idx = find(endsWith(internalNames, "_M" + textBoundary), 1);
+            idx = find(endsWith(internalNames, cigre.description.ModelDescription.RtmVarSuffix + textBoundary), 1);
             if isempty(idx)
-                idx = find(contains(internalNames, "MODEL", "IgnoreCase", true), 1);
+                idx = find(contains(internalNames, cigre.description.ModelDescription.RtmVarFallback, "IgnoreCase", true), 1);
             end
 
             if isempty(idx)
@@ -259,7 +265,7 @@ classdef ModelDescription < handle
             knownNames = string([obj.InternalData.SimulinkName obj.InputData.SimulinkName obj.OutputData.SimulinkName]);
 
             % Strip graphical port prefixes added by Simulink code generation
-            inputNames = erase(inputNames, ["rty_", "rtx_"]);
+            inputNames = erase(inputNames, [cigre.description.ModelDescription.SimulinkOutputPortPrefix, cigre.description.ModelDescription.SimulinkInputPortPrefix]);
             externalNames = string([[obj.Inputs.ExternalName], [obj.Outputs.ExternalName]]);
             simulinkNames = string([[obj.Inputs.SimulinkName], [obj.Outputs.SimulinkName]]);
             for i = 1:numel(inputNames)
@@ -490,7 +496,7 @@ classdef ModelDescription < handle
                     code = [code(1); "{"; code(2:end)];
                 end
 
-                code = regexprep(code, cigreInterfaceName + "_M", "RealTimeModel_M");
+                code = regexprep(code, cigreInterfaceName + cigre.description.ModelDescription.RtmVarSuffix, "RealTimeModel_M");
             else
                 % Ensure there is always a rate scheduler stub
                 code = [...
@@ -511,7 +517,7 @@ classdef ModelDescription < handle
             end
             % Append a suffix to any name that clashes with CIGRE interface
             % reserved identifiers to prevent C struct field name conflicts.
-            reserved = cigre.description.ModelDescription.ReservedNames;
+            reserved = cigre.description.ICodeDescriptor.ReservedCigreIdentifiers;
             for i = 1:numel(names)
                 names(i) = matlab.lang.makeUniqueStrings(names(i), reserved);
             end
