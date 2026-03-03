@@ -149,21 +149,21 @@ classdef CodeDescriptor < handle
             % Return the FunctionInterface for the wrapper's Initialize function.
             desc = obj.getCIGREDescriptor();
             raw = desc.getFunctionInterfaces("Initialize");
-            iface = convertFunctionInterface(raw);
+            iface = cigre.description.FunctionInterface.fromCoderFunctionInterface(raw);
         end
 
         function iface = getOutputInterface(obj)
             % Return the FunctionInterface for the wrapper's Output (step) function.
             desc = obj.getCIGREDescriptor();
             raw = desc.getFunctionInterfaces("Output");
-            iface = convertFunctionInterface(raw);
+            iface = cigre.description.FunctionInterface.fromCoderFunctionInterface(raw);
         end
 
         function iface = getTerminateInterface(obj)
             % Return the FunctionInterface for the referenced model's Terminate function.
             desc = obj.getModelDescriptor();
             raw = desc.getFunctionInterfaces("Terminate");
-            iface = convertFunctionInterface(raw);
+            iface = cigre.description.FunctionInterface.fromCoderFunctionInterface(raw);
         end
 
         function iface = getModelRefInitializeInterface(obj)
@@ -174,10 +174,10 @@ classdef CodeDescriptor < handle
             desc = obj.getCIGREDescriptor();
 
             if verLessThan("MATLAB", "9.14")
-                iface = parseModelRefInitFromSource(desc, model, "Initialize");
+                iface = cigre.description.FunctionInterface.fromSourceFile(desc.BuildDir, model, "Initialize");
             else
                 raw = desc.getServiceFunctionPrototype(model + "_Initialize");
-                iface = convertServiceFunctionPrototype(raw);
+                iface = cigre.description.FunctionInterface.fromServiceFunctionPrototype(raw);
             end
         end
 
@@ -257,91 +257,4 @@ function names = applyReservedNameFallbacks(names)
     for i = 1:numel(names)
         names(i) = matlab.lang.makeUniqueStrings(names(i), reserved);
     end
-end
-
-function iface = convertFunctionInterface(raw)
-    % Convert a coder.FunctionInterface to a FunctionInterface value object.
-    if isempty(raw)
-        iface = cigre.description.FunctionInterface();
-        return
-    end
-
-    name = string(raw.Prototype.Name);
-    args = raw.ActualArgs;
-    nArgs = args.Size;
-
-    argNames = strings(1, nArgs);
-    argTypes = strings(1, nArgs);
-    argPointers = strings(1, nArgs);
-    for i = 1:nArgs
-        argNames(i) = cigre.description.Variable.extractSimulinkName(args(i));
-        [argTypes(i), argPointers(i)] = cigre.description.Variable.extractType(args(i));
-    end
-
-    iface = cigre.description.FunctionInterface(...
-        "Name", name, ...
-        "ArgumentNames", argNames, ...
-        "ArgumentTypes", argTypes, ...
-        "ArgumentPointers", argPointers);
-end
-
-function iface = convertServiceFunctionPrototype(raw)
-    % Convert a coder.ServiceFunctionPrototype (MATLAB >= R2022b) to a
-    % FunctionInterface value object.
-    if isempty(raw)
-        iface = cigre.description.FunctionInterface();
-        return
-    end
-
-    args = raw.Arguments.toArray();
-    argNames = string({args.Name});
-    [argTypes, argPointers] = cigre.description.Variable.extractBaseType(...
-        struct("Implementation", args));
-
-    iface = cigre.description.FunctionInterface(...
-        "Name", string(raw.Name), ...
-        "ArgumentNames", argNames, ...
-        "ArgumentTypes", argTypes, ...
-        "ArgumentPointers", argPointers);
-end
-
-function iface = parseModelRefInitFromSource(desc, model, type)
-    % Parse the model reference initialize function signature by reading the
-    % generated C source directly. Used for MATLAB versions before R2022b that
-    % do not support getServiceFunctionPrototype.
-    sourceFile = model + ".c";
-    f = readFromFile(fullfile(desc.BuildDir, sourceFile));
-
-    idxStart = find(contains(f, "void " + model + "_" + type + "("), 1);
-
-    if isempty(idxStart)
-        iface = cigre.description.FunctionInterface();
-        return
-    end
-
-    % Signature may span multiple lines — collect until the closing parenthesis.
-    sigLines = f(idxStart:end);
-    idxEnd = find(contains(sigLines, ")"), 1);
-    sigText = strjoin(sigLines(1:idxEnd), "");
-
-    funcName = extractBetween(sigText, " ", "(");
-    argsText = extractBetween(sigText, "(", ")");
-    argTokens = strtrim(strsplit(argsText, ","));
-
-    nArgs = numel(argTokens);
-    argNames = strings(1, nArgs);
-    argTypes = strings(1, nArgs);
-    argPointers = strings(1, nArgs); % TODO: extract pointer level from token
-
-    for i = 1:nArgs
-        parts = strsplit(argTokens(i), " ");
-        argTypes(i) = parts(1);
-        argNames(i) = erase(parts(2), "*");
-    end
-
-    iface = cigre.description.FunctionInterface(...
-        "Name", funcName, ...
-        "ArgumentNames", argNames, ...
-        "ArgumentTypes", argTypes, ...
-        "ArgumentPointers", argPointers);
 end
