@@ -605,9 +605,12 @@ classdef ModelDescription < handle
                 idx = ismember(knownTypes, inputTypes(i));
                 if sum(idx) == 1
                     inputNames(i) = knownNames(idx);
-                else
+                elseif ~any(idx)
                     warning("CIGRE:ModelDescription:UnknownType", ...
                         "'%s' could not be resolved to a known variable name", inputTypes(i));
+                else
+                    warning("CIGRE:ModelDescription:AmbiguousType", ...
+                        "'%s' does not resolve to a unique variable name", inputTypes(i));
                 end
             end
         end
