@@ -1,16 +1,48 @@
-classdef CodeDescriptor < handle
-    % Wraps the Simulink coder.CodeDescriptor API
-    
+classdef CodeDescriptor < cigre.description.ICodeDescriptor
+    % Wraps the Simulink coder.CodeDescriptor API.
+
+    properties (Constant, Access = private)
+        % Suffix appended to a model name to form its RTW build folder
+        CigreRtwFolderSuffix (1,1) string = "_cigre_rtw"
+
+        % get_param returns "auto" for CompiledStepSize when not yet evaluated
+        StepSizeAuto (1,1) string = "auto"
+        % get_param stores SystemTargetFile with a .tlc extension
+        SystemTargetFileSuffix (1,1) string = ".tlc"
+
+        % Simulink coder data interface category names
+        DataInterfaceInports (1,1) string = "Inports"
+        DataInterfaceOutports (1,1) string = "Outports"
+        DataInterfaceParameters (1,1) string = "Parameters"
+
+        % codeInfo InternalData GraphicalName values that partition variables
+        GraphicalNameInput (1,1) string = "ExternalInput"
+        GraphicalNameOutput (1,1) string = "ExternalOutput"
+
+        % codeInfo InternalData fields that are Simulink bookkeeping, not model state
+        BookkeepingErrorStatus (1,1) string = "rt_errorStatus"
+        BookkeepingTimingBridge (1,1) string = "timingBridge"
+        BookkeepingMdlrefTidPrefix (1,1) string = "mdlref_TID"
+
+        % Simulink coder function interface category names
+        FunctionInterfaceInitialize (1,1) string = "Initialize"
+        FunctionInterfaceOutput (1,1) string = "Output"
+        FunctionInterfaceTerminate (1,1) string = "Terminate"
+
+        % MATLAB version that introduced the getServiceFunctionPrototype API (R2022b)
+        MatlabVersionR2022b (1,1) string = "9.14"
+    end
+
     properties (Access = private)
         ModelName_ (1,1) string
         CIGREInterfaceName_ (1,1) string
         CodeGenFolder_ (1,1) string
-        CIGREDescriptor_  % cached coder.CodeDescriptor for the wrapper model
-        ModelDescriptor_  % cached coder.CodeDescriptor for the referenced model
-        CodeInfo_         % cached codeInfo struct from codeInfo.mat
+        CIGREDescriptor_
+        ModelDescriptor_
+        CodeInfo_
     end
 
-     methods
+    methods
 
         function obj = CodeDescriptor(modelName, cigreInterfaceName, codeGenFolder)
             arguments
@@ -31,7 +63,7 @@ classdef CodeDescriptor < handle
 
             try
                 step = get_param(model, "CompiledStepSize");
-                if string(step) == "auto"
+                if string(step) == obj.StepSizeAuto
                     error("Step size 'auto' not supported");
                 end
                 sampleTime = sprintf("%.17e", evalin("base", step));
@@ -41,7 +73,7 @@ classdef CodeDescriptor < handle
             end
 
             metadata = cigre.description.ModelMetadata(...
-                "SystemTargetFile", erase(get_param(model, "SystemTargetFile"), ".tlc"), ...
+                "SystemTargetFile", erase(get_param(model, "SystemTargetFile"), obj.SystemTargetFileSuffix), ...
                 "ModelVersion",     get_param(model, "ModelVersion"), ...
                 "Description",      get_param(model, "Description"), ...
                 "SampleTime",       sampleTime, ...
@@ -66,7 +98,7 @@ classdef CodeDescriptor < handle
         function vars = getInports(obj)
             % Return Variable array for the wrapper model inport signals.
             desc = obj.getCIGREDescriptor();
-            inports = desc.getDataInterfaces("Inports");
+            inports = desc.getDataInterfaces(obj.DataInterfaceInports);
             inports = removeUnimplemented(inports);
             vars = cigre.description.Variable.fromDataInterface(inports, obj.ModelName_);
         end
@@ -74,7 +106,7 @@ classdef CodeDescriptor < handle
         function vars = getOutports(obj)
             % Return Variable array for the wrapper model outport signals.
             desc = obj.getCIGREDescriptor();
-            outports = desc.getDataInterfaces("Outports");
+            outports = desc.getDataInterfaces(obj.DataInterfaceOutports);
             outports = removeUnimplemented(outports);
             vars = cigre.description.Variable.fromDataInterface(outports, obj.ModelName_);
         end
@@ -82,7 +114,7 @@ classdef CodeDescriptor < handle
         function vars = getParameters(obj)
             % Return Variable array for the referenced model parameters.
             desc = obj.getModelDescriptor();
-            parameters = desc.getDataInterfaces("Parameters");
+            parameters = desc.getDataInterfaces(obj.DataInterfaceParameters);
             vars = cigre.description.Variable.fromDataInterface(parameters, obj.ModelName_);
         end
 
@@ -105,9 +137,9 @@ classdef CodeDescriptor < handle
 
             % Remove Simulink-internal bookkeeping fields that are not part of
             % model state and should not appear in the CIGRE DLL interface.
-            isBookkeeping = externalNames == "rt_errorStatus" ...
-                | externalNames == "timingBridge" ...
-                | contains(externalNames, "mdlref_TID");
+            isBookkeeping = externalNames == obj.BookkeepingErrorStatus ...
+                | externalNames == obj.BookkeepingTimingBridge ...
+                | contains(externalNames, obj.BookkeepingMdlrefTidPrefix);
             internalData(isBookkeeping) = [];
             simulinkNames(isBookkeeping) = [];
             externalNames(isBookkeeping) = [];
@@ -125,8 +157,8 @@ classdef CodeDescriptor < handle
             pointers(pointers == "") = "*";
 
             graphicalNames = string({internalData.GraphicalName});
-            isInput    = graphicalNames == "ExternalInput";
-            isOutput   = graphicalNames == "ExternalOutput";
+            isInput    = graphicalNames == obj.GraphicalNameInput;
+            isOutput   = graphicalNames == obj.GraphicalNameOutput;
             isInternal = ~isInput & ~isOutput;
 
             inputVars = cigre.description.Variable.create(...
@@ -149,21 +181,21 @@ classdef CodeDescriptor < handle
         function iface = getInitializeInterface(obj)
             % Return the FunctionInterface for the wrapper's Initialize function.
             desc = obj.getCIGREDescriptor();
-            raw = desc.getFunctionInterfaces("Initialize");
+            raw = desc.getFunctionInterfaces(obj.FunctionInterfaceInitialize);
             iface = cigre.description.FunctionInterface.fromCoderFunctionInterface(raw);
         end
 
         function iface = getOutputInterface(obj)
             % Return the FunctionInterface for the wrapper's Output (step) function.
             desc = obj.getCIGREDescriptor();
-            raw = desc.getFunctionInterfaces("Output");
+            raw = desc.getFunctionInterfaces(obj.FunctionInterfaceOutput);
             iface = cigre.description.FunctionInterface.fromCoderFunctionInterface(raw);
         end
 
         function iface = getTerminateInterface(obj)
             % Return the FunctionInterface for the referenced model's Terminate function.
             desc = obj.getModelDescriptor();
-            raw = desc.getFunctionInterfaces("Terminate");
+            raw = desc.getFunctionInterfaces(obj.FunctionInterfaceTerminate);
             iface = cigre.description.FunctionInterface.fromCoderFunctionInterface(raw);
         end
 
@@ -174,11 +206,11 @@ classdef CodeDescriptor < handle
             model = obj.CIGREInterfaceName_;
             desc = obj.getCIGREDescriptor();
 
-            if verLessThan("MATLAB", "9.14")
+            if verLessThan("MATLAB", obj.MatlabVersionR2022b)
                 iface = cigre.description.FunctionInterface.fromSourceFile(...
-                    desc.BuildDir, model, "Initialize");
+                    desc.BuildDir, model, obj.FunctionInterfaceInitialize);
             else
-                raw = desc.getServiceFunctionPrototype(model + "_Initialize");
+                raw = desc.getServiceFunctionPrototype(model + "_" + obj.FunctionInterfaceInitialize);
                 iface = cigre.description.FunctionInterface.fromServiceFunctionPrototype(raw);
             end
         end
@@ -220,7 +252,7 @@ classdef CodeDescriptor < handle
             % Lazily load and cache the codeInfo struct written by the RTW build.
             if isempty(obj.CodeInfo_)
                 codeInfoPath = fullfile(obj.CodeGenFolder_, ...
-                    obj.CIGREInterfaceName_ + "_cigre_rtw", "codeInfo.mat");
+                    obj.CIGREInterfaceName_ + obj.CigreRtwFolderSuffix, "codeInfo.mat");
                 obj.CodeInfo_ = load(codeInfoPath).codeInfo;
             end
             info = obj.CodeInfo_;
@@ -229,7 +261,7 @@ classdef CodeDescriptor < handle
         function code = readWrapperFile(obj, extension)
             % Read a generated wrapper file (.h or .c) as a string array of lines.
             filePath = fullfile(obj.CodeGenFolder_, ...
-                obj.CIGREInterfaceName_ + "_cigre_rtw", ...
+                obj.CIGREInterfaceName_ + obj.CigreRtwFolderSuffix, ...
                 obj.CIGREInterfaceName_ + extension);
             if ~isfile(filePath)
                 error("CIGRE:CodeDescriptor:FileNotFound", ...
@@ -251,9 +283,9 @@ function interfaces = removeUnimplemented(interfaces)
 end
 
 function names = applyReservedNameFallbacks(names)
-    % Append a suffix to any name that clashes with reserved CIGRE interface
-    % identifiers ("inputs"/"outputs") to prevent C struct field name conflicts.
-    reserved = ["inputs", "outputs"];
+    % Append a suffix to any name that clashes with a reserved CIGRE interface
+    % identifier to prevent C struct field name conflicts.
+    reserved = cigre.description.ICodeDescriptor.ReservedCigreIdentifiers;
     for i = 1:numel(names)
         names(i) = matlab.lang.makeUniqueStrings(names(i), reserved);
     end
