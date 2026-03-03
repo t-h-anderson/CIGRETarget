@@ -79,7 +79,7 @@ classdef FunctionInterface
             % and is the preferred path for model-reference init functions.
             % Returns an empty FunctionInterface when raw is empty.
             arguments
-                raw (1,:) coder.descriptor.ServiceFunctionPrototype {mustBeScalarOrEmpty}
+                raw (1,:) coder.descriptor.types.Prototype {mustBeScalarOrEmpty}
             end
 
             if isempty(raw)

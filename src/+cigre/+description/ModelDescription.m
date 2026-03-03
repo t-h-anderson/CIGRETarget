@@ -124,17 +124,17 @@ classdef ModelDescription < handle
             % descriptor owns all Simulink/coder/file I/O
 
             % Model metadata
-            meta = descriptor.getModelMetadata();
-            obj.SystemTargetFile = meta.SystemTargetFile;
-            obj.ModifiedBy = meta.ModifiedBy;
-            obj.ModifiedOn = meta.ModifiedOn;
-            obj.CreatedBy = meta.CreatedBy;
-            obj.CreatedOn = meta.CreatedOn;
-            obj.Description = meta.Description;
-            obj.ModelModifiedComment = meta.ModelModifiedComment;
-            obj.ModelModifiedHistory = meta.ModelModifiedHistory;
-            obj.ModelVersion = meta.ModelVersion;
-            obj.SampleTime = meta.SampleTime;
+            metadata = descriptor.getModelMetadata();
+            obj.SystemTargetFile = metadata.SystemTargetFile;
+            obj.ModifiedBy = metadata.ModifiedBy;
+            obj.ModifiedOn = metadata.ModifiedOn;
+            obj.CreatedBy = metadata.CreatedBy;
+            obj.CreatedOn = metadata.CreatedOn;
+            obj.Description = metadata.Description;
+            obj.ModelModifiedComment = metadata.ModelModifiedComment;
+            obj.ModelModifiedHistory = metadata.ModelModifiedHistory;
+            obj.ModelVersion = metadata.ModelVersion;
+            obj.SampleTime = metadata.SampleTime;
 
             % Parse code structure from the generated wrapper files
             headerCode = descriptor.getWrapperHeaderCode();
