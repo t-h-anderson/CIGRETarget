@@ -475,7 +475,7 @@ classdef ModelDescription < handle
                 srcCode = strsplit(srcCode, newline)';
             end
 
-            idxStart = find(contains(srcCode, "rate_scheduler"));
+            idxStart = find(contains(srcCode, "rate_scheduler") & ~contains(srcCode,  lineBoundary + "/*"));
             if numel(idxStart) > 1
                 idxStart = idxStart(2); % first occurrence is the declaration
             end
