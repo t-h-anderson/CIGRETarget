@@ -2,7 +2,6 @@ classdef ModelDescription < handle
     %MODELDESCRIPTION
 
     properties
-        CIGRESuffix (1,1) string = "" % Cigre wrapper - reduce chance of clash with globals. Only "" works at the moment
         MaxExternalIdentifier (1,1) double = 31
     end
 

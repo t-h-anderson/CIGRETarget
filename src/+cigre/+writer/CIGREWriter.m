@@ -13,16 +13,14 @@ classdef CIGREWriter
                     cigre.config.ParameterConfiguration()
             end
 
-            cigreSuffix = modelDescriptions.CIGRESuffix;
-
             results = readFromFile("TemplateWrapper.c");
             results = cigre.writer.CIGREWriter.applyInitializeOnly(results, modelDescriptions);
-            results = cigre.writer.CIGREWriter.applyHeapAndMemoryDeclarations(results, modelDescriptions, cigreSuffix);
+            results = cigre.writer.CIGREWriter.applyHeapAndMemoryDeclarations(results, modelDescriptions);
             results = cigre.writer.CIGREWriter.applyInternalStateMapping(results, modelDescriptions);
             results = cigre.writer.CIGREWriter.applyParameterMappings(results, modelDescriptions, nvp.ParameterConfig);
             results = cigre.writer.CIGREWriter.applyStateBackupRestore(results, modelDescriptions.RTMStruct);
             results = cigre.writer.CIGREWriter.applyIOUnpacking(results, modelDescriptions);
-            results = cigre.writer.CIGREWriter.applyFunctionSignatures(results, modelDescriptions, cigreSuffix);
+            results = cigre.writer.CIGREWriter.applyFunctionSignatures(results, modelDescriptions);
 
             % Substitute model/wrapper names last so that all previously
             % generated code fragments containing these tags are also resolved
@@ -76,7 +74,7 @@ classdef CIGREWriter
             results = strrep(results, "<<CigreHeader>>", desc.ModelName + "_CIGRE.h");
         end
 
-        function results = applyHeapAndMemoryDeclarations(results, desc, cigreSuffix)
+        function results = applyHeapAndMemoryDeclarations(results, desc)
             % Substitute the heap size expression, the RTM struct declaration,
             % and generate heap_malloc / heap_get_address calls for each internal
             % state, input, and output variable.
@@ -88,14 +86,14 @@ classdef CIGREWriter
             for i = 1:numel(desc.InternalData)
                 % Internal states are addressed by ExternalName in the generated header
                 [results, idx] = insertMemoryEntry( ...
-                    results, desc.InternalData(i), desc.InternalData(i).ExternalName, cigreSuffix, idx);
+                    results, desc.InternalData(i), desc.InternalData(i).ExternalName, idx);
             end
 
             ioStates = [desc.InputData, desc.OutputData];
             for i = 1:numel(ioStates)
                 % IO structs are addressed by SimulinkName (the generated struct variable)
                 [results, idx] = insertMemoryEntry( ...
-                    results, ioStates(i), ioStates(i).SimulinkName, cigreSuffix, idx);
+                    results, ioStates(i), ioStates(i).SimulinkName, idx);
             end
 
             % Clear sentinels left by the incremental insertion pattern
@@ -191,16 +189,16 @@ classdef CIGREWriter
             end
         end
 
-        function results = applyFunctionSignatures(results, desc, cigreSuffix)
+        function results = applyFunctionSignatures(results, desc)
             % Substitute the generated model initialize and step function names
             % and their argument lists.
             initInputs = strjoin( ...
-                string([desc.InitialiseInputs.SimulinkName]) + cigreSuffix, ", ");
+                string({desc.InitialiseInputs.SimulinkName}), ", ");
             results = strrep(results, "<<ModelInitialize>>",      desc.InitializeName);
             results = strrep(results, "<<ModelInitialiseInputs>>", initInputs);
 
             stepInputs = strjoin( ...
-                string([desc.StepInputs.SimulinkName]) + cigreSuffix, ", ");
+                string({desc.StepInputs.SimulinkName}), ", ");
             results = strrep(results, "<<ModelStep>>",       desc.StepName);
             results = strrep(results, "<<ModelStepInputs>>", stepInputs);
         end
@@ -337,23 +335,22 @@ end
 
 % --- Local helper functions (not class methods) ---
 
-function [results, nextIdx] = insertMemoryEntry(results, state, varName, cigreSuffix, idx)
+function [results, nextIdx] = insertMemoryEntry(results, state, varName, idx)
 % Append one heap_malloc / heap_get_address line to the accumulating
 % placeholder lists, using incremental strrep to build up the list.
 % The (void) cast after each declaration suppresses MSVC C4189 for variables
 % that are allocated to reserve heap space but not directly dereferenced.
 type = state.Type;
 ptrs = state.Pointers;
-qualifiedName = varName + cigreSuffix;
 
-mallocLine  = type + ptrs + " " + qualifiedName ...
+mallocLine  = type + ptrs + " " + varName ...
     + " = heap_malloc(&instance->IntStates[0], (int32_t)sizeof(" + type + "));" ...
-    + newline + "    (void)" + qualifiedName + ";" ...
+    + newline + "    (void)" + varName + ";" ...
     + newline + "    <<InternalStatesMalloc>>";
 
-restoreLine = type + ptrs + " " + qualifiedName ...
+restoreLine = type + ptrs + " " + varName ...
     + " = (" + type + ptrs + ")heap_get_address(&instance->IntStates[0], " + idx + ");" ...
-    + newline + "    (void)" + qualifiedName + ";" ...
+    + newline + "    (void)" + varName + ";" ...
     + newline + "    <<InternalStatesRestore>>";
 
 results  = strrep(results, "<<InternalStatesMalloc>>", mallocLine);
