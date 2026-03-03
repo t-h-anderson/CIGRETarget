@@ -1,6 +1,5 @@
 classdef CodeDescriptor < handle
-    % Wraps the Simulink coder.CodeDescriptor API, providing a mockable
-    % boundary.
+    % Wraps the Simulink coder.CodeDescriptor API
     
     properties (Access = private)
         ModelName_ (1,1) string
@@ -11,7 +10,7 @@ classdef CodeDescriptor < handle
         CodeInfo_         % cached codeInfo struct from codeInfo.mat
     end
 
-    methods
+     methods
 
         function obj = CodeDescriptor(modelName, cigreInterfaceName, codeGenFolder)
             arguments
@@ -24,32 +23,34 @@ classdef CodeDescriptor < handle
             obj.CodeGenFolder_ = codeGenFolder;
         end
 
-        function meta = getModelMetadata(obj)
-            % Read model properties via get_param and return them as a plain
-            % struct so callers have no dependency on the Simulink API.
+        function metadata = getModelMetadata(obj)
+            % Read model properties via get_param and return a ModelMetadata
+            % value object so callers have no dependency on the Simulink API.
             model = obj.ModelName_;
             cModel = util.loadSystem(model); %#ok<NASGU>
-
-            meta.SystemTargetFile = erase(get_param(model, "SystemTargetFile"), ".tlc");
-            meta.ModifiedBy = get_param(model, "LastModifiedBy");
-            meta.ModifiedOn = get_param(model, "LastModifiedDate");
-            meta.CreatedBy = get_param(model, "Creator");
-            meta.CreatedOn = get_param(model, "Created");
-            meta.Description = get_param(model, "Description");
-            meta.ModelModifiedComment = get_param(model, "ModifiedComment");
-            meta.ModelModifiedHistory = get_param(model, "ModifiedHistory");
-            meta.ModelVersion = get_param(model, "ModelVersion");
 
             try
                 step = get_param(model, "CompiledStepSize");
                 if string(step) == "auto"
                     error("Step size 'auto' not supported");
                 end
-                meta.SampleTime = sprintf("%.17e", evalin("base", step));
+                sampleTime = sprintf("%.17e", evalin("base", step));
             catch
                 error("CIGRE:CodeDescriptor:StepSizeNotCalculated", ...
                     "Step size could not be evaluated for model '%s'", model);
             end
+
+            metadata = cigre.description.ModelMetadata(...
+                "SystemTargetFile", erase(get_param(model, "SystemTargetFile"), ".tlc"), ...
+                "ModelVersion",     get_param(model, "ModelVersion"), ...
+                "Description",      get_param(model, "Description"), ...
+                "SampleTime",       sampleTime, ...
+                "CreatedBy",        get_param(model, "Creator"), ...
+                "CreatedOn",        get_param(model, "Created"), ...
+                "ModifiedBy",       get_param(model, "LastModifiedBy"), ...
+                "ModifiedOn",       get_param(model, "LastModifiedDate"), ...
+                "ModelModifiedComment", get_param(model, "ModifiedComment"), ...
+                "ModelModifiedHistory", get_param(model, "ModifiedHistory"));
         end
 
         function code = getWrapperHeaderCode(obj)
@@ -93,56 +94,56 @@ classdef CodeDescriptor < handle
             % The RTM struct variable is included in internalVars — callers should
             % use getRTMStruct on ModelDescription to separate it after assignment.
             codeInfo = obj.getCodeInfo();
-            id = codeInfo.InternalData;
+            internalData = codeInfo.InternalData;
 
-            slname = strings(1, numel(id));
-            externalName = strings(1, numel(id));
-            for i = 1:numel(id)
-                slname(i) = cigre.description.Variable.extractSimulinkName(id(i));
-                externalName(i) = cigre.description.Variable.extractExternalName(id(i));
+            simulinkNames = strings(1, numel(internalData));
+            externalNames = strings(1, numel(internalData));
+            for i = 1:numel(internalData)
+                simulinkNames(i) = cigre.description.Variable.extractSimulinkName(internalData(i));
+                externalNames(i) = cigre.description.Variable.extractExternalName(internalData(i));
             end
 
             % Remove Simulink-internal bookkeeping fields that are not part of
             % model state and should not appear in the CIGRE DLL interface.
-            isBookkeeping = externalName == "rt_errorStatus" ...
-                | externalName == "timingBridge" ...
-                | contains(externalName, "mdlref_TID");
-            id(isBookkeeping) = [];
-            slname(isBookkeeping) = [];
-            externalName(isBookkeeping) = [];
+            isBookkeeping = externalNames == "rt_errorStatus" ...
+                | externalNames == "timingBridge" ...
+                | contains(externalNames, "mdlref_TID");
+            internalData(isBookkeeping) = [];
+            simulinkNames(isBookkeeping) = [];
+            externalNames(isBookkeeping) = [];
 
-            externalName = applyReservedNameFallbacks(externalName);
+            externalNames = applyReservedNameFallbacks(externalNames);
 
-            type = strings(1, numel(id));
-            pointers = strings(1, numel(id));
-            for i = 1:numel(id)
-                [type(i), pointers(i)] = cigre.description.Variable.extractType(id(i));
+            types = strings(1, numel(internalData));
+            pointers = strings(1, numel(internalData));
+            for i = 1:numel(internalData)
+                [types(i), pointers(i)] = cigre.description.Variable.extractType(internalData(i));
             end
 
             % Ensure all variables have at least one pointer level as required
             % by the generated C calling conventions.
             pointers(pointers == "") = "*";
 
-            graphicalNames = string({id.GraphicalName});
-            idxInput = graphicalNames == "ExternalInput";
-            idxOutput = graphicalNames == "ExternalOutput";
-            idxInternal = ~idxInput & ~idxOutput;
+            graphicalNames = string({internalData.GraphicalName});
+            isInput    = graphicalNames == "ExternalInput";
+            isOutput   = graphicalNames == "ExternalOutput";
+            isInternal = ~isInput & ~isOutput;
 
             inputVars = cigre.description.Variable.create(...
-                "SimulinkName", slname(idxInput), ...
-                "ExternalName", externalName(idxInput), ...
-                "Type", type(idxInput), ...
-                "Pointers", pointers(idxInput));
+                "SimulinkName", simulinkNames(isInput), ...
+                "ExternalName", externalNames(isInput), ...
+                "Type",         types(isInput), ...
+                "Pointers",     pointers(isInput));
             outputVars = cigre.description.Variable.create(...
-                "SimulinkName", slname(idxOutput), ...
-                "ExternalName", externalName(idxOutput), ...
-                "Type", type(idxOutput), ...
-                "Pointers", pointers(idxOutput));
+                "SimulinkName", simulinkNames(isOutput), ...
+                "ExternalName", externalNames(isOutput), ...
+                "Type",         types(isOutput), ...
+                "Pointers",     pointers(isOutput));
             internalVars = cigre.description.Variable.create(...
-                "SimulinkName", slname(idxInternal), ...
-                "ExternalName", externalName(idxInternal), ...
-                "Type", type(idxInternal), ...
-                "Pointers", pointers(idxInternal));
+                "SimulinkName", simulinkNames(isInternal), ...
+                "ExternalName", externalNames(isInternal), ...
+                "Type",         types(isInternal), ...
+                "Pointers",     pointers(isInternal));
         end
 
         function iface = getInitializeInterface(obj)
@@ -174,7 +175,8 @@ classdef CodeDescriptor < handle
             desc = obj.getCIGREDescriptor();
 
             if verLessThan("MATLAB", "9.14")
-                iface = cigre.description.FunctionInterface.fromSourceFile(desc.BuildDir, model, "Initialize");
+                iface = cigre.description.FunctionInterface.fromSourceFile(...
+                    desc.BuildDir, model, "Initialize");
             else
                 raw = desc.getServiceFunctionPrototype(model + "_Initialize");
                 iface = cigre.description.FunctionInterface.fromServiceFunctionPrototype(raw);
@@ -188,9 +190,6 @@ classdef CodeDescriptor < handle
             end
             if ~isempty(obj.ModelDescriptor_) && isvalid(obj.ModelDescriptor_)
                 delete(obj.ModelDescriptor_);
-            end
-            if ~isempty(obj.CodeInfo_) && isvalid(obj.CodeInfo_)
-                delete(obj.CodeInfo_);
             end
         end
 
@@ -228,9 +227,10 @@ classdef CodeDescriptor < handle
         end
 
         function code = readWrapperFile(obj, extension)
-            here = obj.CodeGenFolder_;
-            wrapper = obj.CIGREInterfaceName_;
-            filePath = fullfile(here, wrapper + "_cigre_rtw", wrapper + extension);
+            % Read a generated wrapper file (.h or .c) as a string array of lines.
+            filePath = fullfile(obj.CodeGenFolder_, ...
+                obj.CIGREInterfaceName_ + "_cigre_rtw", ...
+                obj.CIGREInterfaceName_ + extension);
             if ~isfile(filePath)
                 error("CIGRE:CodeDescriptor:FileNotFound", ...
                     "No wrapper file found at '%s'", filePath);
@@ -246,8 +246,8 @@ end
 function interfaces = removeUnimplemented(interfaces)
     % Remove data interfaces with no code implementation, which arise when a
     % port exists in the model but generates no corresponding C variable.
-    idx = arrayfun(@(x) isempty(x.Implementation), interfaces);
-    interfaces(idx) = [];
+    isUnimplemented = arrayfun(@(x) isempty(x.Implementation), interfaces);
+    interfaces(isUnimplemented) = [];
 end
 
 function names = applyReservedNameFallbacks(names)
