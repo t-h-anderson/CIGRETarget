@@ -572,14 +572,14 @@ classdef ModelDescription < handle
                 inputNames (1,:) string
                 inputTypes (1,:) string
             end
-            % Convert from types to names using internal data - ideally
-            % this could be quite fragile, this should be replaced
+            % Resolve C argument names from their types using the known internal,
+            % input, and output data variables. The RTM struct is handled as a
+            % special case since it is not a data variable.
 
             knownTypes = string([obj.InternalData.Type obj.InputData.Type obj.OutputData.Type]);
             knownNames = string([obj.InternalData.SimulinkName obj.InputData.SimulinkName obj.OutputData.SimulinkName]);
 
-            % Replace graphial names "rtx_"/"rty_" + graphical name with
-            % the internal name
+            % Strip graphical port prefixes added by Simulink code generation
             inputNames = erase(inputNames, ["rty_", "rtx_"]);
             externalNames = string([[obj.Inputs.ExternalName], [obj.Outputs.ExternalName]]);
             simulinkNames = string([[obj.Inputs.SimulinkName], [obj.Outputs.SimulinkName]]);
@@ -594,18 +594,22 @@ classdef ModelDescription < handle
                 if isempty(inputTypes(i))
                     continue
                 end
-                idx = ismember(knownTypes, inputTypes(i));
 
+                % The RTM type is an opaque model handle, not a data variable —
+                % resolve it to the fixed struct name without searching knownTypes
+                if inputTypes(i) == obj.RTMVarType
+                    inputNames(i) = obj.RTMStructName;
+                    continue
+                end
+
+                idx = ismember(knownTypes, inputTypes(i));
                 if sum(idx) == 1
                     inputNames(i) = knownNames(idx);
                 else
-                    warning(inputTypes(i) + " not a known type");
+                    warning("CIGRE:ModelDescription:UnknownType", ...
+                        "'%s' could not be resolved to a known variable name", inputTypes(i));
                 end
             end
-
-            % Replace RTM
-            idx = inputTypes == obj.RTMVarType;
-            inputNames(idx) = obj.RTMStructName;
         end
 
     end
