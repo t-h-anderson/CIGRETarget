@@ -145,6 +145,12 @@ classdef ModelDescription < handle
             headerCode = descriptor.getWrapperHeaderCode();
             sourceCode = descriptor.getWrapperSourceCode();
 
+            % Extract RTM struct pointer field names from the FULL (unstripped)
+            % header before processRTMStructCode discards them. These names are
+            % the reliable discriminator for classifyRTMFields: a variable is an
+            % RTM pointer field iff its ExternalName appears in this list.
+            rtmFieldNames = cigre.description.ModelDescription.parseRTMStructFieldNames(headerCode);
+
             [obj.TimingBridgeCode, obj.NumberOfTasks] = ...
                 cigre.description.ModelDescription.processRTMStructCode(headerCode);
             obj.InitializeOnlyCode = ...
@@ -172,9 +178,10 @@ classdef ModelDescription < handle
             obj.loadTerminateFunctionInterface(descriptor);
 
             % Phase 2: classify remaining InternalData into RTM pointer fields
-            % vs. standalone step arguments. Must run after loadStepFunctionInterface
-            % so that StepInputs types are available as the discriminator.
-            obj.classifyRTMFields();
+            % vs. standalone variables. Name-based matching against the header
+            % is primary; step-arg type matching is the fallback when the header
+            % contains no RTM struct definition (e.g. minimal mock headers in tests).
+            obj.classifyRTMFields(rtmFieldNames);
         end
 
         function writeDLLSource(obj, writer, nvp)
@@ -218,30 +225,42 @@ classdef ModelDescription < handle
             obj.InternalData(idx) = [];
         end
 
-        function classifyRTMFields(obj)
-            % Phase 2 of RTM classification: partition the remaining
-            % InternalData into RTM pointer fields (RTMStruct) and standalone
-            % step-function arguments (kept only in InternalData).
+        function classifyRTMFields(obj, rtmFieldNames)
+            % Phase 2 of RTM classification: populate RTMStruct with the subset
+            % of InternalData entries that are pointer fields of the RTM struct.
             %
-            % Variables whose type appears in the step function argument list
-            % are passed directly to model functions and do NOT need to be
-            % wired into the RTM struct. Variables not in the step argument
-            % list ARE pointer fields of the RTM struct and must be wired via
-            %   RTMStructName->field = field
-            % and backed up/restored around snapshot reinitialisation.
+            % Primary path — name-based matching (rtmFieldNames non-empty):
+            %   A variable is an RTM pointer field iff its ExternalName appears
+            %   in the set of pointer field names parsed from the wrapper header.
+            %   This correctly handles cases where two variables share the same
+            %   C type (e.g. a global InstP instance and the RTM InstP pointer
+            %   field) that cannot be distinguished by type alone.
             %
-            % When no step interface exists (e.g. RTM-only calling convention
-            % where dwork is accessed through the RTM handle), all remaining
-            % InternalData is treated as RTM pointer fields.
-            if isempty(obj.StepInputs) || isempty(obj.InternalData)
+            % Fallback path — step-arg type matching (rtmFieldNames empty):
+            %   Variables whose type appears in the step function argument list
+            %   are standalone; the rest are assumed to be RTM pointer fields.
+            %   Used when the header contains no RTM struct definition (e.g.
+            %   minimal mock headers in unit tests).
+            if isempty(obj.InternalData)
                 obj.RTMStruct = obj.InternalData;
                 return
             end
 
+            if ~isempty(rtmFieldNames)
+                internalNames = string([obj.InternalData.ExternalName]);
+                isRTMField = ismember(internalNames, rtmFieldNames);
+                obj.RTMStruct = obj.InternalData(isRTMField);
+                return
+            end
+
+            % Fallback: classify by step-arg type exclusion
+            if isempty(obj.StepInputs)
+                obj.RTMStruct = obj.InternalData;
+                return
+            end
             stepArgTypes  = string([obj.StepInputs.Type]);
             internalTypes = string([obj.InternalData.Type]);
-            isStepArg = ismember(internalTypes, stepArgTypes);
-            obj.RTMStruct = obj.InternalData(~isStepArg);
+            obj.RTMStruct = obj.InternalData(~ismember(internalTypes, stepArgTypes));
         end
 
         function loadModelRefInitialiseFunctionInterface(obj, descriptor)
@@ -375,6 +394,52 @@ classdef ModelDescription < handle
     end
 
     methods (Static)
+
+        function fieldNames = parseRTMStructFieldNames(headerCode)
+            % Extract the names of pointer fields declared inside the RTM
+            % struct (``struct tag_...``) from the wrapper header.
+            %
+            % These names are the authoritative discriminator for
+            % classifyRTMFields: an InternalData variable whose ExternalName
+            % appears in this set is a pointer field of the RTM struct and
+            % must be wired via RTMStructName->field = field in the generated
+            % DLL source. Variables absent from the set are standalone heap
+            % allocations passed directly as step/init arguments.
+            %
+            % The method matches lines of the form
+            %   <type> *<identifier>;
+            % and returns <identifier>. Non-pointer fields (e.g. errorStatus
+            % which is ``const char_T *errorStatus``) are also matched but
+            % are harmless because they never appear in InternalData.
+            arguments
+                headerCode (:,1) string
+            end
+
+            if isscalar(headerCode)
+                headerCode = strsplit(headerCode, newline)';
+            end
+
+            fieldNames = string.empty(1, 0);
+
+            idxStart = find(contains(headerCode, "struct tag_"), 1);
+            if isempty(idxStart)
+                return
+            end
+
+            idxEnd = findLineStartText(headerCode, "}");
+            idxEnd = idxEnd(find(idxEnd > idxStart, 1));
+            if isempty(idxEnd)
+                return
+            end
+
+            structLines = headerCode(idxStart:idxEnd);
+            for i = 1:numel(structLines)
+                tokens = regexp(structLines(i), '\*\s*(\w+)\s*;', 'tokens');
+                if ~isempty(tokens)
+                    fieldNames(end+1) = string(tokens{1}{1}); %#ok<AGROW>
+                end
+            end
+        end
 
         function desc = analyseModel(model, cigreWrapper, nvp)
             arguments
