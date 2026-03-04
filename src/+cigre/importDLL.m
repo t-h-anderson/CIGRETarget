@@ -43,7 +43,6 @@ function [modelPath, info] = importDLL(dllPath, nvp)
 
     arguments
         dllPath      (1,1) string
-        nvp.Header       (1,1) string  = string(missing)
         nvp.OutputFolder (1,1) string  = string(pwd)
         nvp.BlockName    (1,1) string  = string(missing)
         nvp.OpenModel    (1,1) logical = true
@@ -61,31 +60,21 @@ function [modelPath, info] = importDLL(dllPath, nvp)
     [dllDir, dllBase, ~] = fileparts(dllPath);
 
     % ------------------------------------------------------------------ %
-    %  Resolve header path
-    % ------------------------------------------------------------------ %
-    if ismissing(nvp.Header)
-        headerPath = fullfile(dllDir, dllBase + ".h");
-    else
-        headerPath = resolvePath(nvp.Header);
-    end
-    if ~isfile(headerPath)
-        error('CIGRE:importDLL:HeaderNotFound', ...
-            'DLL header not found: %s\n' + ...
-            'Supply the path explicitly via the Header argument.', headerPath);
-    end
-
-    % ------------------------------------------------------------------ %
     %  Load DLL and read model info
     % ------------------------------------------------------------------ %
     cigreSrcDir = fullfile(cigreRoot(), 'src', 'CIGRESource');
     alias = "cigre_import_" + matlab.lang.makeValidName(dllBase) ...
             + "_" + cigre.util.uuid();
 
+
+    src = fullfile(cigreRoot, "src", "CIGRESource");
+    header = fullfile(src, "IEEE_Cigre_DLLInterface.h");
+
     unloadIfLoaded(alias);
-    loadlibrary(char(dllPath), char(headerPath), ...
+    loadlibrary(char(dllPath), char(header), ...
         'includepath', cigreSrcDir, ...
         'alias',       char(alias));
-    cleanupLib = onCleanup(@() unloadIfLoaded(alias)); %#ok<NASGU>
+    cleanupLib = onCleanup(@() unloadIfLoaded(alias)); 
 
     info = cigre.importer.ModelInfo.fromLoadedDLL(alias);
 
@@ -127,11 +116,11 @@ function [modelPath, info] = importDLL(dllPath, nvp)
         % --- Add Level-2 S-Function block --- %
         add_block('built-in/S-Function', char(blockPath), ...
             'FunctionName', 'cigreDLLSFunction', ...
-            'Parameters',   buildSFParamString(dllPath, headerPath, info.Parameters), ...
+            'Parameters',   buildSFParamString(dllPath, header, info.Parameters), ...
             'Position',     [100, 100, 300, 200]);
 
         % --- Apply block mask with DLL parameter fields --- %
-        applyMask(blockPath, info, dllPath, headerPath);
+        applyMask(blockPath, info, dllPath, header);
 
         % --- Save model --- %
         save_system(hModel, char(modelPath));
