@@ -30,7 +30,7 @@ end
 % Produce a wrapper to deal with buses
 if nvp.PreserveWrapper
     wrapper = cigre.internal.cigreWrap(model, "BusAs", nvp.BusAs, "NameSuffix", wrapSuffix, "VectorDataType", nvp.VectorDataType);
-    cWrap = [];
+    cWrap = []; % Don't create a cleanup object if the user requests to preserve the wrapper
 else 
     [wrapper, cWrap] = cigre.internal.cigreWrap(model, "BusAs", nvp.BusAs, "NameSuffix", wrapSuffix, "VectorDataType", nvp.VectorDataType); 
 end
@@ -74,11 +74,13 @@ dll = model + "_CIGRE";
 c = [];
 
 if nvp.Verbose
-    disp("CIGRE compatible DLL created for model " + model + ". This can be found " + codeGenFolder);
+    disp("CIGRE compatible DLL created for model " + model + ". This can be found at: " + codeGenFolder);
 end
 
 % Output cleanup objects if requests to stop auto cleanup of wrapper
 if nargout > 2
+    % Clean up the model opening, and the wrapper creation (unless
+    % suppressed with PreserveWrapper=true
     c = {cModel, cWrap};
 end
 
