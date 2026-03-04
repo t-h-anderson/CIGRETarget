@@ -1,43 +1,47 @@
-function str = valToString(s)
+function str = valToString(val)
+% Take "any" input and convert it to a string
+arguments
+    val % Could be anything
+end
 
-if ~isscalar(s)
-    sz = size(s);
+if ~isscalar(val)
+    sz = size(val);
     if numel(sz) > 2
         error("Tensors not supported");
     end
 
     p = cell(sz);
-    for i = 1:numel(s)
-        p{i} = util.valToString(s(i));
+    for i = 1:numel(val)
+        p{i} = util.valToString(val(i));
     end
 
     str = "[";
-    for i = 1:size(s, 1)
+    for i = 1:size(val, 1)
         str = str + strjoin([p{i,:}], ", ");
         
-        if i < size(s, 2)
+        % Not the final row, so add a semicolon
+        if i < size(val, 1)
             str = str + "; ";
         end
     end
     str = str + "]";
         
-
     return
 end
 
 str = "";
-if isstruct(s)
+if isstruct(val)
     str = "struct(";
 
-    fs = string(fields(s));
+    fs = string(fields(val));
 
     for i = 1:numel(fs)
         f = fs(i);
 
         str = str + """" + f + """, ";
 
-        val = s.(f);
-        str = str + util.valToString(val);
+        fieldVal = val.(f);
+        str = str + util.valToString(fieldVal);
         
         if i ~= numel(fs)
             str = str + ", ";
@@ -46,14 +50,14 @@ if isstruct(s)
     end
 
     str = str + ")";
-elseif isstring(s) || ischar(s)
-    str = """" + s + """";
+elseif isstring(val) || ischar(val)
+    str = """" + val + """";
 else
-    c = class(s);
+    c = class(val);
     if ~strcmp(c, "double")
-        str = str + c + "(" + s + ")";
+        str = str + c + "(" + val + ")";
     else
-        str = str + string(s);
+        str = str + string(val);
     end
 end
 

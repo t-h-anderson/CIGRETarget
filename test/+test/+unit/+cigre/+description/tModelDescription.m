@@ -1,4 +1,4 @@
-classdef tModelDescription < matlab.unittest.TestCase
+classdef tModelDescription < matlab.mock.TestCase
 
     properties (TestParameter)
         ModelName = {"Test_MultiInput", "Test_MultiOutput", "Test_MIMO", "Test_ParamModel", "Test_FastRef", "Snap"}
@@ -120,12 +120,12 @@ classdef tModelDescription < matlab.unittest.TestCase
                 "  rtTimingBridge timingBridge"
                 "  B_ModelName_wrapper_T *blockIO;"
                 "  "
-                "  /*" 
-                "   * comments" 
-                "   */" 
-                "  struct {" 
+                "  /*"
+                "   * comments"
+                "   */"
+                "  struct {"
                 "    struct {"
-                "      uint32_T TID[2];" 
+                "      uint32_T TID[2];"
                 "    } TaskCounters;"
                 "  } Timing;"
                 "} RealTimeModel_T;"];
@@ -153,6 +153,472 @@ classdef tModelDescription < matlab.unittest.TestCase
             testCase.verifyEqual(tbc, expected);
         end
 
+
+
+        % --- processRTMStructCode -----------------------------------------
+
+        function singleRateModelProducesNoTimingBridge(testCase)
+            % A single-rate model struct has no TID array and no rtTimingBridge,
+            % so no timing bridge declarations should appear in the output.
+            header = [
+                "typedef struct tag_RTM_M_T {"
+                "  const char_T *errorStatus;"
+                "} RT_MODEL_M_T;"
+                ]';
+            [tbc, nTasks] = cigre.description.ModelDescription.processRTMStructCode(header);
+            testCase.verifyFalse(contains(tbc, "timingBridge"), ...
+                "Single-rate model must not include timingBridge declaration");
+            testCase.verifyEqual(nTasks, 1);
+        end
+
+        function multiRateModelExtractsTimingBridgeAndTaskCount(testCase)
+            % A multi-rate struct includes rtTimingBridge and TID[n]; both must
+            % be captured so the generated DLL can manage task scheduling.
+            header = [
+                "typedef struct tag_RTM_M_T {"
+                "  const char_T *errorStatus;"
+                "  rtTimingBridge timingBridge;"
+                "  struct {"
+                "    struct {"
+                "      uint32_T TID[3];"
+                "    } TaskCounters;"
+                "  } Timing;"
+                "} RT_MODEL_M_T;"
+                ]';
+            [tbc, nTasks] = cigre.description.ModelDescription.processRTMStructCode(header);
+            testCase.verifyEqual(nTasks, 3);
+            testCase.verifyTrue(contains(tbc, "timingBridge"), ...
+                "Multi-rate model must include timingBridge declaration");
+        end
+
+        function processRTMStructCodeInsertsRTMStructPlaceholder(testCase)
+            % The closing typedef brace must be replaced with <<RTMStruct>> so the
+            % writer can inject the correct variable name at code generation time.
+            header = [
+                "typedef struct tag_RTM_T {"
+                "  const char_T *errorStatus;"
+                "} RT_MODEL_T;"
+                ]';
+            [tbc, ~] = cigre.description.ModelDescription.processRTMStructCode(header);
+            testCase.verifyTrue(contains(tbc, "<<RTMStruct>>"), ...
+                "Closing typedef line must contain the <<RTMStruct>> placeholder");
+        end
+
+        function processRTMStructCodeWithNoStructReturnsEmptyAndScalarTaskCount(testCase)
+            % When no struct tag_... pattern exists the timing bridge is empty
+            % and task count is the scalar double 1 (single-rate default).
+            header = "/* no struct tag here */";
+            [tbc, nTasks] = cigre.description.ModelDescription.processRTMStructCode(header);
+            testCase.verifyEqual(tbc, "");
+            testCase.verifyEqual(nTasks, 1);
+        end
+
+        function processRTMStructCodeAcceptsScalarNewlineJoinedInput(testCase)
+            % The method must accept a single newline-joined string as well as a
+            % string array, since both forms occur during the build pipeline.
+            header = strjoin([
+                "typedef struct tag_RTM_T {"
+                "  const char_T *errorStatus;"
+                "} RT_MODEL_T;"
+                ], newline);
+            [tbc, nTasks] = cigre.description.ModelDescription.processRTMStructCode(header);
+            testCase.verifyClass(tbc, 'string');
+            testCase.verifyEqual(nTasks, 1);
+        end
+
+        function processRTMStructCodeIncludesErrorStatusWhenPresent(testCase)
+            header = [
+                "typedef struct tag_RTM_T {"
+                "  const char_T *errorStatus;"
+                "} RT_MODEL_T;"
+                ]';
+            [tbc, ~] = cigre.description.ModelDescription.processRTMStructCode(header);
+            testCase.verifyTrue(contains(tbc, "errorStatus"), ...
+                "errorStatus field must be preserved so the DLL can report errors");
+        end
+
+        % --- processInitializeCode ----------------------------------------
+
+        function processInitializeCodeRenamesFunctionWithOnlySuffix(testCase)
+            % The extracted function must carry the _only suffix so it can be called
+            % independently of the RTM struct allocation in the main initialise path.
+            source = [
+                "/* Model initialize function */"
+                "void MyModel_initialize(real_T *rtM)"
+                "{"
+                "  rtM->errorStatus = 0;"
+                "};"
+                ]';
+            code = cigre.description.ModelDescription.processInitializeCode(source);
+            testCase.verifyTrue(contains(code, "_initialize_only"), ...
+                "Extracted function must be renamed to the _only variant");
+        end
+
+        function processInitializeCodeProducesFallbackWhenAbsent(testCase)
+            % When no initialize function exists a minimal body must still be
+            % returned so the writer always has something to substitute.
+            source = "/* unrelated code only */";
+            code = cigre.description.ModelDescription.processInitializeCode(source);
+            testCase.verifyNotEmpty(code);
+            testCase.verifyTrue(contains(code, "};"), ...
+                "Fallback must produce a valid block ending with };");
+        end
+
+        function processInitializeCodeExtractsDefinitionNotDeclaration(testCase)
+            % The first occurrence of the initialize comment marks the forward
+            % declaration; the second marks the definition. Only the definition
+            % body should be extracted to avoid a duplicated signature.
+            source = [
+                "/* Model initialize function */"
+                "void MyModel_initialize(real_T *rtM);"
+                ""
+                "/* Model initialize function */"
+                "void MyModel_initialize(real_T *rtM)"
+                "{"
+                "  rtM->errorStatus = 0;"
+                "};"
+                ]';
+            code = cigre.description.ModelDescription.processInitializeCode(source);
+            occurrences = numel(strfind(code, "_initialize_only"));
+            testCase.verifyEqual(occurrences, 1, ...
+                "Only the definition should be renamed — not the declaration");
+        end
+
+        function processInitializeCodeAcceptsScalarNewlineJoinedInput(testCase)
+            source = strjoin([
+                "/* Model initialize function */"
+                "void M_initialize(real_T *x)"
+                "{"
+                "};"
+                ], newline);
+            code = cigre.description.ModelDescription.processInitializeCode(source);
+            testCase.verifyTrue(contains(code, "_initialize_only"));
+        end
+
+        % --- analyse via mock CodeDescriptor ------------------------------
+
+        function constructorDoesNotRequireSimulink(testCase)
+            % Passing explicit folder paths must bypass the Simulink.fileGenControl
+            % defaults so the constructor is usable without a Simulink licence.
+            testCase.verifyWarningFree(...
+                @() cigre.description.ModelDescription("TestModel", ...
+                "CIGREInterfaceName", "TestWrapper", ...
+                "CodeGenFolder", tempdir(), ...
+                "WorkFolder", tempdir()));
+        end
+
+        function analysePopulatesAllMetadataFields(testCase)
+            % analyse must copy every ModelMetadata field into the corresponding
+            % ModelDescription property so callers see a fully populated description.
+            metadata = cigre.description.ModelMetadata(...
+                "ModelVersion", "2.0.1", ...
+                "Description", "Test DLL", ...
+                "ModifiedBy", "alice", ...
+                "CreatedBy", "bob", ...
+                "SampleTime", "1.234e-03", ...
+                "ModifiedOn", "2024-01-01");
+            [mock, behavior] = testCase.createMock(?cigre.description.ICodeDescriptor);
+            setupDefaultMock(testCase, behavior, "Metadata", metadata);
+
+            desc = makeModelDescription();
+            desc.analyse(mock);
+
+            testCase.verifyEqual(desc.ModelVersion, "2.0.1");
+            testCase.verifyEqual(desc.Description, "Test DLL");
+            testCase.verifyEqual(desc.ModifiedBy, "alice");
+            testCase.verifyEqual(desc.CreatedBy, "bob");
+            testCase.verifyEqual(desc.SampleTime, "1.234e-03");
+            testCase.verifyEqual(desc.ModifiedOn, "2024-01-01");
+        end
+
+        function analysePopulatesInitialiseAndStepAndTerminateNames(testCase)
+            [mock, behavior] = testCase.createMock(?cigre.description.ICodeDescriptor);
+            setupDefaultMock(testCase, behavior, ...
+                "InitName", "MyModel_initialize", ...
+                "StepName", "MyModel_step", ...
+                "TerminateName", "MyModel_terminate");
+
+            desc = makeModelDescription();
+            desc.analyse(mock);
+
+            testCase.verifyEqual(desc.InitializeName, "MyModel_initialize");
+            testCase.verifyEqual(desc.StepName, "MyModel_step");
+            testCase.verifyEqual(desc.TerminateName, "MyModel_terminate");
+        end
+
+        function analyseWithEmptyFunctionInterfacesLeavesNamesEmpty(testCase)
+            % When none of the four entry points are present (e.g. a minimal
+            % model) all function names must remain "" and no error is thrown.
+            [mock, behavior] = testCase.createMock(?cigre.description.ICodeDescriptor);
+            setupDefaultMock(testCase, behavior);
+
+            desc = makeModelDescription();
+            desc.analyse(mock);
+
+            testCase.verifyEqual(desc.InitializeName, "");
+            testCase.verifyEqual(desc.StepName, "");
+            testCase.verifyEqual(desc.TerminateName, "");
+            testCase.verifyEqual(desc.ModelRefInitialiseName, "");
+        end
+
+        function analysePopulatesInputsAndOutputsFromDescriptor(testCase)
+            inputs = cigre.description.Variable.create(...
+                "SimulinkName", ["In1", "In2"], ...
+                "CIGREName", ["In1", "In2"], ...
+                "Type", ["real_T", "real_T"], ...
+                "Pointers", ["*", "*"]);
+            outputs = cigre.description.Variable.create(...
+                "SimulinkName", "Out1", ...
+                "CIGREName", "Out1", ...
+                "Type", "real_T", ...
+                "Pointers", "*");
+            [mock, behavior] = testCase.createMock(?cigre.description.ICodeDescriptor);
+            setupDefaultMock(testCase, behavior, "Inputs", inputs, "Outputs", outputs);
+
+            desc = makeModelDescription();
+            desc.analyse(mock);
+
+            testCase.verifyNumElements(desc.Inputs, 2);
+            testCase.verifyNumElements(desc.Outputs, 1);
+        end
+
+        function analyseExtractsRTMStructFromInternalData(testCase)
+            % The variable ending in _M must be separated from InternalData and
+            % stored in RTMVarType and RTMStruct to drive the state-memory layout.
+            [mock, behavior] = testCase.createMock(?cigre.description.ICodeDescriptor);
+            setupDefaultMock(testCase, behavior);
+
+            desc = makeModelDescription();
+            desc.analyse(mock);
+
+            testCase.verifyEqual(desc.RTMVarType, "RT_MODEL_MyModel_T", ...
+                "RTMVarType must be set from the _M variable type");
+            testCase.verifyNumElements(desc.InternalData, 1, ...
+                "The _M variable must be removed from InternalData after extraction");
+            testCase.verifyNumElements(desc.RTMStruct, 1, ...
+                "Remaining InternalData must be captured in RTMStruct for wiring");
+        end
+
+        function analyseExtractsRTMStructWhenRTMIsNotFirst(testCase)
+            % getRTMStruct must work regardless of the position of the _M
+            % variable in InternalData — the sub-struct pointer fields that
+            % precede it must still be captured in RTMStruct.
+            [rtmVar, dwVar] = makeRTMAndDWVars();
+            [mock, behavior] = testCase.createMock(?cigre.description.ICodeDescriptor);
+            setupDefaultMock(testCase, behavior, "InternalVars", [dwVar, rtmVar]);
+
+            desc = makeModelDescription();
+            desc.analyse(mock);
+
+            testCase.verifyEqual(desc.RTMVarType, "RT_MODEL_MyModel_T", ...
+                "RTMVarType must be resolved even when _M is last in InternalData");
+            testCase.verifyNumElements(desc.InternalData, 1, ...
+                "The _M variable must be removed from InternalData");
+            testCase.verifyNumElements(desc.RTMStruct, 1, ...
+                "Sub-struct field must appear in RTMStruct even when it precedes the _M variable");
+            testCase.verifyEqual(desc.RTMStruct(1).SimulinkName, "localDW", ...
+                "RTMStruct must contain the dwork variable regardless of ordering");
+        end
+
+        function analyseExcludesStepArgsFromRTMStruct(testCase)
+            % Variables that appear as direct step function arguments must NOT
+            % be wired into the RTM struct — only true RTM pointer fields (those
+            % NOT in the step arg list) belong in RTMStruct.
+            % This guards against the C2039 error caused by generating
+            % RTMStructName->stepArgVar = stepArgVar for a non-existent field.
+            [rtmVar, dwVar] = makeRTMAndDWVars();
+            stepIface = cigre.description.FunctionInterface(...
+                "Name", "MyModel_step", ...
+                "ArgumentNames", ["MyWrapper_M", "localDW"], ...
+                "ArgumentTypes", ["RT_MODEL_MyModel_T", "DW_MyModel_T"], ...
+                "ArgumentPointers", ["*", "*"]);
+            [mock, behavior] = testCase.createMock(?cigre.description.ICodeDescriptor);
+            setupDefaultMock(testCase, behavior, ...
+                "InternalVars", [rtmVar, dwVar], ...
+                "StepInterface", stepIface);
+
+            desc = makeModelDescription();
+            desc.analyse(mock);
+
+            testCase.verifyEmpty(desc.RTMStruct, ...
+                "A variable passed as a step argument must not appear in RTMStruct");
+            testCase.verifyNumElements(desc.InternalData, 1, ...
+                "The step-arg variable must remain in InternalData for heap allocation");
+        end
+
+        function analyseUsesHeaderFieldNamesForRTMClassification(testCase)
+            % When the wrapper header contains an RTM struct definition the
+            % pointer field names extracted from it must be used as the
+            % primary discriminator for RTMStruct membership, superseding
+            % the step-arg type fallback. This prevents the C2039 error that
+            % arises when two InternalData entries share the same C type but
+            % only one is an RTM pointer field (e.g. a global InstP instance
+            % vs. the RTM InstP pointer field).
+            [rtmVar, dwVar] = makeRTMAndDWVars();
+
+            % Add a second variable with the SAME type as dwVar but a
+            % different name — simulates Snap_wrap_InstP / Snap_wrap_InstP_ref.
+            instPStandalone = cigre.description.Variable(...
+                "SimulinkName", "globalInstP", ...
+                "CIGREName", "globalInstP", ...
+                "Type", "DW_MyModel_T", ...
+                "Pointers", "*");
+
+            % Header explicitly lists only localDW as an RTM pointer field.
+            % globalInstP is NOT in the struct → must NOT enter RTMStruct.
+            header = strjoin([
+                "typedef struct tag_RTM_MyModel_T {"
+                "  const char_T *errorStatus;"
+                "  DW_MyModel_T *localDW;"
+                "} RT_MODEL_MyModel_T;"
+                ], newline);
+
+            [mock, behavior] = testCase.createMock(?cigre.description.ICodeDescriptor);
+            setupDefaultMock(testCase, behavior, ...
+                "InternalVars", [rtmVar, dwVar, instPStandalone], ...
+                "HeaderCode", header);
+
+            desc = makeModelDescription();
+            desc.analyse(mock);
+
+            testCase.verifyNumElements(desc.RTMStruct, 1, ...
+                "Only the RTM pointer field must appear in RTMStruct");
+            testCase.verifyEqual(desc.RTMStruct(1).ERTName, "localDW", ...
+                "RTMStruct must contain localDW (the declared pointer field)");
+            testCase.verifyNumElements(desc.InternalData, 2, ...
+                "Both non-RTM variables must remain in InternalData for heap allocation");
+        end
+
+        function analysePopulatesStepInputVariables(testCase)
+            % Step inputs are assembled from the function interface arguments;
+            % verifying them end-to-end confirms processInterface is exercised.
+            rtmType = "RT_MODEL_MyModel_T";
+            stepIface = cigre.description.FunctionInterface(...
+                "Name", "MyModel_step", ...
+                "ArgumentNames", ["MyModel_M", "localDW"], ...
+                "ArgumentTypes", [rtmType, "DW_MyModel_T"], ...
+                "ArgumentPointers", ["*", "*"]);
+            [mock, behavior] = testCase.createMock(?cigre.description.ICodeDescriptor);
+            setupDefaultMock(testCase, behavior, "StepInterface", stepIface);
+
+            desc = makeModelDescription();
+            desc.analyse(mock);
+
+            testCase.verifyNumElements(desc.StepInputs, 2, ...
+                "StepInputs must contain one Variable per function argument");
+        end
+
     end
 
+end
+
+% --- Local helpers --------------------------------------------------------
+
+function desc = makeModelDescription()
+% Construct a ModelDescription with explicit folders to avoid Simulink.
+desc = cigre.description.ModelDescription("MyModel", ...
+    "CIGREInterfaceName", "MyWrapper", ...
+    "CodeGenFolder", tempdir(), ...
+    "WorkFolder", tempdir());
+end
+
+function [rtmVar, dwVar] = makeRTMAndDWVars()
+% Return the two canonical internal-data variables used across tests:
+% one RTM struct pointer ending in _M and one DWork struct.
+rtmVar = cigre.description.Variable(...
+    "SimulinkName", "MyWrapper_M", ...
+    "CIGREName", "MyWrapper_M", ...
+    "Type", "RT_MODEL_MyModel_T", ...
+    "Pointers", "*");
+dwVar = cigre.description.Variable(...
+    "SimulinkName", "localDW", ...
+    "CIGREName", "localDW", ...
+    "Type", "DW_MyModel_T", ...
+    "Pointers", "*");
+end
+
+function [internalVars, inputVars, outputVars] = makeDefaultCodeInfoVars()
+% Minimal internal-data set in canonical order: RTM var first, DWork second.
+[rtmVar, dwVar] = makeRTMAndDWVars();
+internalVars = [rtmVar, dwVar];
+inputVars = cigre.description.Variable.empty(1, 0);
+outputVars = cigre.description.Variable.empty(1, 0);
+end
+
+function setupDefaultMock(testCase, behavior, nvp)
+% Configure all CodeDescriptor methods required by analyse.
+% Named pairs override defaults:
+%   Metadata       - ModelMetadata (default: empty)
+%   InitName       - string, initialise function name (default: "")
+%   StepName       - string, step function name (default: "")
+%   TerminateName  - string, terminate function name (default: "")
+%   StepInterface  - FunctionInterface for step (overrides StepName)
+%   Inputs         - Variable array for inports (default: empty)
+%   Outputs        - Variable array for outports (default: empty)
+%   InternalVars   - Variable array overriding the default [rtmVar, dwVar] set
+%   HeaderCode     - string wrapper header (default: minimal, no RTM struct)
+
+arguments
+    testCase
+    behavior
+    nvp.Metadata (1,1) cigre.description.ModelMetadata = cigre.description.ModelMetadata()
+    nvp.InitName (1,1) string = ""
+    nvp.StepName (1,1) string = ""
+    nvp.TerminateName (1,1) string = ""
+    nvp.StepInterface = cigre.description.FunctionInterface.empty(1,0)
+    nvp.Inputs (1,:) cigre.description.Variable = cigre.description.Variable.empty(1,0)
+    nvp.Outputs (1,:) cigre.description.Variable = cigre.description.Variable.empty(1,0)
+    nvp.InternalVars (1,:) cigre.description.Variable = cigre.description.Variable.empty(1,0)
+    nvp.HeaderCode (1,1) string = "/* no RTM struct */"
+end
+
+if isempty(nvp.InternalVars)
+    [internalVars, inputVars, outputVars] = makeDefaultCodeInfoVars();
+else
+    internalVars = nvp.InternalVars;
+    inputVars  = cigre.description.Variable.empty(1, 0);
+    outputVars = cigre.description.Variable.empty(1, 0);
+end
+
+testCase.assignOutputsWhen(behavior.getModelMetadata.withAnyInputs(), nvp.Metadata);
+
+% Header/source — caller may supply a real RTM struct header; default is
+% minimal (no timing bridge) to keep unrelated tests independent
+testCase.assignOutputsWhen(behavior.getWrapperHeaderCode.withAnyInputs(), ...
+    nvp.HeaderCode);
+testCase.assignOutputsWhen(behavior.getWrapperSourceCode.withAnyInputs(), ...
+    "/* no rate_scheduler */");
+
+testCase.assignOutputsWhen(behavior.getCodeInfoVariables.withAnyInputs(), ...
+    internalVars, inputVars, outputVars);
+
+testCase.assignOutputsWhen(behavior.getInports.withAnyInputs(), nvp.Inputs);
+testCase.assignOutputsWhen(behavior.getOutports.withAnyInputs(), nvp.Outputs);
+testCase.assignOutputsWhen(behavior.getParameters.withAnyInputs(), ...
+    cigre.description.Variable.empty(1, 0));
+
+testCase.assignOutputsWhen(behavior.getModelRefInitializeInterface.withAnyInputs(), ...
+    makeFunctionInterface(""));
+testCase.assignOutputsWhen(behavior.getInitializeInterface.withAnyInputs(), ...
+    makeFunctionInterface(nvp.InitName));
+
+if isempty(nvp.StepInterface)
+    stepInterface = makeFunctionInterface(nvp.StepName);
+else
+    stepInterface = nvp.StepInterface;
+end
+
+testCase.assignOutputsWhen(behavior.getOutputInterface.withAnyInputs(), ...
+    stepInterface);
+testCase.assignOutputsWhen(behavior.getTerminateInterface.withAnyInputs(), ...
+    makeFunctionInterface(nvp.TerminateName));
+end
+
+function iface = makeFunctionInterface(name)
+% Build a zero-argument FunctionInterface, or empty if name is "".
+if name == ""
+    iface = cigre.description.FunctionInterface();
+else
+    iface = cigre.description.FunctionInterface("Name", name);
+end
 end

@@ -1,5 +1,4 @@
 classdef CustomCheck < handle
-
     % Copyright 2024 The MathWorks, Inc.
     %
     % Custom Check Super Class
@@ -21,7 +20,7 @@ classdef CustomCheck < handle
     properties (Abstract, Constant, Hidden)
         % Callback function styles:
         % https://www.mathworks.com/help/slcheck/ref/modeladvisor.check.setcallbackfcn.html
-        Style (1,:) char %{mustBeMember(Style, ["StyleOne", "StyleTwo", "StyleThree", "DetailStyle"])}
+        Style (1,:) string
     end
 
 
@@ -45,17 +44,21 @@ classdef CustomCheck < handle
     methods(Static)
 
         function reportResultsSimple(checkObj, model, pass, description, status, recAction)
-            
-            % Check args
-            
+            arguments
+                checkObj
+                model
+                pass
+                description
+                status
+                recAction
+            end
+
             ElementResults = ModelAdvisor.ResultDetail;
-            ElementResults.Description = description;            
+            ElementResults.Description = description;
             if verLessThan("MATLAB", "23.2")
-                if pass
-                    
-                else
+                if ~pass
                     ElementResults.IsViolation = true;
-                end   
+                end
             else
                 ElementResults.Status = status;
                 if pass
@@ -71,8 +74,16 @@ classdef CustomCheck < handle
         end
 
         function reportResults(checkObj, model, vtype, violatingBlocks, description, statusPass, statusFail, recAction)
-            
-            % Check args
+            arguments
+                checkObj
+                model
+                vtype
+                violatingBlocks
+                description
+                statusPass
+                statusFail
+                recAction
+            end
 
             mdladvObj = Simulink.ModelAdvisor.getModelAdvisor(model); % get object
             if isempty(violatingBlocks)
@@ -84,22 +95,22 @@ classdef CustomCheck < handle
                     ElementResults.Status = statusPass;
                 end
                 ElementResults.Description = description;
-                
+
                 mdladvObj.setCheckResultStatus(true);
             else
                 for idx=1:numel(violatingBlocks)
                     ElementResults(1,idx) = ModelAdvisor.ResultDetail;                  %#ok<AGROW>
                 end
                 for idx=1:numel(violatingBlocks)
-                    
+
                     if verLessThan("MATLAB", "23.2")
                         ElementResults(idx).setData(violatingBlocks{idx});
                     else
                         ModelAdvisor.ResultDetail.setData(ElementResults(idx), 'SID', violatingBlocks{idx});
                     end
-                   
+
                     ElementResults(idx).Description = description;
-                    
+
                     if iscell(statusFail)
                         ElementResults(idx).Status = statusFail{idx};
                     else
@@ -111,14 +122,14 @@ classdef CustomCheck < handle
                     else
                         ElementResults(idx).RecAction =  recAction;
                     end
-                    
+
                     if iscell(vtype)
                         if verLessThan("MATLAB", "23.2")
                             if strcmp(vtype{idx}, 'fail')
                                 ElementResults(idx).IsViolation = true;
                             else
                                 ElementResults(idx).IsViolation = false;
-                            end        
+                            end
                         else
                             ElementResults(idx).ViolationType = vtype{idx};
                         end

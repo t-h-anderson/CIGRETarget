@@ -7,7 +7,6 @@ end
 [~, co] = util.loadSystem(mdl); %#ok<ASGLU>
 
 % Probably should be missing, but not supported for e.g. integers
-failedValue = 0;
 
 paramPath = strsplit(param, ".");
 paramRoot = extractBefore(param + ".", ".");

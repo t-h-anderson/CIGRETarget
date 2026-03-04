@@ -2,7 +2,6 @@ classdef ModelDescription < handle
     %MODELDESCRIPTION
 
     properties
-        CIGRESuffix (1,1) string = "" % Cigre wrapper - reduce chance of clash with globals. Only "" works at the moment
         MaxExternalIdentifier (1,1) double = 31
     end
 
@@ -39,7 +38,13 @@ classdef ModelDescription < handle
     end
 
     properties (Constant)
-        ReservedNames (1,:) string = ["inputs", "outputs"];
+        % Simulink code generator prefixes on output/input port argument names
+        SimulinkOutputPortPrefix (1,1) string = "rty_"
+        SimulinkInputPortPrefix (1,1) string = "rtx_"
+
+        % Patterns used to identify the RTM struct variable in InternalData
+        RtmVarSuffix (1,1) string = "_M"
+        RtmVarFallback (1,1) string = "MODEL"
     end
 
     % Build info properties
@@ -84,11 +89,6 @@ classdef ModelDescription < handle
     end
 
     properties (Dependent)
-        CIGREInterfaceDescriptor
-        ModelCodeDescriptor
-
-        CIGREInterfaceCodeInfo
-
         HasTimingBridge
         HasInitFunction
         HasRateScheduler
@@ -110,475 +110,195 @@ classdef ModelDescription < handle
             arguments
                 modelName (1,1) string
                 nvp.CIGREInterfaceName (1,1) string = string(missing)
+                nvp.CodeGenFolder (1,1) string = Simulink.fileGenControl('getConfig').CodeGenFolder
+                nvp.WorkFolder (1,1) string = Simulink.fileGenControl('getConfig').CacheFolder
             end
 
             obj.ModelName = modelName;
             obj.CIGREInterfaceName = nvp.CIGREInterfaceName;
-
-            cfg = Simulink.fileGenControl('getConfig');
-            obj.CodeGenFolder = cfg.CodeGenFolder;
-            obj.WorkFolder = cfg.CacheFolder;
+            obj.CodeGenFolder = nvp.CodeGenFolder;
+            obj.WorkFolder = nvp.WorkFolder;
         end
 
-        function clearCodeDescriptorObjects(obj)
-            % Do this after analysis otherwise the file will be locked
-            delete(obj.CIGREInterfaceDescriptor_);
-            delete(obj.ModelCodeDescriptor_);
-            delete(obj.CIGREInterfaceDescriptor_);
-
-            delete(obj.CIGREInterfaceCodeInfo_);
-            delete(obj.CIGREInterfaceCodeInfo_);
-
-        end
-
-        function analyse(obj)
-
-            % Load the system so we can get_param
-            cModel = util.loadSystem(obj.ModelName); %#ok<NASGU>
-            cWrapper = util.loadSystem(obj.CIGREInterfaceName); %#ok<NASGU>
-
-            cCodeDescriptor = onCleanup(@() obj.clearCodeDescriptorObjects());
-
-            % Get metadata from the model - no interraction with build
-            % objects
-            obj.getModelMetadata();
-
-            % Get information from the wrapper code - this is created for a
-            % top level model, but not for a reference model. This is used
-            % in the cigre dll code
-            obj.loadTimingBridgeCode();
-            obj.loadInitializeOnlyCode();
-            obj.loadRateSchedulerCode();
-
-            obj.loadInternalData();
-
-            % Get information about the data interfaces, i.e. the input,
-            % output and parameters
-            obj.loadDataInterface("Input");
-            obj.loadDataInterface("Output");
-            obj.loadDataInterface("Parameters");
-
-            % Get call signatures for the four key functions
-
-            % Model reference - allow snapshot restart
-            obj.getFunctionInterface("Init");
-
-            % Top model
-            obj.getFunctionInterface("Initialise");
-            obj.getFunctionInterface("Step");
-            obj.getFunctionInterface("Terminate");
-
-            obj.clearCodeDescriptorObjects();
-        end
-
-        function writeDLLSource(obj, writer)
+        function analyse(obj, descriptor)
             arguments
-                obj (1,1)
+                obj
+                descriptor (1,1) cigre.description.ICodeDescriptor
+            end
+            % Populate this description from the given CodeDescriptor. The
+            % descriptor owns all Simulink/coder/file I/O
+
+            % Model metadata
+            metadata = descriptor.getModelMetadata();
+            obj.SystemTargetFile = metadata.SystemTargetFile;
+            obj.ModifiedBy = metadata.ModifiedBy;
+            obj.ModifiedOn = metadata.ModifiedOn;
+            obj.CreatedBy = metadata.CreatedBy;
+            obj.CreatedOn = metadata.CreatedOn;
+            obj.Description = metadata.Description;
+            obj.ModelModifiedComment = metadata.ModelModifiedComment;
+            obj.ModelModifiedHistory = metadata.ModelModifiedHistory;
+            obj.ModelVersion = metadata.ModelVersion;
+            obj.SampleTime = metadata.SampleTime;
+
+            % Parse code structure from the generated wrapper files
+            headerCode = descriptor.getWrapperHeaderCode();
+            sourceCode = descriptor.getWrapperSourceCode();
+
+            % Extract RTM struct pointer field names from the FULL (unstripped)
+            % header before processRTMStructCode discards them. These names are
+            % the reliable discriminator for classifyRTMFields: a variable is an
+            % RTM pointer field iff its ERTName appears in this list.
+            rtmFieldNames = cigre.description.ModelDescription.parseRTMStructFieldNames(headerCode);
+
+            [obj.TimingBridgeCode, obj.NumberOfTasks] = ...
+                cigre.description.ModelDescription.processRTMStructCode(headerCode);
+            obj.InitializeOnlyCode = ...
+                cigre.description.ModelDescription.processInitializeCode(sourceCode);
+            obj.RateSchedulerCode = ...
+                cigre.description.ModelDescription.processRateSchedulerCode(sourceCode, obj.CIGREInterfaceName);
+
+            % Internal state variables — must come before function interfaces
+            % because translateNames relies on InternalData/InputData/OutputData
+            [internalVars, inputVars, outputVars] = descriptor.getCodeInfoVariables();
+            obj.InputData = inputVars;
+            obj.OutputData = outputVars;
+            obj.InternalData = internalVars;
+            obj.getRTMStruct();
+
+            % Data interfaces
+            obj.Inputs = descriptor.getInports();
+            obj.Outputs = descriptor.getOutports();
+            obj.Parameters = descriptor.getParameters();
+
+            % Function call signatures for the four CIGRE entry points
+            obj.loadModelRefInitialiseFunctionInterface(descriptor);
+            obj.loadInitialiseFunctionInterface(descriptor);
+            obj.loadStepFunctionInterface(descriptor);
+            obj.loadTerminateFunctionInterface(descriptor);
+
+            % Phase 2: classify remaining InternalData into RTM pointer fields
+            % vs. standalone variables. Name-based matching against the header
+            % is primary; step-arg type matching is the fallback when the header
+            % contains no RTM struct definition (e.g. minimal mock headers in tests).
+            obj.classifyRTMFields(rtmFieldNames);
+        end
+
+        function writeDLLSource(obj, writer, nvp)
+            arguments
+                obj (1,1) cigre.description.ModelDescription
                 writer (1,1) cigre.writer.CIGREWriter
+                nvp.ParameterConfig (1,1) cigre.config.ParameterConfiguration = cigre.config.ParameterConfiguration()
             end
 
-            [dllText, cFile] = writer.writeDLL(obj);
-            [headerText, hFile] = writer.writeHeader(obj);
+            [dllText, cFile] = writer.writeDLL(obj, "ParameterConfig", nvp.ParameterConfig);
+            [headerText, hFile] = writer.writeHeader(obj, "ParameterConfig", nvp.ParameterConfig);
 
-            here = Simulink.fileGenControl('getConfig').CodeGenFolder; % TODO: This isn't good for testing. Inject location?
-            buildDir = fullfile(here, "slprj", "cigre");
+            buildDir = fullfile(obj.CodeGenFolder, "slprj", "cigre");
 
             writeToFile(dllText, fullfile(buildDir, cFile));
             writeToFile(headerText, fullfile(buildDir, hFile));
-
         end
 
     end
 
-    methods (Access = protected)
-
-        function getModelMetadata(obj)
-
-            model = obj.ModelName;
-            cModel = util.loadSystem(model); %#ok<NASGU>
-
-            obj.SystemTargetFile = erase(get_param(model, "SystemTargetFile"), ".tlc");
-
-            obj.ModifiedBy = get_param(model, "LastModifiedBy");
-            obj.ModifiedOn = get_param(model, "LastModifiedDate");
-            obj.CreatedBy = get_param(model, "Creator");
-            obj.CreatedOn = get_param(model, "Created");
-            obj.CreatedOn = get_param(model, "Description");
-            obj.ModelModifiedComment = get_param(model, "ModifiedComment");
-            obj.ModelModifiedHistory = get_param(model, "ModifiedHistory");
-            obj.ModelVersion = get_param(model, "ModelVersion");
-
-            try
-                step = get_param(model, "CompiledStepSize");
-                if string(step) == "auto"
-                    error("Step size 'auto' not supported");
-                end
-
-                obj.SampleTime = sprintf("%.17e", evalin('base', step)); % TODO: How do we eval this like the model?
-            catch
-                error("ModelDescription:StepSizeNotCalculated", "Step size " + step + " could not be evaluated");
-            end
-
-        end
-
-        function loadTimingBridgeCode(obj)
-            % Find the number of tasks and
-
-            % Example timing bridge code:
-            % typedef struct tag_RTM_Test_MultiInputTopLevel_T {
-            % 	rtTimingBridge timingBridge;
-            %   struct {
-            %     struct {
-            %       uint32_T TID[2];
-            %     } TaskCounters;
-            %   } Timing;
-            % } RT_MODEL_Test_MultiInputTopLevel_T;"], newline)
-            headerCode = obj.getWrapperCode("Type", ".h");
-            [tbc, nTasks] = obj.processRTMStructCode(headerCode);
-
-            obj.TimingBridgeCode = tbc;
-            obj.NumberOfTasks = nTasks;
-
-        end
-
-        function loadInitializeOnlyCode(obj)
-            % Find the number of tasks and
-
-            % Example timing bridge code:
-            % void Snap_wrap_initialize_only(RT_MODEL_Snap_wrap_T* const
-            % Snap_wrap_M)
-            % {
-            %     DW_Snap_wrap_T* Snap_wrap_DW = Snap_wrap_M->dwork;
-            %
-            %     {
-            %     static uint32_T* taskCounterPtrs;
-            %     Snap_wrap_M->timingBridge.nTasks = 3;
-            %     Snap_wrap_M->timingBridge.clockTick = (NULL);
-            %     Snap_wrap_M->timingBridge.clockTickH = (NULL);
-            %     taskCounterPtrs = &(Snap_wrap_M->Timing.TaskCounters.TID[0]);
-            %     Snap_wrap_M->timingBridge.taskCounter = taskCounterPtrs;
-            %     }
-            %
-            %     /* Model Initialize function for ModelReference Block: '<Root>/mdl' */
-            %         Snap_initialize(rtmGetErrorStatusPointer(Snap_wrap_M),
-            %         &Snap_wrap_M->timingBridge, 0, 1, 2,
-            %         &(Snap_wrap_DW->mdl_InstanceData.rtm),
-            %         &(Snap_wrap_DW->mdl_InstanceData.rtdw));
-            %
-            % }
-
-            wrapperCode = obj.getWrapperCode("Type", ".c");
-            initialize = obj.processInitializeCode(wrapperCode);
-
-            obj.InitializeOnlyCode = initialize;
-
-        end
-
-        function loadRateSchedulerCode(obj)
-            % TODO: Make more stable. Can include other code which may have
-            % include dependencies
-            headerCode = obj.getWrapperCode("Type", ".c");
-            code = obj.processRateSchedulerCode(headerCode, obj.CIGREInterfaceName);
-
-            obj.RateSchedulerCode = code;
-        end
-
-        function loadInternalData(obj)
-            %
-            % % Code Descriptor
-            % codeDescObj = obj.ModelCodeDescriptor;
-            % internal = codeDescObj.getDataInterfaces("InternalData");
-            %
-            % type = arrayfun(@(x) string(x.Implementation.BaseRegion.Type.Identifier), internal);
-            % [~, idx] = unique(type, "stable");
-            % type = num2cell(type(idx));
-            %
-            % try
-            %     name = arrayfun(@(x) string(x.Implementation.BaseRegion.ElementIdentifier), internal, "UniformOutput", false);
-            %     name = name(idx);
-            % catch
-            %     % This fails in 2020a
-            %     name = "internalState" + (1:numel(type));
-            % end
-
-            % Code info
-            codeInfo = obj.CIGREInterfaceCodeInfo;
-
-            id = codeInfo.InternalData;
-
-            % Dealt with cetain fields of model struct explicitly
-            slname = string.empty(1,0);
-            externalName = string.empty(1,0);
-            for i = 1:numel(id)
-                slname(i) = cigre.description.Variable.extractSimulinkName(id(i));
-                externalName(i) = cigre.description.Variable.extractExternalName(id(i));
-            end
-            idx = cellfun(@(x) x == "rt_errorStatus", externalName);
-            idx = idx | cellfun(@(x) x == "timingBridge", externalName);
-            idx = idx | cellfun(@(x) contains(x, "mdlref_TID"), externalName);
-            id(idx) = [];
-
-            % Ensure we don't have any name clases
-            externalName = obj.avoidReservedName(externalName);
-
-            type = string.empty(1,0);
-            pointers = string.empty(1,0);
-            for i = 1:numel(id)
-                [type(i), pointers(i)] = cigre.description.Variable.extractType(id(i));
-            end
-
-            % Separate external input and outputs
-            idxInput = (string({id.GraphicalName}) == "ExternalInput");
-            idxOutput = (string({id.GraphicalName}) == "ExternalOutput");
-            idxInternal = (~idxInput & ~idxOutput);
-
-            % Always at least one pointer used in writer. Why do we have a
-            % difference?
-            idx = cellfun(@(x) x == "", pointers);
-            pointers(idx) = {"*"};
-
-            obj.InputData = cigre.description.Variable.create("SimulinkName", slname(idxInput), "ExternalName", externalName(idxInput), "Type", type(idxInput), "Pointers", pointers(idxInput));
-            obj.OutputData = cigre.description.Variable.create("SimulinkName", slname(idxOutput), "ExternalName", externalName(idxOutput), "Type", type(idxOutput), "Pointers", pointers(idxOutput));
-            obj.InternalData = cigre.description.Variable.create("SimulinkName", slname(idxInternal), "ExternalName", externalName(idxInternal), "Type", type(idxInternal), "Pointers", pointers(idxInternal));
-
-            obj.getRTMStruct();
-        end
+    methods (Access = private)
 
         function getRTMStruct(obj)
-
-            % Ignore Inputs, outputs and RTM
-            idx = find(endsWith([obj.InternalData.SimulinkName], "_M" + textBoundaryPattern), 1); % TODO: Make this more robust
+            % Phase 1 of RTM classification: find the RTM struct variable,
+            % record its type, and remove it from InternalData.
+            % RTMStruct is populated later by classifyRTMFields once the
+            % step function interface is available for discrimination.
+            internalNames = string({obj.InternalData.ERTName});
+            idx = find(endsWith(internalNames, cigre.description.ModelDescription.RtmVarSuffix + textBoundary), 1);
             if isempty(idx)
-                idx = find(contains([obj.InternalData.SimulinkName], "MODEL", "IgnoreCase", true), 1); % TODO: Make this more robust
+                idx = find(contains(internalNames, cigre.description.ModelDescription.RtmVarFallback, "IgnoreCase", true), 1);
+            end
+
+            if isempty(idx)
+                error("CIGRE:ModelDescription:RTMStructNotFound", ...
+                    "Could not identify the Real-Time Model struct in the internal data for model '%s'. " + ...
+                    "Expected a variable ending in '_M' or containing 'MODEL'.", obj.ModelName);
             end
 
             obj.RTMVarType = obj.InternalData(idx).Type;
-            obj.RTMStruct = obj.InternalData((idx+1):end);
-
-            % Remove from the heap. It is stored independently
             obj.InternalData(idx) = [];
-
         end
 
-        function getFunctionInterface(obj, type)
-            arguments
-                obj
-                type (1,1) string {mustBeMember(type, ["Init", "Initialise", "Step", "Terminate"])}
+        function classifyRTMFields(obj, rtmFieldNames)
+            % Phase 2 of RTM classification: populate RTMStruct with the subset
+            % of InternalData entries that are pointer fields of the RTM struct.
+            %
+            % Primary path — name-based matching (rtmFieldNames non-empty):
+            %   A variable is an RTM pointer field iff its ERTName appears
+            %   in the set of pointer field names parsed from the wrapper header.
+            %   This correctly handles cases where two variables share the same
+            %   C type (e.g. a global InstP instance and the RTM InstP pointer
+            %   field) that cannot be distinguished by type alone.
+            %
+            % Fallback path — step-arg type matching (rtmFieldNames empty):
+            %   Variables whose type appears in the step function argument list
+            %   are standalone; the rest are assumed to be RTM pointer fields.
+            %   Used when the header contains no RTM struct definition (e.g.
+            %   minimal mock headers in unit tests).
+            if isempty(obj.InternalData)
+                obj.RTMStruct = obj.InternalData;
+                return
             end
 
-            switch type
-                case "Init"
-                    obj.loadModelRefInitialiseFunctionInterface();
-                case "Initialise"
-                    obj.loadInitialiseFunctionInterface();
-                case "Step"
-                    obj.loadStepFunctionInterface();
-                case "Terminate"
-                    obj.loadTerminateFunctionInterface();
+            if ~isempty(rtmFieldNames)
+                internalNames = string([obj.InternalData.ERTName]);
+                isRTMField = ismember(internalNames, rtmFieldNames);
+                obj.RTMStruct = obj.InternalData(isRTMField);
+                return
             end
 
+            % Fallback: classify by step-arg type exclusion
+            if isempty(obj.StepInputs)
+                obj.RTMStruct = obj.InternalData;
+                return
+            end
+            stepArgTypes  = string([obj.StepInputs.Type]);
+            internalTypes = string([obj.InternalData.Type]);
+            obj.RTMStruct = obj.InternalData(~ismember(internalTypes, stepArgTypes));
         end
 
-        function loadModelRefInitialiseFunctionInterface(obj)
-
-            [name, inputs] = getCodeInterfaceForModelRef(obj, "Type", "Initialize");
-
-            obj.ModelRefInitialiseName = name;
-            obj.ModelRefInitialiseInputs = inputs;
-
+        function loadModelRefInitialiseFunctionInterface(obj, descriptor)
+            iface = descriptor.getModelRefInitializeInterface();
+            [obj.ModelRefInitialiseName, obj.ModelRefInitialiseInputs] = ...
+                obj.processInterface(iface);
         end
 
-        function loadInitialiseFunctionInterface(obj)
-
-            codeDescObj = obj.CIGREInterfaceDescriptor;
-            initialise = codeDescObj.getFunctionInterfaces("Initialize");
-
-            [name, inputs] = obj.processInterface(initialise);
-
-            obj.InitializeName = name;
-            obj.InitialiseInputs = inputs;
+        function loadInitialiseFunctionInterface(obj, descriptor)
+            iface = descriptor.getInitializeInterface();
+            [obj.InitializeName, obj.InitialiseInputs] = obj.processInterface(iface);
         end
 
-        function loadStepFunctionInterface(obj)
-
-            codeDescObj = obj.CIGREInterfaceDescriptor;
-            step = codeDescObj.getFunctionInterfaces("Output");
-
-            [name, inputs] = obj.processInterface(step);
-
-            obj.StepName = name;
-            obj.StepInputs = inputs;
+        function loadStepFunctionInterface(obj, descriptor)
+            iface = descriptor.getOutputInterface();
+            [obj.StepName, obj.StepInputs] = obj.processInterface(iface);
         end
 
-        function loadTerminateFunctionInterface(obj)
-
-            codeDescObj = obj.ModelCodeDescriptor;
-            terminate = codeDescObj.getFunctionInterfaces("Terminate");
-
-            [name, inputs] = obj.processInterface(terminate);
-
-            obj.TerminateName = name;
-            obj.TerminateInputs = inputs;
-
+        function loadTerminateFunctionInterface(obj, descriptor)
+            iface = descriptor.getTerminateInterface();
+            [obj.TerminateName, obj.TerminateInputs] = obj.processInterface(iface);
         end
 
-
-        function [name, inputs] = processInterface(obj, funcInterface)
-
-            if isempty(funcInterface)
+        function [name, inputs] = processInterface(obj, iface)
+            % Convert a FunctionInterface into a name and Variable array,
+            % resolving argument names via translateNames.
+            if isempty(iface) || iface.IsEmpty
                 name = "";
                 inputs = cigre.description.Variable.empty(1,0);
                 return
             end
 
-            name = funcInterface.Prototype.Name;
-
-            args = funcInterface.ActualArgs;
-            inputs = string.empty(1,0);
-            types = string.empty(1,0);
-            for i = 1:(args.Size)
-                inputs(i) = cigre.description.Variable.extractSimulinkName(args(i));
-                types(i) = cigre.description.Variable.extractType(args(i));
-            end
-
-            inputs = obj.translateNames(inputs, types);
-            inputs = cigre.description.Variable.create("SimulinkName", inputs, "Type",types);
-
-
-        end
-
-        function code = getWrapperCode(obj, nvp)
-            arguments
-                obj
-                nvp.Type (1,1) string {mustBeMember(nvp.Type, [".h", ".c"])} = ".h"
-            end
-
-            % Load the wrapper header file by naming convention
-            here = obj.CodeGenFolder;
-            wrapper = obj.CIGREInterfaceName;
-            wrapperHeader = fullfile(here, wrapper + "_cigre_rtw", wrapper + nvp.Type);
-
-            if ~isfile(wrapperHeader)
-                error("CIGRE:TimingBridgeCode:NoWrapperCode", "No file found for the CIGRE wrapper model at " + wrapperHeader);
-            end
-
-            code = readFromFile(wrapperHeader);
-        end
-
-        function [funcName, inputs] = getCodeInterfaceForModelRef(md, nvp)
-            arguments
-                md cigre.description.ModelDescription
-                nvp.Type {mustBeMember(nvp.Type, ["Init", "Initialize"])}
-            end
-
-            type = nvp.Type;
-
-            model = md.CIGREInterfaceName;
-            codeDescObj = md.CIGREInterfaceDescriptor;
-
-            if verLessThan("MATLAB", "9.14")
-
-                sourceFile = model + ".c";
-
-                f = readFromFile(fullfile(codeDescObj.BuildDir, sourceFile));
-
-                % Get the block with the tag_RTM
-                idxStart = find(contains(f, "void " + model + "_" + type + "("), 1);
-
-                inputTypes = string.empty(1,0);
-                inputNames = string.empty(1,0);
-                pointers = string.empty(1,0);
-                funcName = "";
-
-                if ~isempty(idxStart)
-
-                    % Function can span mulitple lines
-                    initFn = f(idxStart:end);
-                    idxEnd = find(contains(initFn, ")"), 1);
-                    initFn = strjoin(initFn(1:idxEnd), "");
-
-                    % Take arguments
-                    funcName = extractBetween(initFn, " ", "(");
-                    argsIn = extractBetween(initFn, "(", ")");
-
-                    argsIn = strtrim(strsplit(argsIn, ","));
-                    for i = 1:numel(argsIn)
-                        thisArg = strsplit(argsIn(i), " ");
-                        inputTypes(i) = thisArg(1);
-                        pointers(i) = ""; % TODO
-                        inputNames(i) = erase(thisArg(2), "*");
-                    end
-
-                end
-
-            else
-                init = codeDescObj.getServiceFunctionPrototype(model + "_" + type); %  TODO: Show How do we find this?
-
-                if ~isempty(init)
-                    funcName = init.Name;
-                    args = init.Arguments;
-                    args = args.toArray();
-
-                    inputNames = string({args.Name});
-                    [inputTypes, pointers] = cigre.description.Variable.extractBaseType(struct("Implementation", args));
-                else
-                    funcName = "";
-                    inputNames = string.empty(1,0);
-                    inputTypes = string.empty(1,0);
-                    pointers = string.empty(1,0);
-                end
-
-            end
-
-            inputNames = md.translateNames(inputNames, inputTypes);
-
-            inputs = cigre.description.Variable.create("SimulinkName", inputNames, "Pointers", pointers, "Type", inputTypes);
-
-        end
-
-        %coder.descriptor.types.Argument
-
-        function loadDataInterface(obj, type)
-            arguments
-                obj
-                type (1,1) string {mustBeMember(type, ["Input", "Output", "Parameters"])}
-            end
-
-            switch type
-                case "Input"
-                    obj.loadInputInterface();
-                case "Output"
-                    obj.loadOutputInterface();
-                case "Parameters"
-                    obj.loadParameterInterface();
-            end
-        end
-
-        function loadInputInterface(obj)
-            inports = obj.CIGREInterfaceDescriptor.getDataInterfaces("Inports");
-
-            % Remove outports that do not appear in code
-            idxNoIn = arrayfun(@(x) isempty(x.Implementation), inports);
-            inports(idxNoIn) = [];
-
-            obj.Inputs = cigre.description.Variable.fromDataInterface(inports, obj.ModelName);
-        end
-
-        function loadOutputInterface(obj)
-            outports = obj.CIGREInterfaceDescriptor.getDataInterfaces("Outports");
-
-            % Remove outports that do not appear in code
-            idxNoOut = arrayfun(@(x) isempty(x.Implementation), outports);
-            outports(idxNoOut) = [];
-
-            obj.Outputs = cigre.description.Variable.fromDataInterface(outports, obj.ModelName);
-        end
-
-        function loadParameterInterface(obj)
-            parameters = obj.ModelCodeDescriptor.getDataInterfaces("Parameters");
-            pObj = cigre.description.Variable.fromDataInterface(parameters, obj.ModelName);
-
-            obj.Parameters = pObj;
+            argNames = obj.translateNames(iface.ArgumentNames, iface.ArgumentTypes);
+            name = iface.Name;
+            inputs = cigre.description.Variable.create(...
+                "ERTName", argNames, ...
+                "Type", iface.ArgumentTypes, ...
+                "Pointers", iface.ArgumentPointers);
         end
 
         function inputNames = translateNames(obj, inputNames, inputTypes)
@@ -587,21 +307,20 @@ classdef ModelDescription < handle
                 inputNames (1,:) string
                 inputTypes (1,:) string
             end
-            % Convert from types to names using internal data - ideally
-            % this could be quite fragile, this should be replaced
+            % Resolve C argument names from their types using the known internal,
+            % input, and output data variables. The RTM struct is handled as a
+            % special case since it is not a data variable.
 
             knownTypes = string([obj.InternalData.Type obj.InputData.Type obj.OutputData.Type]);
-            knownNames = string([obj.InternalData.SimulinkName obj.InputData.SimulinkName obj.OutputData.SimulinkName]);
+            knownNames = string([obj.InternalData.ERTName obj.InputData.ERTName obj.OutputData.ERTName]);
 
-            % Replace graphial names "rtx_"/"rty_" + graphical name with
-            % the internal name
-            inputNames = erase(inputNames, ["rty_", "rtx_"]);
-            externalNames = string([[obj.Inputs.ExternalName], [obj.Outputs.ExternalName]]);
-            simulinkNames = string([[obj.Inputs.SimulinkName], [obj.Outputs.SimulinkName]]);
+            % Strip graphical port prefixes added by Simulink code generation
+            inputNames = erase(inputNames, [cigre.description.ModelDescription.SimulinkOutputPortPrefix, cigre.description.ModelDescription.SimulinkInputPortPrefix]);
+            portERTNames = string([[obj.Inputs.ERTName], [obj.Outputs.ERTName]]);
             for i = 1:numel(inputNames)
-                idx = ismember(externalNames, inputNames(i));
+                idx = ismember(portERTNames, inputNames(i));
                 if any(idx)
-                    inputNames(i) = simulinkNames(idx);
+                    inputNames(i) = portERTNames(idx);
                 end
             end
 
@@ -609,167 +328,162 @@ classdef ModelDescription < handle
                 if isempty(inputTypes(i))
                     continue
                 end
-                idx = ismember(knownTypes, inputTypes(i));
 
+                % The RTM type is an opaque model handle, not a data variable —
+                % resolve it to the fixed struct name without searching knownTypes
+                if inputTypes(i) == obj.RTMVarType
+                    inputNames(i) = obj.RTMStructName;
+                    continue
+                end
+
+                idx = ismember(knownTypes, inputTypes(i));
                 if sum(idx) == 1
                     inputNames(i) = knownNames(idx);
                 else
-                    % warning(inputTypes(i) + " not a know type");
+                    warning("CIGRE:ModelDescription:UnknownType", ...
+                        "'%s' could not be resolved to a known variable name", inputTypes(i));
                 end
             end
-
-            % Replace RTM
-            idx = inputTypes == obj.RTMVarType;
-            inputNames(idx) = obj.RTMStructName;
         end
 
     end
 
     methods % Dependent
-        % Take care to close code descriptor files after use
-        function val = get.CIGREInterfaceDescriptor(obj)
-
-            if ~isempty(obj.CIGREInterfaceDescriptor_) && isvalid(obj.CIGREInterfaceDescriptor_)
-                val = obj.CIGREInterfaceDescriptor_;
-            else
-                wrapper = obj.CIGREInterfaceName;
-                val = coder.getCodeDescriptor(wrapper);
-                obj.CIGREInterfaceDescriptor_ = val;
-            end
-
-        end
-
-        function val = get.ModelCodeDescriptor(obj)
-
-            if ~isempty(obj.ModelCodeDescriptor_) && isvalid(obj.ModelCodeDescriptor_)
-                val = obj.ModelCodeDescriptor_;
-            else
-                wrapObj = obj.CIGREInterfaceDescriptor;
-                model = obj.ModelName;
-                val = getReferencedModelCodeDescriptor(wrapObj, model);
-                obj.ModelCodeDescriptor_ = val;
-            end
-
-        end
-
-        function val = get.CIGREInterfaceCodeInfo(obj)
-
-            if ~isempty(obj.CIGREInterfaceCodeInfo_) && isvalid(obj.CIGREInterfaceCodeInfo_)
-                val = obj.CIGREInterfaceCodeInfo_;
-            else
-                here = Simulink.fileGenControl('getConfig').CodeGenFolder;
-                codeInfo =  fullfile(here, obj.CIGREInterfaceName + "_cigre_rtw", "codeInfo.mat");
-                val = load(codeInfo).codeInfo;
-                obj.CIGREInterfaceCodeInfo_ = val;
-            end
-
-        end
 
         function value = get.HasTimingBridge(obj)
-            if contains(obj.TimingBridgeCode, "timingBridge")
-                value = true;
-            else
-                value = false;
-            end
+            value = contains(obj.TimingBridgeCode, "timingBridge");
         end
 
         function value = get.HasInitFunction(obj)
-            if obj.ModelRefInitialiseName == ""
-                value = false;
-            else
-                value = true;
-            end
+            value = obj.ModelRefInitialiseName ~= "";
         end
 
         function value = get.HasRateScheduler(obj)
-            if obj.RateSchedulerCode == ""
-                value = false;
-            else
-                value = true;
-            end
+            value = obj.RateSchedulerCode ~= "";
         end
 
         function value = get.CIGREParameters(obj)
             leaves = obj.Parameters.getLeaves();
             value = leaves([]);
-            
             names = string.empty(1,0);
             for i = 1:numel(leaves)
                 leaf = leaves(i);
                 nData = numel(leaf.DefaultValue);
                 for j = 1:nData
-                   thisParam = leaf;
-                   thisParam.DefaultValue = leaf.DefaultValue(j);
-                   thisParam.ExternalName = matlab.lang.makeUniqueStrings(leaf.ExternalName, names);
-                   thisParam.Dimensions = 1;
-                   if nData > 1
-                       thisParam.SimulinkName = thisParam.SimulinkName + "[" + (j-1) + "]";
-                   end
-                   names = [names, thisParam.ExternalName]; %#ok<AGROW>
-                   value(end+1) = thisParam; %#ok<AGROW>
+                    thisParam = leaf;
+                    thisParam.DefaultValue = leaf.DefaultValue(j);
+                    thisParam.CIGREName = matlab.lang.makeUniqueStrings(leaf.CIGREName, names);
+                    thisParam.Dimensions = 1;
+                    if nData > 1
+                        % Convert to C-style base 0 indexing
+                        cIdx = (j-1);
+                        thisParam.SimulinkName = thisParam.SimulinkName + "[" + cIdx + "]";
+                    end
+                    names = [names, thisParam.CIGREName]; %#ok<AGROW>
+                    value(end+1) = thisParam; %#ok<AGROW>
                 end
             end
         end
-        
+
         function value = get.NumCigreParameters(obj)
             parameterDefaultVal = {obj.CIGREParameters.DefaultValue}';
             value = sum(cellfun(@(x) numel(x), parameterDefaultVal));
-        end
-
-        function delete(obj)
-            obj.clearCodeDescriptorObjects();
         end
 
     end
 
     methods (Static)
 
-        function desc = analyseModel(model, cigreWrapper)
+        function fieldNames = parseRTMStructFieldNames(headerCode)
+            % Extract the names of pointer fields declared inside the RTM
+            % struct (``struct tag_...``) from the wrapper header.
+            %
+            % These names are the authoritative discriminator for
+            % classifyRTMFields: an InternalData variable whose ERTName
+            % appears in this set is a pointer field of the RTM struct and
+            % must be wired via RTMStructName->field = field in the generated
+            % DLL source. Variables absent from the set are standalone heap
+            % allocations passed directly as step/init arguments.
+            %
+            % The method matches lines of the form
+            %   <type> *<identifier>;
+            % and returns <identifier>. Non-pointer fields (e.g. errorStatus
+            % which is ``const char_T *errorStatus``) are also matched but
+            % are harmless because they never appear in InternalData.
             arguments
-                model (1,1) string
-                cigreWrapper (1,1) string = cigre.internal.cigreWrap(model)
-            end
-
-            desc = cigre.description.ModelDescription(model,"CIGREInterfaceName", cigreWrapper);
-            desc.analyse();
-
-        end
-
-        % Local functions
-        function [tbc, nTasks] = processRTMStructCode(headerCode)
-            arguments
-                headerCode string
+                headerCode (:,1) string
             end
 
             if isscalar(headerCode)
-                headerCode = strsplit(headerCode, newline);
+                headerCode = strsplit(headerCode, newline)';
             end
 
-            % Get the code line that starts with struct tag_
+            fieldNames = string.empty(1, 0);
+
+            idxStart = find(contains(headerCode, "struct tag_"), 1);
+            if isempty(idxStart)
+                return
+            end
+
+            idxEnd = findLineStartText(headerCode, "}");
+            idxEnd = idxEnd(find(idxEnd > idxStart, 1));
+            if isempty(idxEnd)
+                return
+            end
+
+            structLines = headerCode(idxStart:idxEnd);
+            for i = 1:numel(structLines)
+                tokens = regexp(structLines(i), '\*\s*(\w+)\s*;', 'tokens');
+                if ~isempty(tokens)
+                    fieldNames(end+1) = string(tokens{1}{1}); %#ok<AGROW>
+                end
+            end
+        end
+
+        function desc = analyseModel(model, cigreWrapper, nvp)
+            arguments
+                model (1,1) string
+                cigreWrapper (1,1) string = cigre.internal.cigreWrap(model)
+                nvp.CodeGenFolder (1,1) string = Simulink.fileGenControl('getConfig').CodeGenFolder
+            end
+            % Load models before constructing the descriptor so
+            % coder.getCodeDescriptor can locate them. The cleanup objects
+            % ensure both remain open for the duration of the analysis.
+            cModel = util.loadSystem(model); %#ok<NASGU>
+            cWrapper = util.loadSystem(cigreWrapper); %#ok<NASGU>
+
+            descriptor = cigre.description.CodeDescriptor(...
+                model, cigreWrapper, nvp.CodeGenFolder);
+            desc = cigre.description.ModelDescription(model, ...
+                "CIGREInterfaceName", cigreWrapper, ...
+                "CodeGenFolder", nvp.CodeGenFolder);
+            desc.analyse(descriptor);
+        end
+
+        function [tbc, nTasks] = processRTMStructCode(headerCode)
+            arguments
+                headerCode (:,1) string
+            end
+
+            if isscalar(headerCode)
+                headerCode = strsplit(headerCode, newline)';
+            end
+
             idxStart = find(contains(headerCode, "struct tag_"), 1);
 
             if ~isempty(idxStart)
-                % The timing bridge block ends with "};"
                 idxEnd = findLineStartText(headerCode, "}");
                 idxEnd = idxEnd(find(idxEnd > idxStart, 1));
 
                 code = headerCode(idxStart:idxEnd);
 
-                % Make the struct into a typedef so we can use it
                 if ~contains(code(1), "typedef")
                     code(1) = "typedef " + code(1);
                 end
-
                 code(end) = "}<<RTMStruct>>;";
 
-                % Find number of tasks
                 tmp = strjoin(code, newline);
-                nTasks = extractBetween(tmp, "TID[", "]");
-                if isempty(nTasks)
-                    nTasks = "0";
-                end
-
-                % See if contains timing bridge
+                nTasksStr = extractBetween(tmp, "TID[", "]");
 
                 tbc = code(1);
 
@@ -781,10 +495,12 @@ classdef ModelDescription < handle
                     tbc = [tbc; "  rtTimingBridge timingBridge;"];
                 end
 
-                % Update number of tasks
-                if nTasks == "0"
-                    nTasks = "1";
+                if isempty(nTasksStr)
+                    % Single-rate model — no TID array, no timing substructure
+                    nTasks = 1;
                 else
+                    % Multi-rate model — embed the TID array and parse task count
+                    nTasks = str2double(nTasksStr);
                     tbc = [tbc
                         "  /*"
                         "   * Timing:"
@@ -793,82 +509,24 @@ classdef ModelDescription < handle
                         "   */"
                         "  struct {"
                         "    struct {"
-                        "      uint32_T TID[" + nTasks + "];"
+                        "      uint32_T TID[" + nTasksStr + "];"
                         "    } TaskCounters;"
                         "  } Timing;"
-                        ];
+                    ];
                 end
 
                 tbc = [tbc; code(end)];
-
                 tbc = strjoin(tbc, newline);
-
             else
-                % tag_RTM not found, so we are a single rate model without
-                % a timing bridge
+                % No RTM struct tag found — single-rate model with no timing bridge
                 tbc = "";
                 nTasks = 1;
             end
-
-        end
-
-        function code = processRateSchedulerCode(srcCodeIn, CIGREInterfaceName)
-            arguments
-                srcCodeIn (:, 1) string
-                CIGREInterfaceName (1,1) string
-            end
-
-            srcCode = srcCodeIn;
-            if numel(srcCode) == 1
-                srcCode = strsplit(srcCode, newline)';
-            end
-
-            % Get the block with the tag_RTM
-            idxStart = find(contains(srcCode, "rate_scheduler"));
-            if numel(idxStart) > 1
-                % First one is definition;
-                idxStart = idxStart(2);
-            end
-
-            if ~isempty(idxStart)
-
-                idxEnd = findLineStartText(srcCode, "}");
-                idxEnd = idxEnd(find(idxEnd > idxStart, 1));
-
-                code = srcCode(idxStart:idxEnd);
-
-                % Replace method call with standard
-                idxEnd = find(contains(code, ")"), 1);
-                code(1:idxEnd) = [];
-                code = ["static void rate_scheduler(<<RTMStruct>> *const RealTimeModel_M)"; code];
-
-                if code(2) ~= "{"
-                    code = [code(1); "{"; code(2:end)];
-                end
-
-                code = regexprep(code, CIGREInterfaceName + "_M", "RealTimeModel_M");
-
-            else
-                % Ensure there is always a rate scheduler
-                code = [...
-                    "static void rate_scheduler(<<RTMStruct>> *const RealTimeModel_M)" ...
-                    "{" ...
-                    "}"
-                    ];
-            end
-
-            % TODO: Make more robust - this removes block io which requires
-            % a different include
-            idx = contains(code, "B_");
-            idx2 = contains(code, "*blockIO");
-            code(idx|idx2) = [];
-
-            code = strjoin(code, newline);
         end
 
         function code = processInitializeCode(srcCodeIn)
             arguments
-                srcCodeIn (:, 1) string
+                srcCodeIn (:,1) string
             end
 
             srcCode = srcCodeIn;
@@ -876,62 +534,90 @@ classdef ModelDescription < handle
                 srcCode = strsplit(srcCode, newline)';
             end
 
-            % Get the block with the tag_RTM
             idxStart = find(contains(srcCode, "/* Model initialize function"));
             if numel(idxStart) > 1
-                % First one is definition;
-                idxStart = idxStart(2);
+                idxStart = idxStart(2); % first occurrence is the declaration
             end
 
             if ~isempty(idxStart)
-                % Find the end of the initialize function call
-                % "  /* Model Initialize function for ModelReference Block: '<Root>/mdl' */"
-                %   "  InterOPERA_initialize(rtmGetErrorStatusPointer(InterOPERA_wrap_M),"
-                %   "    &InterOPERA_wrap_M->timingBridge, 0, 1, 2, 3,"
-                %   "    &(InterOPERA_wrap_DW->mdl_InstanceData.rtm),"
-                %   "    &(InterOPERA_wrap_DW->mdl_InstanceData.rtdw));"
-                % See the first ");" after the "_initialize(" call
-
-                idxInitialize = find(contains(srcCode,  "_initialize("), 1, "last");
+                idxInitialize = find(contains(srcCode, "_initialize("), 1, "last");
                 idxEnd = find(contains(srcCode, ");"));
                 idxEnd = idxEnd(find(idxEnd > idxInitialize, 1));
 
                 if isempty(idxEnd)
-                    % No initialize function
                     idxEnd = findLineStartText(srcCode, "}");
                 end
 
                 idxEnd = idxEnd(find(idxEnd > idxStart, 1));
+                code = srcCode(idxStart:idxEnd);
+                code = [code; "};"];
+            else
+                % Ensure there is always an initialize-only function
+                code = ["{"; "};"];
+            end
+
+            % Rename to the _only variant so it can be called independently
+            code(2) = insertAfter(code(2), "_initialize", "_only");
+            code = strjoin(code, newline);
+        end
+
+        function code = processRateSchedulerCode(srcCodeIn, cigreInterfaceName)
+            arguments
+                srcCodeIn (:,1) string
+                cigreInterfaceName (1,1) string
+            end
+
+            srcCode = srcCodeIn;
+            if isscalar(srcCode)
+                srcCode = strsplit(srcCode, newline)';
+            end
+
+            idxStart = find(contains(srcCode, "rate_scheduler") & ~contains(srcCode,  lineBoundary + "/*"));
+            if numel(idxStart) > 1
+                idxStart = idxStart(2); % first occurrence is the declaration
+            end
+
+            if ~isempty(idxStart)
+                idxEnd = findLineStartText(srcCode, "}");
+                idxEnd = idxEnd(find(idxEnd > idxStart, 1));
 
                 code = srcCode(idxStart:idxEnd);
 
-                % Close out the initialize only function
-                code = [code; "};"];
+                % Drop the old signature lines up to the closing ")" and
+                % replace with the standardised RTMStruct-parameterised form
+                idxSigEnd = find(contains(code, ")"), 1);
+                code(1:idxSigEnd) = [];
+                code = ["static void rate_scheduler(<<RTMStruct>> *const RealTimeModel_M)"; code];
 
+                if code(2) ~= "{"
+                    code = [code(1); "{"; code(2:end)];
+                end
+
+                code = regexprep(code, cigreInterfaceName + cigre.description.ModelDescription.RtmVarSuffix, "RealTimeModel_M");
             else
-                % Ensure there is always an initialize only function
+                % Ensure there is always a rate scheduler stub
                 code = [...
-                    "{" ...
-                    "};"
-                    ];
+                    "static void rate_scheduler(<<RTMStruct>> *const RealTimeModel_M)"
+                    "{"
+                    "}"];
             end
 
-            % Add _only to function name
-            code(2) = insertAfter(code(2), "_initialize", "_only");
+            % TODO: remove block IO references — they require a different include
+            code(contains(code, "B_") | contains(code, "*blockIO")) = [];
 
             code = strjoin(code, newline);
-
         end
 
         function names = avoidReservedName(names)
             arguments
                 names (1,:) string
             end
-
+            % Append a suffix to any name that clashes with CIGRE interface
+            % reserved identifiers to prevent C struct field name conflicts.
+            reserved = cigre.description.ICodeDescriptor.ReservedCigreIdentifiers;
             for i = 1:numel(names)
-                names(i) = matlab.lang.makeUniqueStrings(names(i), cigre.description.ModelDescription.ReservedNames);
+                names(i) = matlab.lang.makeUniqueStrings(names(i), reserved);
             end
-
         end
 
     end

@@ -1,12 +1,14 @@
 #include "CIGRE_Defaults.h"
 #include "IEEE_Cigre_DLLInterface.h"
 
+#ifndef DEBUG
 #define DEBUG 1
+#endif
 
 // CIGRE_Defaults
 void logout(char *str){
     if (DEBUG) {
-        printf(str);
+        printf("%s", str);
         fflush(stdout);
     }
 };
@@ -35,6 +37,7 @@ __declspec(dllexport) int32_T __cdecl Model_CheckParameters(IEEE_Cigre_DLLInterf
     // Model_CheckParameters is called in the first step of a simulation (so model writers can perform
     // more complex checks on input parameters in addition to simple min/max checks).
 
+    (void)instance; /* reserved for future parameter validation against instance state */
 	printf("Checking parameters...nothing to do!\n");
     return IEEE_Cigre_DLLInterface_Return_OK;
 };
@@ -45,12 +48,14 @@ __declspec(dllexport) int32_T Model_Iterate(IEEE_Cigre_DLLInterface_Instance* in
     // It can be used for RMS programs to approximate fast control action (such as fault behaviour) which cannot directly
     // be simulated with large time step RMS programs.
     // The model code should also update/store its state variables at the end of this call before returning.
+    (void)instance; /* reserved for future RMS iteration logic */
     return IEEE_Cigre_DLLInterface_Return_OK;
 };
 
 // ----------------------------------------------------------------
 __declspec(dllexport) int32_T __cdecl Model_Terminate(IEEE_Cigre_DLLInterface_Instance* instance) {
     // Called by the main simulation program at the end of a simulation (or in the event the simulation is terminated).
+    (void)instance; /* reserved for future cleanup of instance-specific resources */
     return IEEE_Cigre_DLLInterface_Return_OK;
 };
 

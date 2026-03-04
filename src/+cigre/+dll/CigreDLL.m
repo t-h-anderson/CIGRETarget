@@ -22,7 +22,7 @@ classdef CigreDLL < handle
             obj.Name = dllName;
             obj.Header = hfile;
 
-            thisDLL = dllName + matlab.lang.internal.uuid();
+            thisDLL = dllName + cigre.util.uuid();
             obj.Name_ = thisDLL;
         end
 
@@ -54,6 +54,7 @@ classdef CigreDLL < handle
                 input (1,1) cigre.dll.InterfaceInstance
                 nvp.NSteps (1,1) double {mustBePositive} = 1
             end
+            % Return the result after NSteps
 
             if ~input.IsInitialised
                 obj.initialise(input);
@@ -124,7 +125,7 @@ if libisloaded(dllName)
     try
         unloadlibrary(dllName)
     catch me
-        display(me.message)
+        disp("Warning: failed to unload library '" + dllName + "': " + me.message)
     end
 end
 end

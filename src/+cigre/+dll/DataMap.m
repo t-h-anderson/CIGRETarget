@@ -10,13 +10,20 @@ classdef DataMap
 
     methods
         function obj = DataMap(data, words, dataType, sizes, dims)
-           if nargin > 0
-                obj.Data = data;
-                obj.Words = words;
-                obj.DataType = dataType;
-                obj.Sizes = sizes;
-                obj.Dims = dims;
+            arguments
+                data = []
+                words (1,:) = []
+                dataType (1,:) string = string.empty
+                sizes (1,:) double = []
+                dims (1,:) cell = {}
             end
+
+            obj.Data = data;
+            obj.Words = words;
+            obj.DataType = dataType;
+            obj.Sizes = sizes;
+            obj.Dims = dims;
+
         end
 
         function obj = wordsToData(obj, nvp)
@@ -34,38 +41,38 @@ classdef DataMap
             data = cell(1, nWords);
             pos = 1;
 
-            for j = 1:nWords
+            for iWord = 1:nWords
 
-                szData = sizes(j);
-                sz = szData * prod(dims{j});
+                wordByteSize = sizes(iWord);
+                totalBytes = wordByteSize * prod(dims{iWord});
 
-                szMem = max(szData, nvp.Packing);
+                szMem = max(wordByteSize, nvp.Packing);
 
                 pad = mod(szMem - mod(pos-1, szMem), szMem);
 
                 pos = pos + pad;
 
-                this = words(pos:(pos+sz-1));
+                this = words(pos:(pos+totalBytes-1));
 
-                pos = pos + sz;
+                pos = pos + totalBytes;
 
-                dt = dataTypes(j);
-                if dt == "logical"
+                dataType = dataTypes(iWord);
+                if dataType == "logical"
                     var = (this ~= 0);
                 else
-                    var = typecast(this, dt);
+                    var = typecast(this, dataType);
                 end
 
-                d = dims{j};
-                d = num2cell(d);
+                dimensions = dims{iWord};
+                dimensions = num2cell(dimensions);
 
                 % Remove any padding
-                nVal = prod([d{:}]);
+                nVal = prod([dimensions{:}]);
                 var = var(1:nVal);
 
-                var = reshape(var, d{:});
+                var = reshape(var, dimensions{:});
                 
-                data{j} = var;
+                data{iWord} = var;
             end
 
             obj.Data = data;
@@ -76,22 +83,6 @@ classdef DataMap
     end
 
     methods (Static)
-
-        % Try using "typecast"
-        %in = typecast(firstVal, "uint32");
-        %in = [in, secondVal] ; % May do some alignment for doubles, i.e. padding to make sure it fits. This is compiler dependent.
-        % Look at xcp toolbox. Has lots of examples
-
-        % Can run an initialise which returns this information
-        % address of input.myField - address of input input& - input.myField&
-        % capi or code descriptor - getCodeDescriptor, or add to cigre
-        % C code to get offsets, matlab code to ask for the data
-
-        % Can we add other functions?
-        % All inputs and outputs are in structure, not as separate
-        % parameters. Codegen options - interface. Make sure don't use
-        % custom storage class. Ignore storage classes, goes back to
-        % in/out structs. *codeDescriptorInterface*
 
         function obj = create(data, nvp)
             arguments
@@ -114,7 +105,7 @@ classdef DataMap
 
             target = nvp.Target;
 
-            words = eval(nvp.Target + ".empty(1,0)");
+            words = cast([], nvp.Target);
             dataTypes = string.empty();
             sizes = zeros(numel(data), 1);
             dims = cell(size(data, 2),1);
@@ -161,7 +152,7 @@ classdef DataMap
                    
                     n = max(size(typecast(val, "int8")));
                     
-                    nTarget = max(size(typecast(eval(target + "(1)"), "int8")));
+                    nTarget = numel(typecast(cast(1, target), "int8"));
 
                     nPad = (nTarget - n)/n;
 

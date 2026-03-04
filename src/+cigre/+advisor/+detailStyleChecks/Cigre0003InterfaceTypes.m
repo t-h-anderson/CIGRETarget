@@ -28,7 +28,7 @@ classdef Cigre0003InterfaceTypes < cigre.advisor.common.CustomCheck
 
     methods (Static)
         function [ok, b] = isSupportedType(dt)
-            if sum(ismember(util.TranslateTypes.StandardTypes, dt)) > 0.5  % Better way?
+            if any(ismember(util.TranslateTypes.StandardTypes, dt))
                 ok = true;
             else
                 ok = false;
@@ -69,7 +69,9 @@ classdef Cigre0003InterfaceTypes < cigre.advisor.common.CustomCheck
                     bo = {};
                 end               
             else
-                error('***** Unknown data source *****');
+                error("cigre:advisor:unknownDataSource", ...
+                    "Unknown data source type '%s'. Expected 'data dictionary' or 'base workspace'.", ...
+                    modelVars.SourceType);
             end
         end
 

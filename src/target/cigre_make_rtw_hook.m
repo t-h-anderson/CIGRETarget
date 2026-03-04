@@ -1,14 +1,5 @@
-function cigre_make_rtw_hook(hookMethod,modelName,~,~,~,buildArgs,buildInfo)
-% ERT_MAKE_RTW_HOOK - This is the standard ERT hook file for the build
-% process (make_rtw), and implements automatic configuration of the
-% models configuration parameters.  When the buildArgs option is specified
-% as 'optimized_fixed_point=1' or 'optimized_floating_point=1', the model
-% is configured automatically for optimized code generation.
-%
-% This hook file (i.e., file that implements various codegen callbacks) is
-% called for system target file ert.tlc.  The file leverages
-% strategic points of the build process.  A brief synopsis of the callback
-% API is as follows:
+function cigre_make_rtw_hook(hookMethod, modelName,~, ~, ~, buildArgs, buildInfo)
+% CIGRE RTW build hook - called by Simulink at each stage of the RTW build.
 %
 % ert_make_rtw_hook(hookMethod, modelName, rtwroot, templateMakefile,
 %                   buildOpts, buildArgs)
@@ -20,13 +11,13 @@ function cigre_make_rtw_hook(hookMethod,modelName,~,~,~,buildArgs,buildInfo)
 % modelName:
 %   Name of model.  Valid for all stages.
 %
-% rtwroot:
+% rtwroot (~):
 %   Reserved.
 %
-% templateMakefile:
+% templateMakefile (~):
 %   Name of template makefile.  Valid for stages 'before_make' and 'exit'.
 %
-% buildOpts:
+% buildOpts (~):
 %   Valid for stages 'before_make' and 'exit', a MATLAB structure
 %   containing fields
 %
@@ -52,12 +43,13 @@ function cigre_make_rtw_hook(hookMethod,modelName,~,~,~,buildArgs,buildInfo)
 %     optimized_fixed_point=1
 %     optimized_floating_point=1
 %
-% You are encouraged to add other configuration options, and extend the
-% various callbacks to fully integrate ERT into your environment.
-
-% Copyright 1996-2018 The MathWorks, Inc.
-
-% determine if this model is a referenced model
+%
+% Stages and what this hook does at each:
+%   entry       - optionally auto-configure model for fixed/floating-point optimisation
+%   before_make - generate CIGRE wrapper C source and configure build paths/sources
+%   after_make  - rename and deploy the compiled DLL and header to output locations
+%   exit        - log completion message
+%   error       - log build failure message
 
 switch hookMethod
     case 'error'
@@ -74,7 +66,6 @@ switch hookMethod
         disp(msg);
 
         option = LocalParseArgList(buildArgs);
-
         if ~strcmp(option,'none')
             ert_unspecified_hardware(modelName);
             cs = getActiveConfigSet(modelName);
@@ -97,77 +88,12 @@ switch hookMethod
         % Called after code generation is complete, and just prior to kicking
         % off make process (assuming code generation only is not selected.)  All
         % arguments are valid at this stage
-
-        % TODO: Can we make this more robust?
-        if contains(modelName, "_wrap")
-
-            wrapperName = modelName;
-            modelName = erase(wrapperName, "_wrap");
-
-            here = Simulink.fileGenControl('getConfig').CodeGenFolder; % TODO: This isn't good for testing. Inject location?
-            buildDir = fullfile(here, "slprj", "cigre");
-
-            % Remove the stale rtwtypes
-            replacement = fullfile(cigreRoot, "src", "CIGRESource", "rtwtypes.h");
-            rtwTypes = fullfile(buildDir, "_sharedutils");
-            copyfile(replacement, rtwTypes)
-
-            % Create the dll
-            try
-                desc = cigre.description.ModelDescription.analyseModel(modelName, wrapperName);
-            catch me
-                error("Error building model description: " + me.message)
-            end
-            writer = cigre.writer.CIGREWriter;
-
-            try
-                desc.writeDLLSource(writer);
-            catch me
-                error("Error writing dll source: " + me.message)
-            end
-
-            inc = string(buildInfo.getIncludePaths(false))';
-            inc = [inc; fullfile(cigreRoot, "src", "CIGRESource"); buildDir]; % Custom CIGRE code
-
-            buildInfo.addIncludePaths(inc);
-
-            % Add custom source code needed for DLL
-            src = [fullfile(buildDir, modelName + "_CIGRE.c"), ...
-                fullfile(cigreRoot, "src", "CIGRESource", "heap.c"),  ...
-                fullfile(cigreRoot, "src", "CIGRESource", "CIGRE_Defaults.c")];
-
-            buildInfo.addSourceFiles(src);
-                  
-        end
+        handleBeforeMake(modelName, buildInfo);
 
     case 'after_make'
         % Called after make process is complete. All arguments are valid at
         % this stage.
-
-        if contains(modelName, "_wrap")
-
-            wrapperName = modelName;
-            modelName = erase(wrapperName, "_wrap");
-
-            % Build in code gen folder
-            here = Simulink.fileGenControl('getConfig').CodeGenFolder; % TODO: This isn't good for testing. Inject location?
-            cgf = here;
-            
-            dll = fullfile(cgf, wrapperName + ".dll");
-
-            dllDeploy = fullfile(here, modelName + "_CIGRE.dll");
-            copyfile(dll, dllDeploy);
-            delete(dll);
-
-            [~, dll] = fileparts(dllDeploy);
-            headerDeploy = fullfile(here, dll + ".h");
-            header = fullfile(cgf, "slprj", "cigre",  modelName + "_CIGRE" + ".h");
-
-            copyfile(header, headerDeploy);
-
-            disp("CIGRE compatible DLL created for model " + modelName + ". This can be found " + here);
-
-        end
+        handleAfterMake(modelName);
 
     case 'exit'
         % Called at the end of the build process.  All arguments are valid
@@ -213,4 +139,136 @@ if ~iseq
         msg);
 end
 
+end
+
+
+function buildContext = loadBuildContext(codeGenFolder)
+% Load build options written by buildDLL before invoking slbuild.
+% buildDLL serialises options to a .mat file because the hook has no
+% direct parameter channel from user code.
+contextPath = fullfile(codeGenFolder, "cigre_build_context.mat");
+if isfile(contextPath)
+    buildContext = load(contextPath);
+else
+    buildContext = struct();
+end
+end
+
+function handleBeforeMake(modelName, buildInfo)
+
+here = Simulink.fileGenControl('getConfig').CodeGenFolder;
+buildContext = loadBuildContext(here);
+
+% Generate CIGRE C source and configure build paths, but only for
+% CIGRE wrapper models identified by the configured wrapSuffix.
+wrapSuffix = getFieldOrDefault(buildContext, "WrapSuffix", "_wrap");
+if ~endsWith(modelName, wrapSuffix)
+    return
+end
+
+wrapperName = modelName;
+modelName = erase(wrapperName, wrapSuffix + textBoundary);
+buildDir = fullfile(here, "slprj", "cigre");
+
+replaceRtwTypes(buildDir);
+paramConfig = loadParameterConfig(buildContext);
+generateCigreSource(modelName, wrapperName, paramConfig);
+configureBuildPaths(buildInfo, buildDir, modelName);
+end
+
+
+function replaceRtwTypes(buildDir)
+% Replace the Simulink-generated rtwtypes.h with the CIGRE-compatible
+% version to resolve type definition conflicts at link time.
+replacement = fullfile(cigreRoot, "src", "CIGRESource", "rtwtypes.h");
+sharedUtils = fullfile(buildDir, "_sharedutils");
+copyfile(replacement, sharedUtils);
+end
+
+
+function paramConfig = loadParameterConfig(buildContext)
+% Load the ParameterConfiguration from the file path stored in the build
+% context. Returns an empty (all-visible) config if no file was specified.
+paramConfig = cigre.config.ParameterConfiguration();
+hasFile = isfield(buildContext, "ParameterConfigFile") ...
+    && ~ismissing(buildContext.ParameterConfigFile) ...
+    && isfile(buildContext.ParameterConfigFile);
+if hasFile
+    paramConfig = cigre.config.ParameterConfiguration.fromFile(...
+        buildContext.ParameterConfigFile);
+end
+end
+
+
+function generateCigreSource(modelName, wrapperName, paramConfig)
+% Analyse the generated model code and write the CIGRE wrapper C source.
+try
+    desc = cigre.description.ModelDescription.analyseModel(modelName, wrapperName);
+catch me
+    error("Error building model description: " + me.message);
+end
+try
+    desc.writeDLLSource(cigre.writer.CIGREWriter, "ParameterConfig", paramConfig);
+catch me
+    error("Error writing DLL source: " + me.message);
+end
+end
+
+
+function configureBuildPaths(buildInfo, buildDir, modelName)
+% Add CIGRE-specific include paths and source files so the compiler can
+% find the generated wrapper and the CIGRE runtime support files.
+sourceRoot = fullfile(cigreRoot, "src", "CIGRESource");
+
+existingIncludes = string(buildInfo.getIncludePaths(false))';
+buildInfo.addIncludePaths([existingIncludes; sourceRoot; buildDir]);
+
+src = [fullfile(buildDir, modelName + "_CIGRE.c"), ...
+    fullfile(sourceRoot, "heap.c"), ...
+    fullfile(sourceRoot, "CIGRE_Defaults.c")];
+buildInfo.addSourceFiles(src);
+end
+
+
+function handleAfterMake(modelName)
+
+here = Simulink.fileGenControl('getConfig').CodeGenFolder;
+buildContext = loadBuildContext(here);
+
+% Rename the compiled wrapper DLL to the CIGRE output name and copy the
+% header alongside it, so both are ready for distribution together.
+wrapSuffix = getFieldOrDefault(buildContext, "WrapSuffix", "_wrap");
+if ~endsWith(modelName, wrapSuffix)
+    return
+end
+
+wrapperName = modelName;
+modelName = erase(wrapperName, wrapSuffix + textBoundary);
+
+dll = fullfile(here, wrapperName + ".dll");
+if ~isfile(dll)
+    % Normal when SkipBuild was requested - nothing to deploy
+    return
+end
+
+dllDeploy = fullfile(here, modelName + "_CIGRE.dll");
+copyfile(dll, dllDeploy);
+delete(dll);
+
+[~, deployedDllName] = fileparts(dllDeploy);
+header = fullfile(here, "slprj", "cigre", modelName + "_CIGRE.h");
+headerDeploy = fullfile(here, deployedDllName + ".h");
+copyfile(header, headerDeploy);
+
+disp("CIGRE DLL for model '" + modelName + "' deployed to: " + here);
+end
+
+
+function value = getFieldOrDefault(s, field, default)
+% Return s.(field) if present, otherwise return default.
+if isfield(s, field)
+    value = s.(field);
+else
+    value = default;
+end
 end

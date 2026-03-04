@@ -38,4 +38,3 @@ codegen/
 *.vcxproj.*
 .vs/
 **/VSBuild_*/
-
