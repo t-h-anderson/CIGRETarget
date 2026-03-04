@@ -225,7 +225,7 @@ classdef CIGREWriter
             % Substitute the #define count, the struct field declarations,
             % and the InputSignals array for all model inputs.
             simulinkNames = string([desc.Inputs.SimulinkName]');
-            ertNames  = string([desc.Inputs.ERTName]');
+            cigreNames  = string([desc.Inputs.CIGREName]');
             types = util.TranslateTypes.translateType( ...
                 [desc.Inputs.Type]', "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
             dims  = cellfun(@(x) string(prod(x)), {desc.Inputs.Dimensions})';
@@ -236,7 +236,7 @@ classdef CIGREWriter
             % .Name / .Description fields in the InputSignals array.
             results = strrep(results, "<<NumInputs>>",  string(numel(simulinkNames)));
             results = strrep(results, "<<DefineInputs>>", ...
-                strjoin(types + " " + ertNames + "[" + dims + "];", newline));
+                strjoin(types + " " + cigreNames + "[" + dims + "];", newline));
 
             template = strjoin([ ...
                 "[<<Num>>] = {", ...
@@ -248,14 +248,14 @@ classdef CIGREWriter
                 "     }"], newline);
 
             results = strrep(results, "<<InputDefinition>>", ...
-                buildSignalDefinitions(simulinkNames, types, dims, desc.MaxExternalIdentifier, "i_", template));
+                buildSignalDefinitions(cigreNames, simulinkNames, types, dims, template));
         end
 
         function results = applyOutputSection(results, desc, cigreInterface)
             % Substitute the #define count, the struct field declarations,
             % and the OutputSignals array for all model outputs.
             simulinkNames = string([desc.Outputs.SimulinkName]');
-            ertNames  = string([desc.Outputs.ERTName]');
+            cigreNames = string([desc.Outputs.CIGREName]');
             types = util.TranslateTypes.translateType( ...
                 [desc.Outputs.Type]', "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
             dims  = cellfun(@(x) string(prod(x)), {desc.Outputs.Dimensions})';
@@ -263,7 +263,7 @@ classdef CIGREWriter
             % ERTName is already a valid C identifier — see applyInputSection.
             results = strrep(results, "<<NumOutputs>>",  string(numel(simulinkNames)));
             results = strrep(results, "<<DefineOutputs>>", ...
-                strjoin(types + " " + ertNames + "[" + dims + "];", newline));
+                strjoin(types + " " + cigreNames + "[" + dims + "];", newline));
 
             template = strjoin([ ...
                 "[<<Num>>] = {", ...
@@ -275,7 +275,7 @@ classdef CIGREWriter
                 "      }"], newline);
 
             results = strrep(results, "<<OutputDefinition>>", ...
-                buildSignalDefinitions(simulinkNames, types, dims, desc.MaxExternalIdentifier, "o_", template));
+                buildSignalDefinitions(cigreNames, simulinkNames, types, dims, template));
         end
 
         function results = applyParameterSection(results, visibleParams, cigreInterface)
@@ -369,21 +369,15 @@ nextIdx  = idx + 1;
 end
 
 
-function defs = buildSignalDefinitions(names, types, dims, maxIdentifierLen, pscadPrefix, template)
+function defs = buildSignalDefinitions(cigreNames, simulinkNames, types, dims, template)
 % Build a comma-separated list of CIGRE signal definition structs.
-% Strips the PSCAD-convention i_/o_ prefix and truncates external names to
-% respect the maxIdentifierLen constraint imposed by some simulation tools.
-externalNames = toValidCIdentifiers(names);
-externalNames = erase(externalNames, textBoundaryPattern + pscadPrefix);
-externalNames = matlab.lang.makeUniqueStrings( ...
-    externalNames, [], maxIdentifierLen);
 
-defs = strings(numel(names), 1);
-for i = 1:numel(names)
+defs = strings(numel(cigreNames), 1);
+for i = 1:numel(cigreNames)
     entry = template;
     entry = strrep(entry, "<<Num>>",         string(i-1));
-    entry = strrep(entry, "<<Name>>",        externalNames(i));
-    entry = strrep(entry, "<<Description>>", names(i));
+    entry = strrep(entry, "<<Name>>",        cigreNames(i));
+    entry = strrep(entry, "<<Description>>", simulinkNames(i));
     entry = strrep(entry, "<<Type>>",        types(i));
     entry = strrep(entry, "<<Width>>",       dims(i));
     defs(i) = entry;
@@ -495,16 +489,19 @@ if ~isempty(globalVisible) || ~isempty(globalHidden)
     warning("CIGRE:CIGREWriter:GlobalParameters", ...
         "Global parameters found: %s. DLL may be non-deterministic when called in parallel.", ...
         strjoin([string([globalVisible.SimulinkName]), string([globalHidden.SimulinkName])], ", "));
+    paramMaps = newline + "// Globally defined parameters - these may break parallel execution" + newline;
+else
+    paramMaps = "";
 end
 
-paramMaps = "";
+
 for i = 1:numel(globalVisible)
     p = globalVisible(i);
-    paramMaps = paramMaps + p.SimulinkName + " = parameters->" + p.CIGREName + ";" + newline;
+    paramMaps = paramMaps + p.ERTName + " = parameters->" + p.CIGREName + ";" + newline;
 end
 for i = 1:numel(globalHidden)
     p = globalHidden(i);
-    paramMaps = paramMaps + p.ExternalName + " = " + string(double(p.DefaultValue)) + ";" + newline;
+    paramMaps = paramMaps + p.ERTName + " = " + string(double(p.DefaultValue)) + ";" + newline;
 end
 end
 
