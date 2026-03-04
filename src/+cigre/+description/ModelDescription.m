@@ -206,13 +206,11 @@ classdef ModelDescription < handle
             end
 
             obj.RTMVarType = obj.InternalData(idx).Type;
-
             % Remove the RTM struct pointer first, then treat everything
             % remaining as pointer fields that must be wired into the RTM
             % struct and backed up around snapshot reinitialisation.
             % This is order-independent: codeInfo.InternalData has no
-            % guaranteed ordering, so using positional slicing ((idx+1):end)
-            % is fragile and will silently omit fields that precede the RTM var.
+            % guaranteed ordering
             obj.InternalData(idx) = [];
             obj.RTMStruct = obj.InternalData;
         end
@@ -330,7 +328,9 @@ classdef ModelDescription < handle
                     thisParam.ExternalName = matlab.lang.makeUniqueStrings(leaf.ExternalName, names);
                     thisParam.Dimensions = 1;
                     if nData > 1
-                        thisParam.SimulinkName = thisParam.SimulinkName + "[" + (j-1) + "]";
+                        % Convert to C-style base 0 indexing
+                        cIdx = (j-1);
+                        thisParam.SimulinkName = thisParam.SimulinkName + "[" + cIdx + "]"; 
                     end
                     names = [names, thisParam.ExternalName]; %#ok<AGROW>
                     value(end+1) = thisParam; %#ok<AGROW>
