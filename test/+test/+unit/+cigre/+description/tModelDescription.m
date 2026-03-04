@@ -420,6 +420,32 @@ classdef tModelDescription < matlab.mock.TestCase
                 "RTMStruct must contain the dwork variable regardless of ordering");
         end
 
+        function analyseExcludesStepArgsFromRTMStruct(testCase)
+            % Variables that appear as direct step function arguments must NOT
+            % be wired into the RTM struct — only true RTM pointer fields (those
+            % NOT in the step arg list) belong in RTMStruct.
+            % This guards against the C2039 error caused by generating
+            % RTMStructName->stepArgVar = stepArgVar for a non-existent field.
+            [rtmVar, dwVar] = makeRTMAndDWVars();
+            stepIface = cigre.description.FunctionInterface(...
+                "Name", "MyModel_step", ...
+                "ArgumentNames", ["MyWrapper_M", "localDW"], ...
+                "ArgumentTypes", ["RT_MODEL_MyModel_T", "DW_MyModel_T"], ...
+                "ArgumentPointers", ["*", "*"]);
+            [mock, behavior] = testCase.createMock(?cigre.description.ICodeDescriptor);
+            setupDefaultMock(testCase, behavior, ...
+                "InternalVars", [rtmVar, dwVar], ...
+                "StepInterface", stepIface);
+
+            desc = makeModelDescription();
+            desc.analyse(mock);
+
+            testCase.verifyEmpty(desc.RTMStruct, ...
+                "A variable passed as a step argument must not appear in RTMStruct");
+            testCase.verifyNumElements(desc.InternalData, 1, ...
+                "The step-arg variable must remain in InternalData for heap allocation");
+        end
+
         function analysePopulatesStepInputVariables(testCase)
             % Step inputs are assembled from the function interface arguments;
             % verifying them end-to-end confirms processInterface is exercised.
