@@ -446,6 +446,49 @@ classdef tModelDescription < matlab.mock.TestCase
                 "The step-arg variable must remain in InternalData for heap allocation");
         end
 
+        function analyseUsesHeaderFieldNamesForRTMClassification(testCase)
+            % When the wrapper header contains an RTM struct definition the
+            % pointer field names extracted from it must be used as the
+            % primary discriminator for RTMStruct membership, superseding
+            % the step-arg type fallback. This prevents the C2039 error that
+            % arises when two InternalData entries share the same C type but
+            % only one is an RTM pointer field (e.g. a global InstP instance
+            % vs. the RTM InstP pointer field).
+            [rtmVar, dwVar] = makeRTMAndDWVars();
+
+            % Add a second variable with the SAME type as dwVar but a
+            % different name — simulates Snap_wrap_InstP / Snap_wrap_InstP_ref.
+            instPStandalone = cigre.description.Variable(...
+                "SimulinkName", "globalInstP", ...
+                "ExternalName", "globalInstP", ...
+                "Type", "DW_MyModel_T", ...
+                "Pointers", "*");
+
+            % Header explicitly lists only localDW as an RTM pointer field.
+            % globalInstP is NOT in the struct → must NOT enter RTMStruct.
+            header = strjoin([
+                "typedef struct tag_RTM_MyModel_T {"
+                "  const char_T *errorStatus;"
+                "  DW_MyModel_T *localDW;"
+                "} RT_MODEL_MyModel_T;"
+                ], newline);
+
+            [mock, behavior] = testCase.createMock(?cigre.description.ICodeDescriptor);
+            setupDefaultMock(testCase, behavior, ...
+                "InternalVars", [rtmVar, dwVar, instPStandalone], ...
+                "HeaderCode", header);
+
+            desc = makeModelDescription();
+            desc.analyse(mock);
+
+            testCase.verifyNumElements(desc.RTMStruct, 1, ...
+                "Only the RTM pointer field must appear in RTMStruct");
+            testCase.verifyEqual(desc.RTMStruct(1).ExternalName, "localDW", ...
+                "RTMStruct must contain localDW (the declared pointer field)");
+            testCase.verifyNumElements(desc.InternalData, 2, ...
+                "Both non-RTM variables must remain in InternalData for heap allocation");
+        end
+
         function analysePopulatesStepInputVariables(testCase)
             % Step inputs are assembled from the function interface arguments;
             % verifying them end-to-end confirms processInterface is exercised.
@@ -513,6 +556,7 @@ function setupDefaultMock(testCase, behavior, nvp)
 %   Inputs         - Variable array for inports (default: empty)
 %   Outputs        - Variable array for outports (default: empty)
 %   InternalVars   - Variable array overriding the default [rtmVar, dwVar] set
+%   HeaderCode     - string wrapper header (default: minimal, no RTM struct)
 
 arguments
     testCase
@@ -525,6 +569,7 @@ arguments
     nvp.Inputs (1,:) cigre.description.Variable = cigre.description.Variable.empty(1,0)
     nvp.Outputs (1,:) cigre.description.Variable = cigre.description.Variable.empty(1,0)
     nvp.InternalVars (1,:) cigre.description.Variable = cigre.description.Variable.empty(1,0)
+    nvp.HeaderCode (1,1) string = "/* no RTM struct */"
 end
 
 if isempty(nvp.InternalVars)
@@ -537,9 +582,10 @@ end
 
 testCase.assignOutputsWhen(behavior.getModelMetadata.withAnyInputs(), nvp.Metadata);
 
-% Minimal header/source with no timing bridge to keep tests independent
+% Header/source — caller may supply a real RTM struct header; default is
+% minimal (no timing bridge) to keep unrelated tests independent
 testCase.assignOutputsWhen(behavior.getWrapperHeaderCode.withAnyInputs(), ...
-    "/* no RTM struct */");
+    nvp.HeaderCode);
 testCase.assignOutputsWhen(behavior.getWrapperSourceCode.withAnyInputs(), ...
     "/* no rate_scheduler */");
 
