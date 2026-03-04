@@ -231,9 +231,15 @@ classdef CIGREWriter
                 [desc.Inputs.Type]', "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
             dims  = cellfun(@(x) string(prod(x)), {desc.Inputs.Dimensions})';
 
+            % Struct field names must be valid C identifiers. Port names may
+            % contain dots, slashes, emoji, etc. — sanitize before embedding.
+            % The original names are preserved for the string-literal .Name /
+            % .Description fields in the InputSignals array (valid there).
+            fieldNames = toValidCIdentifiers(names);
+
             results = strrep(results, "<<NumInputs>>",  string(numel(names)));
             results = strrep(results, "<<DefineInputs>>", ...
-                strjoin(types + " " + names + "[" + dims + "];", newline));
+                strjoin(types + " " + fieldNames + "[" + dims + "];", newline));
 
             template = strjoin([ ...
                 "[<<Num>>] = {", ...
@@ -256,9 +262,12 @@ classdef CIGREWriter
                 [desc.Outputs.Type]', "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
             dims  = cellfun(@(x) string(prod(x)), {desc.Outputs.Dimensions})';
 
+            % Struct field names must be valid C identifiers — see applyInputSection.
+            fieldNames = toValidCIdentifiers(names);
+
             results = strrep(results, "<<NumOutputs>>",  string(numel(names)));
             results = strrep(results, "<<DefineOutputs>>", ...
-                strjoin(types + " " + names + "[" + dims + "];", newline));
+                strjoin(types + " " + fieldNames + "[" + dims + "];", newline));
 
             template = strjoin([ ...
                 "[<<Num>>] = {", ...
@@ -421,6 +430,17 @@ for i = 1:numel(visibleParams)
     paramDef(i) = entry;
 end
 paramDef = strjoin(paramDef, "," + newline);
+end
+
+
+function fieldNames = toValidCIdentifiers(names)
+% Convert an array of strings to valid, unique C identifier names.
+% Any character outside [a-zA-Z0-9_] is replaced with underscore.
+% A leading digit is prefixed with underscore.
+% Uniqueness is enforced with a numeric suffix.
+fieldNames = regexprep(names, '[^a-zA-Z0-9_]', '_');
+fieldNames = regexprep(fieldNames, '^(\d)', '_$1');
+fieldNames = matlab.lang.makeUniqueStrings(fieldNames);
 end
 
 
