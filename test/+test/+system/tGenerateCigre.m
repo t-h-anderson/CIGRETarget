@@ -390,9 +390,9 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 try
                     cigreVal = cast(cigreVal, cigreParam.BaseType);
                 catch
-                    warning("Could not cast CIGRE parameter " + cigreParam.CIGREName + " to type " + cigreParam.BaseType);
+                    warning("Could not cast CIGRE parameter " + cigreParam.ExternalName + " to type " + cigreParam.BaseType);
                 end
-                testCase.CIGREParameters(end+1) = struct("Name", cigreParam.CIGREName, "Value", cigreVal);
+                testCase.CIGREParameters(end+1) = struct("Name", cigreParam.ExternalName, "Value", cigreVal);
             end
 
         end

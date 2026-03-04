@@ -84,14 +84,16 @@ classdef CIGREWriter
 
             idx = 1;
             for i = 1:numel(desc.InternalData)
+                % Internal states are addressed by ExternalName in the generated header
                 [results, idx] = insertMemoryEntry( ...
-                    results, desc.InternalData(i), desc.InternalData(i).ERTName, idx);
+                    results, desc.InternalData(i), desc.InternalData(i).ExternalName, idx);
             end
 
             ioStates = [desc.InputData, desc.OutputData];
             for i = 1:numel(ioStates)
+                % IO structs are addressed by SimulinkName (the generated struct variable)
                 [results, idx] = insertMemoryEntry( ...
-                    results, ioStates(i), ioStates(i).ERTName, idx);
+                    results, ioStates(i), ioStates(i).SimulinkName, idx);
             end
 
             % Clear sentinels left by the incremental insertion pattern
@@ -108,7 +110,7 @@ classdef CIGREWriter
                 + "    <<RTMStructName>>->errorStatus = errorStatus;" + newline;
 
             for i = 1:numel(desc.RTMStruct)
-                name = desc.RTMStruct(i).ERTName;
+                name = desc.RTMStruct(i).ExternalName;
                 mapping = mapping + newline ...
                     + "    <<RTMStructName>>->" + name + " = " + name + ";" + newline;
             end
@@ -134,7 +136,7 @@ classdef CIGREWriter
 
             for i = 1:numel(rtmStructs)
                 rtmType = rtmStructs(i).Type;
-                rtmName = rtmStructs(i).ERTName;
+                rtmName = rtmStructs(i).ExternalName;
 
                 backupCode = backupCode ...
                     + newline + "    " + rtmType + "* " + rtmName + "_backup;" ...
@@ -154,7 +156,7 @@ classdef CIGREWriter
             % Generate casts from the instance void pointers to typed model structs,
             % and the copy statements that move data between instance and model.
             inputType = string([desc.InputData.Type]);
-            inputName = string([desc.InputData.ERTName]);
+            inputName = string([desc.InputData.SimulinkName]);
             if isempty(inputType)
                 results = strrep(results, "<<InputUnpack>>",    " // No inputs");
                 results = strrep(results, "<<ApplyInputData>>", " // No input data");
@@ -167,7 +169,7 @@ classdef CIGREWriter
             end
 
             outputType = string([desc.OutputData.Type]);
-            outputName = string([desc.OutputData.ERTName]);
+            outputName = string([desc.OutputData.SimulinkName]);
             if isempty(outputType)
                 results = strrep(results, "<<OutputUnpack>>",    " // No outputs");
                 results = strrep(results, "<<ApplyOutputData>>", " // No output data");
@@ -191,12 +193,12 @@ classdef CIGREWriter
             % Substitute the generated model initialize and step function names
             % and their argument lists.
             initInputs = strjoin( ...
-                string({desc.InitialiseInputs.ERTName}), ", ");
+                string({desc.InitialiseInputs.SimulinkName}), ", ");
             results = strrep(results, "<<ModelInitialize>>",      desc.InitializeName);
             results = strrep(results, "<<ModelInitialiseInputs>>", initInputs);
 
             stepInputs = strjoin( ...
-                string({desc.StepInputs.ERTName}), ", ");
+                string({desc.StepInputs.SimulinkName}), ", ");
             results = strrep(results, "<<ModelStep>>",       desc.StepName);
             results = strrep(results, "<<ModelStepInputs>>", stepInputs);
         end
@@ -224,19 +226,14 @@ classdef CIGREWriter
         function results = applyInputSection(results, desc, cigreInterface)
             % Substitute the #define count, the struct field declarations,
             % and the InputSignals array for all model inputs.
-            simulinkNames = string([desc.Inputs.SimulinkName]');
-            ertNames  = string([desc.Inputs.ERTName]');
+            names = string([desc.Inputs.SimulinkName]');
             types = util.TranslateTypes.translateType( ...
                 [desc.Inputs.Type]', "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
             dims  = cellfun(@(x) string(prod(x)), {desc.Inputs.Dimensions})';
 
-            % ERTName is already a valid C identifier (from extractExternalName).
-            % Use it directly for struct field declarations; SimulinkName (the
-            % human-readable Simulink port name) is used for the string-literal
-            % .Name / .Description fields in the InputSignals array.
-            results = strrep(results, "<<NumInputs>>",  string(numel(simulinkNames)));
+            results = strrep(results, "<<NumInputs>>",  string(numel(names)));
             results = strrep(results, "<<DefineInputs>>", ...
-                strjoin(types + " " + ertNames + "[" + dims + "];", newline));
+                strjoin(types + " " + names + "[" + dims + "];", newline));
 
             template = strjoin([ ...
                 "[<<Num>>] = {", ...
@@ -248,22 +245,20 @@ classdef CIGREWriter
                 "     }"], newline);
 
             results = strrep(results, "<<InputDefinition>>", ...
-                buildSignalDefinitions(simulinkNames, types, dims, desc.MaxExternalIdentifier, "i_", template));
+                buildSignalDefinitions(names, types, dims, desc.MaxExternalIdentifier, "i_", template));
         end
 
         function results = applyOutputSection(results, desc, cigreInterface)
             % Substitute the #define count, the struct field declarations,
             % and the OutputSignals array for all model outputs.
-            simulinkNames = string([desc.Outputs.SimulinkName]');
-            ertNames  = string([desc.Outputs.ERTName]');
+            names = string([desc.Outputs.SimulinkName]');
             types = util.TranslateTypes.translateType( ...
                 [desc.Outputs.Type]', "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
             dims  = cellfun(@(x) string(prod(x)), {desc.Outputs.Dimensions})';
 
-            % ERTName is already a valid C identifier — see applyInputSection.
-            results = strrep(results, "<<NumOutputs>>",  string(numel(simulinkNames)));
+            results = strrep(results, "<<NumOutputs>>",  string(numel(names)));
             results = strrep(results, "<<DefineOutputs>>", ...
-                strjoin(types + " " + ertNames + "[" + dims + "];", newline));
+                strjoin(types + " " + names + "[" + dims + "];", newline));
 
             template = strjoin([ ...
                 "[<<Num>>] = {", ...
@@ -275,7 +270,7 @@ classdef CIGREWriter
                 "      }"], newline);
 
             results = strrep(results, "<<OutputDefinition>>", ...
-                buildSignalDefinitions(simulinkNames, types, dims, desc.MaxExternalIdentifier, "o_", template));
+                buildSignalDefinitions(names, types, dims, desc.MaxExternalIdentifier, "o_", template));
         end
 
         function results = applyParameterSection(results, visibleParams, cigreInterface)
@@ -290,7 +285,7 @@ classdef CIGREWriter
                 return;
             end
 
-            cigreParamNames = string([visibleParams.CIGREName]');
+            cigreParamNames = string([visibleParams.ExternalName]');
             cigreParamTypes = util.TranslateTypes.translateType( ...
                 [visibleParams.Type]', "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
 
@@ -416,7 +411,7 @@ for i = 1:numel(visibleParams)
 
     entry = template;
     entry = strrep(entry, "<<Num>>",         string(i-1));
-    entry = strrep(entry, "<<Name>>",        p.CIGREName);
+    entry = strrep(entry, "<<Name>>",        p.ExternalName);
     entry = strrep(entry, "<<Description>>", p.SimulinkName);
     entry = strrep(entry, "<<Type>>",        cigreParamTypes(i));
     entry = strrep(entry, "<<ValType>>",     valType);
@@ -427,7 +422,6 @@ for i = 1:numel(visibleParams)
 end
 paramDef = strjoin(paramDef, "," + newline);
 end
-
 
 
 function literal = formatCNumericLiteral(value)
@@ -466,7 +460,7 @@ for i = 1:numel(modelArgVisible)
     structName = erase(p.StorageSpecifier, "ModelArgument:");
     paramMaps = paramMaps ...
         + "<<RTMStructName>>->dwork->mdl_InstanceData.rtm." + structName + "->" ...
-        + p.SimulinkName + " = parameters->" + p.CIGREName + ";" + newline;
+        + p.SimulinkName + " = parameters->" + p.ExternalName + ";" + newline;
 end
 
 for i = 1:numel(modelArgHidden)
@@ -499,7 +493,7 @@ end
 paramMaps = "";
 for i = 1:numel(globalVisible)
     p = globalVisible(i);
-    paramMaps = paramMaps + p.SimulinkName + " = parameters->" + p.CIGREName + ";" + newline;
+    paramMaps = paramMaps + p.SimulinkName + " = parameters->" + p.ExternalName + ";" + newline;
 end
 for i = 1:numel(globalHidden)
     p = globalHidden(i);
