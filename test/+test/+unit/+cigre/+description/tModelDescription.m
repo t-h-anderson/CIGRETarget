@@ -395,6 +395,29 @@ classdef tModelDescription < matlab.mock.TestCase
                 "RTMVarType must be set from the _M variable type");
             testCase.verifyNumElements(desc.InternalData, 1, ...
                 "The _M variable must be removed from InternalData after extraction");
+            testCase.verifyNumElements(desc.RTMStruct, 1, ...
+                "Remaining InternalData must be captured in RTMStruct for wiring");
+        end
+
+        function analyseExtractsRTMStructWhenRTMIsNotFirst(testCase)
+            % getRTMStruct must work regardless of the position of the _M
+            % variable in InternalData — the sub-struct pointer fields that
+            % precede it must still be captured in RTMStruct.
+            [rtmVar, dwVar] = makeRTMAndDWVars();
+            [mock, behavior] = testCase.createMock(?cigre.description.ICodeDescriptor);
+            setupDefaultMock(testCase, behavior, "InternalVars", [dwVar, rtmVar]);
+
+            desc = makeModelDescription();
+            desc.analyse(mock);
+
+            testCase.verifyEqual(desc.RTMVarType, "RT_MODEL_MyModel_T", ...
+                "RTMVarType must be resolved even when _M is last in InternalData");
+            testCase.verifyNumElements(desc.InternalData, 1, ...
+                "The _M variable must be removed from InternalData");
+            testCase.verifyNumElements(desc.RTMStruct, 1, ...
+                "Sub-struct field must appear in RTMStruct even when it precedes the _M variable");
+            testCase.verifyEqual(desc.RTMStruct(1).SimulinkName, "localDW", ...
+                "RTMStruct must contain the dwork variable regardless of ordering");
         end
 
         function analysePopulatesStepInputVariables(testCase)
@@ -430,9 +453,9 @@ desc = cigre.description.ModelDescription("MyModel", ...
     "WorkFolder", tempdir());
 end
 
-function [internalVars, inputVars, outputVars] = makeDefaultCodeInfoVars()
-% Minimal internal-data set: one RTM struct pointer ending in _M plus one
-% DWork struct. getRTMStruct requires exactly one _M variable to succeed.
+function [rtmVar, dwVar] = makeRTMAndDWVars()
+% Return the two canonical internal-data variables used across tests:
+% one RTM struct pointer ending in _M and one DWork struct.
 rtmVar = cigre.description.Variable(...
     "SimulinkName", "MyWrapper_M", ...
     "ExternalName", "MyWrapper_M", ...
@@ -443,6 +466,11 @@ dwVar = cigre.description.Variable(...
     "ExternalName", "localDW", ...
     "Type", "DW_MyModel_T", ...
     "Pointers", "*");
+end
+
+function [internalVars, inputVars, outputVars] = makeDefaultCodeInfoVars()
+% Minimal internal-data set in canonical order: RTM var first, DWork second.
+[rtmVar, dwVar] = makeRTMAndDWVars();
 internalVars = [rtmVar, dwVar];
 inputVars = cigre.description.Variable.empty(1, 0);
 outputVars = cigre.description.Variable.empty(1, 0);
@@ -458,6 +486,7 @@ function setupDefaultMock(testCase, behavior, nvp)
 %   StepInterface  - FunctionInterface for step (overrides StepName)
 %   Inputs         - Variable array for inports (default: empty)
 %   Outputs        - Variable array for outports (default: empty)
+%   InternalVars   - Variable array overriding the default [rtmVar, dwVar] set
 
 arguments
     testCase
@@ -469,9 +498,16 @@ arguments
     nvp.StepInterface = cigre.description.FunctionInterface.empty(1,0)
     nvp.Inputs (1,:) cigre.description.Variable = cigre.description.Variable.empty(1,0)
     nvp.Outputs (1,:) cigre.description.Variable = cigre.description.Variable.empty(1,0)
+    nvp.InternalVars (1,:) cigre.description.Variable = cigre.description.Variable.empty(1,0)
 end
 
-[internalVars, inputVars, outputVars] = makeDefaultCodeInfoVars();
+if isempty(nvp.InternalVars)
+    [internalVars, inputVars, outputVars] = makeDefaultCodeInfoVars();
+else
+    internalVars = nvp.InternalVars;
+    inputVars  = cigre.description.Variable.empty(1, 0);
+    outputVars = cigre.description.Variable.empty(1, 0);
+end
 
 testCase.assignOutputsWhen(behavior.getModelMetadata.withAnyInputs(), nvp.Metadata);
 
