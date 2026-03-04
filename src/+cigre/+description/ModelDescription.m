@@ -236,7 +236,7 @@ classdef ModelDescription < handle
         function [name, inputs] = processInterface(obj, iface)
             % Convert a FunctionInterface into a name and Variable array,
             % resolving argument names via translateNames.
-            if iface.IsEmpty
+            if isempty(iface) || iface.IsEmpty
                 name = "";
                 inputs = cigre.description.Variable.empty(1,0);
                 return
@@ -385,10 +385,7 @@ classdef ModelDescription < handle
                 code(end) = "}<<RTMStruct>>;";
 
                 tmp = strjoin(code, newline);
-                nTasks = extractBetween(tmp, "TID[", "]");
-                if isempty(nTasks)
-                    nTasks = "0";
-                end
+                nTasksStr = extractBetween(tmp, "TID[", "]");
 
                 tbc = code(1);
 
@@ -400,9 +397,12 @@ classdef ModelDescription < handle
                     tbc = [tbc; "  rtTimingBridge timingBridge;"];
                 end
 
-                if nTasks == "0"
-                    nTasks = "1";
+                if isempty(nTasksStr)
+                    % Single-rate model — no TID array, no timing substructure
+                    nTasks = 1;
                 else
+                    % Multi-rate model — embed the TID array and parse task count
+                    nTasks = str2double(nTasksStr);
                     tbc = [tbc
                         "  /*"
                         "   * Timing:"
@@ -411,16 +411,16 @@ classdef ModelDescription < handle
                         "   */"
                         "  struct {"
                         "    struct {"
-                        "      uint32_T TID[" + nTasks + "];"
+                        "      uint32_T TID[" + nTasksStr + "];"
                         "    } TaskCounters;"
                         "  } Timing;"
-                        ];
+                    ];
                 end
 
                 tbc = [tbc; code(end)];
                 tbc = strjoin(tbc, newline);
             else
-                % Single-rate model with no timing bridge
+                % No RTM struct tag found — single-rate model with no timing bridge
                 tbc = "";
                 nTasks = 1;
             end

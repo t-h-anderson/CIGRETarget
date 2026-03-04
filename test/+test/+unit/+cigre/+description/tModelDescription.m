@@ -168,7 +168,7 @@ classdef tModelDescription < matlab.mock.TestCase
             [tbc, nTasks] = cigre.description.ModelDescription.processRTMStructCode(header);
             testCase.verifyFalse(contains(tbc, "timingBridge"), ...
                 "Single-rate model must not include timingBridge declaration");
-            testCase.verifyEqual(nTasks, "1");
+            testCase.verifyEqual(nTasks, 1);
         end
 
         function multiRateModelExtractsTimingBridgeAndTaskCount(testCase)
@@ -186,7 +186,7 @@ classdef tModelDescription < matlab.mock.TestCase
                 "} RT_MODEL_M_T;"
                 ]';
             [tbc, nTasks] = cigre.description.ModelDescription.processRTMStructCode(header);
-            testCase.verifyEqual(nTasks, "3");
+            testCase.verifyEqual(nTasks, 3);
             testCase.verifyTrue(contains(tbc, "timingBridge"), ...
                 "Multi-rate model must include timingBridge declaration");
         end
@@ -223,7 +223,7 @@ classdef tModelDescription < matlab.mock.TestCase
                 ], newline);
             [tbc, nTasks] = cigre.description.ModelDescription.processRTMStructCode(header);
             testCase.verifyClass(tbc, 'string');
-            testCase.verifyEqual(nTasks, "1");
+            testCase.verifyEqual(nTasks, 1);
         end
 
         function processRTMStructCodeIncludesErrorStatusWhenPresent(testCase)
@@ -448,7 +448,7 @@ inputVars = cigre.description.Variable.empty(1, 0);
 outputVars = cigre.description.Variable.empty(1, 0);
 end
 
-function setupDefaultMock(testCase, behavior, varargin)
+function setupDefaultMock(testCase, behavior, nvp)
 % Configure all CodeDescriptor methods required by analyse.
 % Named pairs override defaults:
 %   Metadata       - ModelMetadata (default: empty)
@@ -459,10 +459,21 @@ function setupDefaultMock(testCase, behavior, varargin)
 %   Inputs         - Variable array for inports (default: empty)
 %   Outputs        - Variable array for outports (default: empty)
 
-opts = parseOpts(varargin{:});
+arguments
+    testCase
+    behavior
+    nvp.Metadata (1,1) cigre.description.ModelMetadata = cigre.description.ModelMetadata()
+    nvp.InitName (1,1) string = ""
+    nvp.StepName (1,1) string = ""
+    nvp.TerminateName (1,1) string = ""
+    nvp.StepInterface = cigre.description.FunctionInterface.empty(1,0)
+    nvp.Inputs (1,:) cigre.description.Variable = cigre.description.Variable.empty(1,0)
+    nvp.Outputs (1,:) cigre.description.Variable = cigre.description.Variable.empty(1,0)
+end
+
 [internalVars, inputVars, outputVars] = makeDefaultCodeInfoVars();
 
-testCase.assignOutputsWhen(behavior.getModelMetadata.withAnyInputs(), opts.Metadata);
+testCase.assignOutputsWhen(behavior.getModelMetadata.withAnyInputs(), nvp.Metadata);
 
 % Minimal header/source with no timing bridge to keep tests independent
 testCase.assignOutputsWhen(behavior.getWrapperHeaderCode.withAnyInputs(), ...
@@ -473,19 +484,26 @@ testCase.assignOutputsWhen(behavior.getWrapperSourceCode.withAnyInputs(), ...
 testCase.assignOutputsWhen(behavior.getCodeInfoVariables.withAnyInputs(), ...
     internalVars, inputVars, outputVars);
 
-testCase.assignOutputsWhen(behavior.getInports.withAnyInputs(), opts.Inputs);
-testCase.assignOutputsWhen(behavior.getOutports.withAnyInputs(), opts.Outputs);
+testCase.assignOutputsWhen(behavior.getInports.withAnyInputs(), nvp.Inputs);
+testCase.assignOutputsWhen(behavior.getOutports.withAnyInputs(), nvp.Outputs);
 testCase.assignOutputsWhen(behavior.getParameters.withAnyInputs(), ...
     cigre.description.Variable.empty(1, 0));
 
 testCase.assignOutputsWhen(behavior.getModelRefInitializeInterface.withAnyInputs(), ...
     makeFunctionInterface(""));
 testCase.assignOutputsWhen(behavior.getInitializeInterface.withAnyInputs(), ...
-    makeFunctionInterface(opts.InitName));
+    makeFunctionInterface(nvp.InitName));
+
+if isempty(nvp.StepInterface)
+    stepInterface = makeFunctionInterface(nvp.StepName);
+else
+    stepInterface = nvp.StepInterface;
+end
+
 testCase.assignOutputsWhen(behavior.getOutputInterface.withAnyInputs(), ...
-    opts.StepInterface);
+    stepInterface);
 testCase.assignOutputsWhen(behavior.getTerminateInterface.withAnyInputs(), ...
-    makeFunctionInterface(opts.TerminateName));
+    makeFunctionInterface(nvp.TerminateName));
 end
 
 function iface = makeFunctionInterface(name)
@@ -495,24 +513,4 @@ if name == ""
 else
     iface = cigre.description.FunctionInterface("Name", name);
 end
-end
-
-function opts = parseOpts(varargin)
-% Parse optional name-value pairs with defaults for setupDefaultMock.
-p = inputParser();
-addParameter(p, "Metadata", cigre.description.ModelMetadata());
-addParameter(p, "InitName", "");
-addParameter(p, "StepName", "");
-addParameter(p, "TerminateName", "");
-addParameter(p, "StepInterface", []);
-addParameter(p, "Inputs", cigre.description.Variable.empty(1, 0));
-addParameter(p, "Outputs", cigre.description.Variable.empty(1, 0));
-parse(p, varargin{:});
-opts = p.Results;
-
-% StepInterface takes precedence over StepName if explicitly provided
-if isempty(opts.StepInterface)
-    opts.StepInterface = makeFunctionInterface(opts.StepName);
-end
-
 end
