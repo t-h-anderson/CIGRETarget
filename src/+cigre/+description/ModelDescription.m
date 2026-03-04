@@ -206,10 +206,13 @@ classdef ModelDescription < handle
             end
 
             obj.RTMVarType = obj.InternalData(idx).Type;
-            obj.RTMStruct = obj.InternalData((idx+1):end); % Contents of the RTM Struct comes after the definition
-
-            % Remove RTM struct from InternalData — it is stored independently
+            % Remove the RTM struct pointer first, then treat everything
+            % remaining as pointer fields that must be wired into the RTM
+            % struct and backed up around snapshot reinitialisation.
+            % This is order-independent: codeInfo.InternalData has no
+            % guaranteed ordering
             obj.InternalData(idx) = [];
+            obj.RTMStruct = obj.InternalData;
         end
 
         function loadModelRefInitialiseFunctionInterface(obj, descriptor)
