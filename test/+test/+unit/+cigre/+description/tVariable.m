@@ -93,30 +93,30 @@ classdef tVariable < matlab.unittest.TestCase
             testCase.verifyNumElements(leaves, 2);
         end
 
-        % --- ExternalName defaults -----------------------------------------
+        % --- CIGREName defaults --------------------------------------------
 
-        function externalNameDefaultsToSimulinkName(testCase)
-            % When ExternalName is not set, it should be derived from
+        function cigreNameDefaultsToSimulinkName(testCase)
+            % When CIGREName is not set, it should be derived from
             % SimulinkName via makeValidName so the C identifier is valid.
             v = cigre.description.Variable("SimulinkName", "myParam");
-            testCase.verifyEqual(v.ExternalName, "myParam");
+            testCase.verifyEqual(v.CIGREName, "myParam");
         end
 
-        function externalNameMakesIdentifierValid(testCase)
+        function cigreNameMakesIdentifierValid(testCase)
             % SimulinkName may contain characters invalid in C identifiers;
-            % ExternalName must sanitise these.
+            % CIGREName must sanitise these.
             simulinkName = "my param";
             v = cigre.description.Variable("SimulinkName", simulinkName);
 
             expected = matlab.lang.makeValidName(simulinkName);
-            testCase.verifyEqual(v.ExternalName, expected);
+            testCase.verifyEqual(v.CIGREName, expected);
         end
 
-        function explicitExternalNameIsPreserved(testCase)
+        function explicitCIGRENameIsPreserved(testCase)
             v = cigre.description.Variable( ...
                 "SimulinkName", "myParam", ...
-                "ExternalName", "customName");
-            testCase.verifyEqual(v.ExternalName, "customName");
+                "CIGREName", "customName");
+            testCase.verifyEqual(v.CIGREName, "customName");
         end
 
         % --- IsModelArgument -----------------------------------------------

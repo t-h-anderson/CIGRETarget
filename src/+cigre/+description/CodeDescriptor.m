@@ -100,7 +100,7 @@ classdef CodeDescriptor < cigre.description.ICodeDescriptor
             desc = obj.getCIGREDescriptor();
             inports = desc.getDataInterfaces(obj.DataInterfaceInports);
             inports = removeUnimplemented(inports);
-            vars = cigre.description.Variable.fromDataInterface(inports, obj.ModelName_);
+            vars = cigre.description.Variable.fromDataInterface(inports, obj.ModelName_, string.empty(1,0), HasDefaultValue=false);
         end
 
         function vars = getOutports(obj)
@@ -108,14 +108,14 @@ classdef CodeDescriptor < cigre.description.ICodeDescriptor
             desc = obj.getCIGREDescriptor();
             outports = desc.getDataInterfaces(obj.DataInterfaceOutports);
             outports = removeUnimplemented(outports);
-            vars = cigre.description.Variable.fromDataInterface(outports, obj.ModelName_);
+            vars = cigre.description.Variable.fromDataInterface(outports, obj.ModelName_, string.empty(1,0), HasDefaultValue=false);
         end
 
         function vars = getParameters(obj)
             % Return Variable array for the referenced model parameters.
             desc = obj.getModelDescriptor();
             parameters = desc.getDataInterfaces(obj.DataInterfaceParameters);
-            vars = cigre.description.Variable.fromDataInterface(parameters, obj.ModelName_);
+            vars = cigre.description.Variable.fromDataInterface(parameters, obj.ModelName_, string.empty(1,0), HasDefaultValue=true);
         end
 
         function [internalVars, inputVars, outputVars] = getCodeInfoVariables(obj)
@@ -129,22 +129,22 @@ classdef CodeDescriptor < cigre.description.ICodeDescriptor
             internalData = codeInfo.InternalData;
 
             simulinkNames = strings(1, numel(internalData));
-            externalNames = strings(1, numel(internalData));
+            ertNames = strings(1, numel(internalData));
             for i = 1:numel(internalData)
                 simulinkNames(i) = cigre.description.Variable.extractSimulinkName(internalData(i));
-                externalNames(i) = cigre.description.Variable.extractExternalName(internalData(i));
+                ertNames(i) = cigre.description.Variable.extractExternalName(internalData(i));
             end
 
             % Remove Simulink-internal bookkeeping fields that are not part of
             % model state and should not appear in the CIGRE DLL interface.
-            isBookkeeping = externalNames == obj.BookkeepingErrorStatus ...
-                | externalNames == obj.BookkeepingTimingBridge ...
-                | contains(externalNames, obj.BookkeepingMdlrefTidPrefix);
+            isBookkeeping = ertNames == obj.BookkeepingErrorStatus ...
+                | ertNames == obj.BookkeepingTimingBridge ...
+                | contains(ertNames, obj.BookkeepingMdlrefTidPrefix);
             internalData(isBookkeeping) = [];
             simulinkNames(isBookkeeping) = [];
-            externalNames(isBookkeeping) = [];
+            ertNames(isBookkeeping) = [];
 
-            externalNames = applyReservedNameFallbacks(externalNames);
+            ertNames = applyReservedNameFallbacks(ertNames);
 
             types = strings(1, numel(internalData));
             pointers = strings(1, numel(internalData));
@@ -163,17 +163,17 @@ classdef CodeDescriptor < cigre.description.ICodeDescriptor
 
             inputVars = cigre.description.Variable.create(...
                 "SimulinkName", simulinkNames(isInput), ...
-                "ExternalName", externalNames(isInput), ...
+                "ERTName",      ertNames(isInput), ...
                 "Type",         types(isInput), ...
                 "Pointers",     pointers(isInput));
             outputVars = cigre.description.Variable.create(...
                 "SimulinkName", simulinkNames(isOutput), ...
-                "ExternalName", externalNames(isOutput), ...
+                "ERTName",      ertNames(isOutput), ...
                 "Type",         types(isOutput), ...
                 "Pointers",     pointers(isOutput));
             internalVars = cigre.description.Variable.create(...
                 "SimulinkName", simulinkNames(isInternal), ...
-                "ExternalName", externalNames(isInternal), ...
+                "ERTName",      ertNames(isInternal), ...
                 "Type",         types(isInternal), ...
                 "Pointers",     pointers(isInternal));
         end

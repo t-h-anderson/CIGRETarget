@@ -1,6 +1,6 @@
 function [ports, idx, idxRange] = vectorToBus(signalInput, mdl, fromName, toName, creatorName, idx, terminate, nvp)
 arguments
-    signalInput (1,1) string
+    signalInput (1,1)
     mdl (1,1) string
     fromName (1,1) string
     toName (1,1) string
@@ -73,7 +73,7 @@ for j = 1:numel(busElements)
         elementCreatorName = creatorName + "_" + j;
         elementToName = creatorName + "/" + j;
 
-        [p, idx, idxRanges] = vectorToBus(signalInput.Children(j), mdl, portName, elementToName, elementCreatorName, idx, "CastTo", nvp.CastTo);
+        [p, idx, idxRanges] = util.sl.vectorToBus(signalInput.Children(j), mdl, portName, elementToName, elementCreatorName, idx, "CastTo", nvp.CastTo);
         ports = [ports, p];
         idxRange = [idxRange, idxRanges];
     end
