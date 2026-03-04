@@ -1,7 +1,9 @@
 classdef Variable
     properties
-        SimulinkName (:,1) string = ""
-        ExternalName (:,1) string = ""
+        SimulinkName (:,1) string = "" % Graphical name in Simulink
+        CIGREName (:,1) string = "" % Name exposed in CIGRE DLL
+        ERTName (:,1) string = "" % Internal name within generated code
+
         Type (:,1) string = ""
         Pointers (:,1) string = ""
         BaseType (:,1) string = ""
@@ -37,8 +39,8 @@ classdef Variable
                 end
             end
             
-            if all(obj.ExternalName == "")
-                obj.ExternalName = matlab.lang.makeValidName(obj.SimulinkName);
+            if all(obj.CIGREName == "")
+                obj.CIGREName = matlab.lang.makeValidName(obj.SimulinkName);
             end
 
         end
@@ -141,7 +143,7 @@ classdef Variable
                 nameroot (1,:) string = string.empty % Allow nested parameter search
                 nvp.OverloadStorage (1,1) string = string(nan)
                 nvp.UsedExternalNames (1,:) string = string.empty(1,0)
-                nvp.DefaultParamValue (1,:) = [] 
+                nvp.HasDefaultValue (1,1) logical = false 
             end
 
             objs = cigre.description.Variable.empty(1,0);
@@ -166,7 +168,11 @@ classdef Variable
                 end                    
 
                 paramName = strjoin([nameroot, simulinkName], ".");
-                defaultValues = cigre.description.Variable.extractDefaultParamValue(modelName, paramName);
+                if nvp.HasDefaultValue
+                    defaultValues = cigre.description.Variable.extractDefaultParamValue(modelName, paramName);
+                else
+                    defaultValues = [];
+                end
 
                 % Determine if the data interface describes a parameter
                 % struct
@@ -192,7 +198,8 @@ classdef Variable
                         % a struct
                         [sub, subExternalNames] = cigre.description.Variable.fromDataInterface(elements, modelName, [nameroot, simulinkName], ...
                             "OverloadStorage", storage, ...
-                            "UsedExternalNames", usedExternalNames);
+                            "UsedExternalNames", usedExternalNames, ...
+                            "HasDefaultValue", nvp.HasDefaultValue);
                     else
                         sub = cigre.description.Variable.empty(1,0);
                     end
@@ -283,6 +290,8 @@ classdef Variable
                 name = erase(imp.ReadExpression, "get_");
             elseif isprop(imp, "ElementIdentifier") && ~isempty(imp.ElementIdentifier)
                 name = imp.ElementIdentifier;
+            elseif isprop(imp, "GraphcalName")
+                name = imp.GraphicalName;
             elseif isprop(imp, "Type")
                 % We want the property name
                 type = imp.Type;

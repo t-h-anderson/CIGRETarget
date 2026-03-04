@@ -1,6 +1,6 @@
 function signalsToBus(signalInput, mdl, fromName, toName, creatorName)
 arguments
-    signalInput (1,1) string
+    signalInput (1,1)
     mdl (1,1) string
     fromName (1,1) string
     toName (1,1) string
@@ -50,7 +50,7 @@ for j = 1:numel(busElements)
     else
         elementCreatorName = creatorName + "_" + j;
         elementToName = creatorName + "/" + j;
-        signalsToBus(signalInput.Children(j), mdl, portName, elementToName, elementCreatorName)
+        util.sl.signalsToBus(signalInput.Children(j), mdl, portName, elementToName, elementCreatorName)
     end
 end
 

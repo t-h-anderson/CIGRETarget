@@ -1,6 +1,6 @@
 function sigs = busToVector(busOutput, mdl, fromName, toName, selectorName, terminate)
 arguments
-    busOutput (1,1) string
+    busOutput (1,1)
     mdl (1,1) string
     fromName (1,1) string
     toName (1,1) string
@@ -38,7 +38,7 @@ for j = 1:numel(busElementOutput)
 
         bus = util.sl.loadBus(mdl, me.DataType);
 
-        s = busToVector(bus, mdl, selectorName + "/" + j, portName, selectorName + "_" + j);
+        s = util.sl.busToVector(bus, mdl, selectorName + "/" + j, portName, selectorName + "_" + j);
         sigs = [sigs, s]; %#ok<AGROW>
     end
 end
