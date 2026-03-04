@@ -22,7 +22,6 @@
 helpsearch*/
 
 # Code generation folders
-slprj/
 sccprj/
 codegen/
 
@@ -37,5 +36,4 @@ codegen/
 *.suo
 *.vcxproj.*
 .vs/
-**/VSBuild_*/
 
