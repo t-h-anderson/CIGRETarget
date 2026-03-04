@@ -1,6 +1,6 @@
 function busToSignals(busOutput, mdl, fromName, toName, selectorName)
 arguments
-    busOutput (1,1) string
+    busOutput (1,1)
     mdl (1,1) string
     fromName (1,1) string
     toName (1,1) string
@@ -36,7 +36,7 @@ for j = 1:numel(busElementOutput)
         add_block("built-in/Outport", mdl + "/" + portName);
         add_line(mdl, nextBlock , portName + "/1");
     else
-        busToSignals(children, mdl, selectorName + "/" + j, portName, selectorName + "_" + j)
+        util.sl.busToSignals(children, mdl, selectorName + "/" + j, portName, selectorName + "_" + j)
     end
 end
 

@@ -215,7 +215,7 @@ classdef CIGREWriter
             results = strrep(results, "<<WrapperHeader>>", desc.CIGREInterfaceName + ".h");
             
             here = desc.CodeGenFolder;
-            if false %isfile(fullfile(here, "/slprj/cigre/_sharedutils/model_reference_types.h"))
+            if isfile(fullfile(here, "/slprj/cigre/_sharedutils/model_reference_types.h"))
                 modelRefHeader = "#include ""model_reference_types.h""";
             else
                 modelRefHeader = "";
@@ -291,7 +291,7 @@ classdef CIGREWriter
             if nParams == 0
                 results = strrep(results, "<<DefineParameters>>",    "");
                 results = strrep(results, "<<ParameterDefinitions>>", "");
-                return;
+                return
             end
 
             cigreParamNames = string([visibleParams.ExternalName]');
@@ -377,7 +377,8 @@ function defs = buildSignalDefinitions(names, types, dims, maxIdentifierLen, psc
 % Build a comma-separated list of CIGRE signal definition structs.
 % Strips the PSCAD-convention i_/o_ prefix and truncates external names to
 % respect the maxIdentifierLen constraint imposed by some simulation tools.
-externalNames = erase(names, textBoundaryPattern + pscadPrefix);
+externalNames = toValidCIdentifiers(names);
+externalNames = erase(externalNames, textBoundaryPattern + pscadPrefix);
 externalNames = matlab.lang.makeUniqueStrings( ...
     externalNames, [], maxIdentifierLen);
 
@@ -513,11 +514,11 @@ end
 paramMaps = "";
 for i = 1:numel(globalVisible)
     p = globalVisible(i);
-    paramMaps = paramMaps + p.SimulinkName + " = parameters->" + p.ExternalName + ";" + newline;
+    paramMaps = paramMaps + p.ExternalName + " = parameters->" + p.SimulinkName + ";" + newline;
 end
 for i = 1:numel(globalHidden)
     p = globalHidden(i);
-    paramMaps = paramMaps + p.SimulinkName + " = " + string(double(p.DefaultValue)) + ";" + newline;
+    paramMaps = paramMaps + p.ExternalName + " = " + string(double(p.DefaultValue)) + ";" + newline;
 end
 end
 
