@@ -98,7 +98,7 @@ classdef Variable
 
             isOk = all((n == 1) | (n == maxN));
             if ~isOk
-                error("Entry must be scalar or all the same lenght");
+                error("Entry must be scalar or all the same length");
             end
 
             % Copy the data into new objects
@@ -288,12 +288,12 @@ classdef Variable
                 type = imp.Type;
 
                 while(isa(type, "coder.types.Pointer"))
-                    % Dricll into pointer
+                    % Drill into pointer
                     type = type.BaseType;
                 end
 
                 if isprop(type, "ExternalName")
-                    name = type.name;
+                    name = type.ExternalName;
                 else
                     name = type.Name;
                 end

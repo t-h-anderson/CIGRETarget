@@ -13,7 +13,7 @@ classdef InterfaceInstance <handle
     end
 
     properties (Constant)
-        IntStateBufferSize = 100000; % Pre-allocated int32 state buffer
+        IntStateBufferSize = 100000; % Arbitrary pre-allocated int32 state buffer
     end
 
     methods
