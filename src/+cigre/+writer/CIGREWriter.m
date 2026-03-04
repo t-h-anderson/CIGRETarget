@@ -206,11 +206,16 @@ classdef CIGREWriter
         % --- writeHeader helpers ---
 
         function results = applyHeaderIncludes(results, desc)
+            arguments
+                results (1,:) string
+                desc (1,1) cigre.description.ModelDescription
+            end
             % Substitute the model wrapper header include and the optional
             % model_reference_types.h include required by some model configurations.
             results = strrep(results, "<<WrapperHeader>>", desc.CIGREInterfaceName + ".h");
-
-            if isfile("./slprj/ert/_sharedutils/model_reference_types.h")
+            
+            here = desc.CodeGenFolder;
+            if false %isfile(fullfile(here, "/slprj/cigre/_sharedutils/model_reference_types.h"))
                 modelRefHeader = "#include ""model_reference_types.h""";
             else
                 modelRefHeader = "";
@@ -365,7 +370,7 @@ function defs = buildSignalDefinitions(names, types, dims, maxIdentifierLen, psc
 % respect the maxIdentifierLen constraint imposed by some simulation tools.
 externalNames = erase(names, textBoundaryPattern + pscadPrefix);
 externalNames = matlab.lang.makeUniqueStrings( ...
-    externalNames, 1:numel(externalNames), maxIdentifierLen);
+    externalNames, [], maxIdentifierLen);
 
 defs = strings(numel(names), 1);
 for i = 1:numel(names)
@@ -508,12 +513,8 @@ allStates = [modelDescriptions.InternalData, ...
     modelDescriptions.OutputData];
 
 for i = 1:numel(allStates)
-    heap = heap + " + sizeof(" + allStates(i).Type + ")";
+    type = allStates(i).Type;
+    heap = heap + " + sizeof(" + type + ")";
 end
 
-if isempty(heap) || ismissing(heap)
-    heap = "80000";
-    warning("CIGRE:heapSize:calculationFailed", ...
-        "Heap size calculation failed, using fallback value");
-end
 end

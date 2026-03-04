@@ -145,6 +145,12 @@ classdef ModelDescription < handle
             headerCode = descriptor.getWrapperHeaderCode();
             sourceCode = descriptor.getWrapperSourceCode();
 
+            % Extract RTM struct pointer field names from the FULL (unstripped)
+            % header before processRTMStructCode discards them. These names are
+            % the reliable discriminator for classifyRTMFields: a variable is an
+            % RTM pointer field iff its ExternalName appears in this list.
+            rtmFieldNames = cigre.description.ModelDescription.parseRTMStructFieldNames(headerCode);
+
             [obj.TimingBridgeCode, obj.NumberOfTasks] = ...
                 cigre.description.ModelDescription.processRTMStructCode(headerCode);
             obj.InitializeOnlyCode = ...
@@ -170,6 +176,12 @@ classdef ModelDescription < handle
             obj.loadInitialiseFunctionInterface(descriptor);
             obj.loadStepFunctionInterface(descriptor);
             obj.loadTerminateFunctionInterface(descriptor);
+
+            % Phase 2: classify remaining InternalData into RTM pointer fields
+            % vs. standalone variables. Name-based matching against the header
+            % is primary; step-arg type matching is the fallback when the header
+            % contains no RTM struct definition (e.g. minimal mock headers in tests).
+            obj.classifyRTMFields(rtmFieldNames);
         end
 
         function writeDLLSource(obj, writer, nvp)
@@ -193,6 +205,10 @@ classdef ModelDescription < handle
     methods (Access = private)
 
         function getRTMStruct(obj)
+            % Phase 1 of RTM classification: find the RTM struct variable,
+            % record its type, and remove it from InternalData.
+            % RTMStruct is populated later by classifyRTMFields once the
+            % step function interface is available for discrimination.
             internalNames = string({obj.InternalData.SimulinkName});
             idx = find(endsWith(internalNames, cigre.description.ModelDescription.RtmVarSuffix + textBoundary), 1);
             if isempty(idx)
@@ -206,10 +222,45 @@ classdef ModelDescription < handle
             end
 
             obj.RTMVarType = obj.InternalData(idx).Type;
-            obj.RTMStruct = obj.InternalData((idx+1):end);
-
-            % Remove RTM struct from InternalData — it is stored independently
             obj.InternalData(idx) = [];
+        end
+
+        function classifyRTMFields(obj, rtmFieldNames)
+            % Phase 2 of RTM classification: populate RTMStruct with the subset
+            % of InternalData entries that are pointer fields of the RTM struct.
+            %
+            % Primary path — name-based matching (rtmFieldNames non-empty):
+            %   A variable is an RTM pointer field iff its ExternalName appears
+            %   in the set of pointer field names parsed from the wrapper header.
+            %   This correctly handles cases where two variables share the same
+            %   C type (e.g. a global InstP instance and the RTM InstP pointer
+            %   field) that cannot be distinguished by type alone.
+            %
+            % Fallback path — step-arg type matching (rtmFieldNames empty):
+            %   Variables whose type appears in the step function argument list
+            %   are standalone; the rest are assumed to be RTM pointer fields.
+            %   Used when the header contains no RTM struct definition (e.g.
+            %   minimal mock headers in unit tests).
+            if isempty(obj.InternalData)
+                obj.RTMStruct = obj.InternalData;
+                return
+            end
+
+            if ~isempty(rtmFieldNames)
+                internalNames = string([obj.InternalData.ExternalName]);
+                isRTMField = ismember(internalNames, rtmFieldNames);
+                obj.RTMStruct = obj.InternalData(isRTMField);
+                return
+            end
+
+            % Fallback: classify by step-arg type exclusion
+            if isempty(obj.StepInputs)
+                obj.RTMStruct = obj.InternalData;
+                return
+            end
+            stepArgTypes  = string([obj.StepInputs.Type]);
+            internalTypes = string([obj.InternalData.Type]);
+            obj.RTMStruct = obj.InternalData(~ismember(internalTypes, stepArgTypes));
         end
 
         function loadModelRefInitialiseFunctionInterface(obj, descriptor)
@@ -236,7 +287,7 @@ classdef ModelDescription < handle
         function [name, inputs] = processInterface(obj, iface)
             % Convert a FunctionInterface into a name and Variable array,
             % resolving argument names via translateNames.
-            if iface.IsEmpty
+            if isempty(iface) || iface.IsEmpty
                 name = "";
                 inputs = cigre.description.Variable.empty(1,0);
                 return
@@ -325,7 +376,9 @@ classdef ModelDescription < handle
                     thisParam.ExternalName = matlab.lang.makeUniqueStrings(leaf.ExternalName, names);
                     thisParam.Dimensions = 1;
                     if nData > 1
-                        thisParam.SimulinkName = thisParam.SimulinkName + "[" + (j-1) + "]";
+                        % Convert to C-style base 0 indexing
+                        cIdx = (j-1);
+                        thisParam.SimulinkName = thisParam.SimulinkName + "[" + cIdx + "]"; 
                     end
                     names = [names, thisParam.ExternalName]; %#ok<AGROW>
                     value(end+1) = thisParam; %#ok<AGROW>
@@ -341,6 +394,52 @@ classdef ModelDescription < handle
     end
 
     methods (Static)
+
+        function fieldNames = parseRTMStructFieldNames(headerCode)
+            % Extract the names of pointer fields declared inside the RTM
+            % struct (``struct tag_...``) from the wrapper header.
+            %
+            % These names are the authoritative discriminator for
+            % classifyRTMFields: an InternalData variable whose ExternalName
+            % appears in this set is a pointer field of the RTM struct and
+            % must be wired via RTMStructName->field = field in the generated
+            % DLL source. Variables absent from the set are standalone heap
+            % allocations passed directly as step/init arguments.
+            %
+            % The method matches lines of the form
+            %   <type> *<identifier>;
+            % and returns <identifier>. Non-pointer fields (e.g. errorStatus
+            % which is ``const char_T *errorStatus``) are also matched but
+            % are harmless because they never appear in InternalData.
+            arguments
+                headerCode (:,1) string
+            end
+
+            if isscalar(headerCode)
+                headerCode = strsplit(headerCode, newline)';
+            end
+
+            fieldNames = string.empty(1, 0);
+
+            idxStart = find(contains(headerCode, "struct tag_"), 1);
+            if isempty(idxStart)
+                return
+            end
+
+            idxEnd = findLineStartText(headerCode, "}");
+            idxEnd = idxEnd(find(idxEnd > idxStart, 1));
+            if isempty(idxEnd)
+                return
+            end
+
+            structLines = headerCode(idxStart:idxEnd);
+            for i = 1:numel(structLines)
+                tokens = regexp(structLines(i), '\*\s*(\w+)\s*;', 'tokens');
+                if ~isempty(tokens)
+                    fieldNames(end+1) = string(tokens{1}{1}); %#ok<AGROW>
+                end
+            end
+        end
 
         function desc = analyseModel(model, cigreWrapper, nvp)
             arguments
@@ -385,10 +484,7 @@ classdef ModelDescription < handle
                 code(end) = "}<<RTMStruct>>;";
 
                 tmp = strjoin(code, newline);
-                nTasks = extractBetween(tmp, "TID[", "]");
-                if isempty(nTasks)
-                    nTasks = "0";
-                end
+                nTasksStr = extractBetween(tmp, "TID[", "]");
 
                 tbc = code(1);
 
@@ -400,9 +496,12 @@ classdef ModelDescription < handle
                     tbc = [tbc; "  rtTimingBridge timingBridge;"];
                 end
 
-                if nTasks == "0"
-                    nTasks = "1";
+                if isempty(nTasksStr)
+                    % Single-rate model — no TID array, no timing substructure
+                    nTasks = 1;
                 else
+                    % Multi-rate model — embed the TID array and parse task count
+                    nTasks = str2double(nTasksStr);
                     tbc = [tbc
                         "  /*"
                         "   * Timing:"
@@ -411,16 +510,16 @@ classdef ModelDescription < handle
                         "   */"
                         "  struct {"
                         "    struct {"
-                        "      uint32_T TID[" + nTasks + "];"
+                        "      uint32_T TID[" + nTasksStr + "];"
                         "    } TaskCounters;"
                         "  } Timing;"
-                        ];
+                    ];
                 end
 
                 tbc = [tbc; code(end)];
                 tbc = strjoin(tbc, newline);
             else
-                % Single-rate model with no timing bridge
+                % No RTM struct tag found — single-rate model with no timing bridge
                 tbc = "";
                 nTasks = 1;
             end
