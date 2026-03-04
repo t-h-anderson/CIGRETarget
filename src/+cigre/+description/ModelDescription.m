@@ -148,7 +148,7 @@ classdef ModelDescription < handle
             % Extract RTM struct pointer field names from the FULL (unstripped)
             % header before processRTMStructCode discards them. These names are
             % the reliable discriminator for classifyRTMFields: a variable is an
-            % RTM pointer field iff its ExternalName appears in this list.
+            % RTM pointer field iff its ERTName appears in this list.
             rtmFieldNames = cigre.description.ModelDescription.parseRTMStructFieldNames(headerCode);
 
             [obj.TimingBridgeCode, obj.NumberOfTasks] = ...
@@ -209,7 +209,7 @@ classdef ModelDescription < handle
             % record its type, and remove it from InternalData.
             % RTMStruct is populated later by classifyRTMFields once the
             % step function interface is available for discrimination.
-            internalNames = string({obj.InternalData.SimulinkName});
+            internalNames = string({obj.InternalData.ERTName});
             idx = find(endsWith(internalNames, cigre.description.ModelDescription.RtmVarSuffix + textBoundary), 1);
             if isempty(idx)
                 idx = find(contains(internalNames, cigre.description.ModelDescription.RtmVarFallback, "IgnoreCase", true), 1);
@@ -230,7 +230,7 @@ classdef ModelDescription < handle
             % of InternalData entries that are pointer fields of the RTM struct.
             %
             % Primary path — name-based matching (rtmFieldNames non-empty):
-            %   A variable is an RTM pointer field iff its ExternalName appears
+            %   A variable is an RTM pointer field iff its ERTName appears
             %   in the set of pointer field names parsed from the wrapper header.
             %   This correctly handles cases where two variables share the same
             %   C type (e.g. a global InstP instance and the RTM InstP pointer
@@ -247,7 +247,7 @@ classdef ModelDescription < handle
             end
 
             if ~isempty(rtmFieldNames)
-                internalNames = string([obj.InternalData.ExternalName]);
+                internalNames = string([obj.InternalData.ERTName]);
                 isRTMField = ismember(internalNames, rtmFieldNames);
                 obj.RTMStruct = obj.InternalData(isRTMField);
                 return
@@ -296,7 +296,7 @@ classdef ModelDescription < handle
             argNames = obj.translateNames(iface.ArgumentNames, iface.ArgumentTypes);
             name = iface.Name;
             inputs = cigre.description.Variable.create(...
-                "SimulinkName", argNames, ...
+                "ERTName", argNames, ...
                 "Type", iface.ArgumentTypes, ...
                 "Pointers", iface.ArgumentPointers);
         end
@@ -312,16 +312,15 @@ classdef ModelDescription < handle
             % special case since it is not a data variable.
 
             knownTypes = string([obj.InternalData.Type obj.InputData.Type obj.OutputData.Type]);
-            knownNames = string([obj.InternalData.SimulinkName obj.InputData.SimulinkName obj.OutputData.SimulinkName]);
+            knownNames = string([obj.InternalData.ERTName obj.InputData.ERTName obj.OutputData.ERTName]);
 
             % Strip graphical port prefixes added by Simulink code generation
             inputNames = erase(inputNames, [cigre.description.ModelDescription.SimulinkOutputPortPrefix, cigre.description.ModelDescription.SimulinkInputPortPrefix]);
-            externalNames = string([[obj.Inputs.ExternalName], [obj.Outputs.ExternalName]]);
-            simulinkNames = string([[obj.Inputs.SimulinkName], [obj.Outputs.SimulinkName]]);
+            portERTNames = string([[obj.Inputs.ERTName], [obj.Outputs.ERTName]]);
             for i = 1:numel(inputNames)
-                idx = ismember(externalNames, inputNames(i));
+                idx = ismember(portERTNames, inputNames(i));
                 if any(idx)
-                    inputNames(i) = simulinkNames(idx);
+                    inputNames(i) = portERTNames(idx);
                 end
             end
 
@@ -373,14 +372,14 @@ classdef ModelDescription < handle
                 for j = 1:nData
                     thisParam = leaf;
                     thisParam.DefaultValue = leaf.DefaultValue(j);
-                    thisParam.ExternalName = matlab.lang.makeUniqueStrings(leaf.ExternalName, names);
+                    thisParam.CIGREName = matlab.lang.makeUniqueStrings(leaf.CIGREName, names);
                     thisParam.Dimensions = 1;
                     if nData > 1
                         % Convert to C-style base 0 indexing
                         cIdx = (j-1);
-                        thisParam.SimulinkName = thisParam.SimulinkName + "[" + cIdx + "]"; 
+                        thisParam.SimulinkName = thisParam.SimulinkName + "[" + cIdx + "]";
                     end
-                    names = [names, thisParam.ExternalName]; %#ok<AGROW>
+                    names = [names, thisParam.CIGREName]; %#ok<AGROW>
                     value(end+1) = thisParam; %#ok<AGROW>
                 end
             end
@@ -400,7 +399,7 @@ classdef ModelDescription < handle
             % struct (``struct tag_...``) from the wrapper header.
             %
             % These names are the authoritative discriminator for
-            % classifyRTMFields: an InternalData variable whose ExternalName
+            % classifyRTMFields: an InternalData variable whose ERTName
             % appears in this set is a pointer field of the RTM struct and
             % must be wired via RTMStructName->field = field in the generated
             % DLL source. Variables absent from the set are standalone heap
