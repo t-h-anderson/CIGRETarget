@@ -206,7 +206,7 @@ classdef ModelDescription < handle
             end
 
             obj.RTMVarType = obj.InternalData(idx).Type;
-            obj.RTMStruct = obj.InternalData((idx+1):end);
+            obj.RTMStruct = obj.InternalData((idx+1):end); % Contents of the RTM Struct comes after the definition
 
             % Remove RTM struct from InternalData — it is stored independently
             obj.InternalData(idx) = [];
@@ -325,7 +325,9 @@ classdef ModelDescription < handle
                     thisParam.ExternalName = matlab.lang.makeUniqueStrings(leaf.ExternalName, names);
                     thisParam.Dimensions = 1;
                     if nData > 1
-                        thisParam.SimulinkName = thisParam.SimulinkName + "[" + (j-1) + "]";
+                        % Convert to C-style base 0 indexing
+                        cIdx = (j-1);
+                        thisParam.SimulinkName = thisParam.SimulinkName + "[" + cIdx + "]"; 
                     end
                     names = [names, thisParam.ExternalName]; %#ok<AGROW>
                     value(end+1) = thisParam; %#ok<AGROW>
