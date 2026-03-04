@@ -370,7 +370,7 @@ function defs = buildSignalDefinitions(names, types, dims, maxIdentifierLen, psc
 % respect the maxIdentifierLen constraint imposed by some simulation tools.
 externalNames = erase(names, textBoundaryPattern + pscadPrefix);
 externalNames = matlab.lang.makeUniqueStrings( ...
-    externalNames, maxIdentifierLen);
+    externalNames, [], maxIdentifierLen);
 
 defs = strings(numel(names), 1);
 for i = 1:numel(names)
