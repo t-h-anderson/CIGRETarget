@@ -170,6 +170,11 @@ classdef ModelDescription < handle
             obj.loadInitialiseFunctionInterface(descriptor);
             obj.loadStepFunctionInterface(descriptor);
             obj.loadTerminateFunctionInterface(descriptor);
+
+            % Phase 2: classify remaining InternalData into RTM pointer fields
+            % vs. standalone step arguments. Must run after loadStepFunctionInterface
+            % so that StepInputs types are available as the discriminator.
+            obj.classifyRTMFields();
         end
 
         function writeDLLSource(obj, writer, nvp)
@@ -193,6 +198,10 @@ classdef ModelDescription < handle
     methods (Access = private)
 
         function getRTMStruct(obj)
+            % Phase 1 of RTM classification: find the RTM struct variable,
+            % record its type, and remove it from InternalData.
+            % RTMStruct is populated later by classifyRTMFields once the
+            % step function interface is available for discrimination.
             internalNames = string({obj.InternalData.SimulinkName});
             idx = find(endsWith(internalNames, cigre.description.ModelDescription.RtmVarSuffix + textBoundary), 1);
             if isempty(idx)
@@ -206,13 +215,33 @@ classdef ModelDescription < handle
             end
 
             obj.RTMVarType = obj.InternalData(idx).Type;
-            % Remove the RTM struct pointer first, then treat everything
-            % remaining as pointer fields that must be wired into the RTM
-            % struct and backed up around snapshot reinitialisation.
-            % This is order-independent: codeInfo.InternalData has no
-            % guaranteed ordering
             obj.InternalData(idx) = [];
-            obj.RTMStruct = obj.InternalData;
+        end
+
+        function classifyRTMFields(obj)
+            % Phase 2 of RTM classification: partition the remaining
+            % InternalData into RTM pointer fields (RTMStruct) and standalone
+            % step-function arguments (kept only in InternalData).
+            %
+            % Variables whose type appears in the step function argument list
+            % are passed directly to model functions and do NOT need to be
+            % wired into the RTM struct. Variables not in the step argument
+            % list ARE pointer fields of the RTM struct and must be wired via
+            %   RTMStructName->field = field
+            % and backed up/restored around snapshot reinitialisation.
+            %
+            % When no step interface exists (e.g. RTM-only calling convention
+            % where dwork is accessed through the RTM handle), all remaining
+            % InternalData is treated as RTM pointer fields.
+            if isempty(obj.StepInputs) || isempty(obj.InternalData)
+                obj.RTMStruct = obj.InternalData;
+                return
+            end
+
+            stepArgTypes  = string([obj.StepInputs.Type]);
+            internalTypes = string([obj.InternalData.Type]);
+            isStepArg = ismember(internalTypes, stepArgTypes);
+            obj.RTMStruct = obj.InternalData(~isStepArg);
         end
 
         function loadModelRefInitialiseFunctionInterface(obj, descriptor)
