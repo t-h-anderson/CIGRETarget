@@ -103,9 +103,10 @@ end
 %  CheckParameters / ProcessParameters
 % ======================================================================= %
 function CheckParameters(block) %#ok<DEFNU>
+    % Guard: during the first setup() pass (before the mask is applied)
+    % NumDialogPrms is 0.  Nothing to check yet.
     if block.NumDialogPrms < 2
-        error('CIGRE:cigreDLLSFunction:BadParams', ...
-            'Block requires at least 2 dialog parameters (DLLPath, HeaderPath).');
+        return
     end
     if ~isfile(string(block.DialogPrm(1).Data))
         error('CIGRE:cigreDLLSFunction:DLLNotFound', ...
