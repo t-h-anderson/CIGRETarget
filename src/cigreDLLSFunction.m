@@ -1,10 +1,9 @@
 function cigreDLLSFunction(block)
 % CIGREDRLLSFUNCTION  Level-2 MATLAB S-Function that executes a CIGRE DLL.
 %
-% This file is generated once and is shared by every CIGRE DLL block
-% created by cigre.importDLL.  The DLL identity and tunable parameter
-% values are stored as block dialog parameters (see Dialog Parameters
-% section below).
+% This file is shared by every CIGRE DLL block created by cigre.importDLL.
+% The DLL identity and tunable parameter values are stored as block dialog
+% parameters (see Dialog Parameters below).
 %
 % Dialog Parameters
 % -----------------
@@ -15,13 +14,14 @@ function cigreDLLSFunction(block)
 %
 % Simulation Phases
 % -----------------
-%   setup()  – loads the DLL, calls Model_GetInfo(), configures input /
-%              output ports and sample time, then unloads the DLL.
-%   Start()  – reloads the DLL, packs parameters, creates an
-%              InterfaceInstance, calls Model_FirstCall and
-%              Model_Initialize, stores state in SimUserData.
-%   Outputs()– packs input port data, calls Model_Outputs, unpacks
-%              output port data.
+%   setup()     – reads model info via the cigre_read_model_info MEX
+%                 (no loadlibrary required here), then configures input /
+%                 output ports and sample time.
+%   Start()     – loads the DLL via loadlibrary, creates an
+%                 InterfaceInstance, calls Model_FirstCall and
+%                 Model_Initialize, stores state in UserData.
+%   Outputs()   – packs input port data, calls Model_Outputs, unpacks
+%                 output port data.
 %   Terminate() – calls Model_Terminate and unloads the DLL.
 
     setup(block);
@@ -32,18 +32,10 @@ end
 % ======================================================================= %
 function setup(block)
 
-    % The first two dialog params are always DLL path and header path.
-    % Any additional params are CIGRE parameter values.
-    block.NumDialogPrms = block.NumDialogPrms; % keep existing count
+    dllPath = string(block.DialogPrm(1).Data);
 
-    dllPath    = string(block.DialogPrm(1).Data);
-    headerPath = string(block.DialogPrm(2).Data);
-
-    % ---- Load DLL temporarily to read model info ---- %
-    alias = loadDLLForInfo(dllPath, headerPath);
-    cleanupLib = onCleanup(@() unloadIfLoaded(alias));
-
-    info = cigre.importer.ModelInfo.fromLoadedDLL(alias);
+    % Read model info via MEX — no loadlibrary required in setup.
+    info = cigre.importer.ModelInfo.fromDLL(dllPath);
 
     % ---- Configure sample time ---- %
     if info.SampleTime > 0
@@ -112,16 +104,14 @@ function Start(block)
     dllPath    = string(block.DialogPrm(1).Data);
     headerPath = string(block.DialogPrm(2).Data);
 
-    % Load DLL for simulation (unique alias per block instance)
-    alias = loadDLLForInfo(dllPath, headerPath);
+    % Read model info (MEX, no loadlibrary needed)
+    info = cigre.importer.ModelInfo.fromDLL(dllPath);
 
-    % Re-read model info to know types/widths
-    info = cigre.importer.ModelInfo.fromLoadedDLL(alias);
+    % Load DLL for simulation via loadlibrary with a unique alias
+    alias = loadDLLForSim(dllPath, headerPath);
 
-    % Build initial zero inputs (correctly typed)
-    inputs = buildZeroSignals(info.Inputs);
-
-    % Build initial zero outputs (correctly typed)
+    % Build initial zero inputs/outputs (correctly typed)
+    inputs  = buildZeroSignals(info.Inputs);
     outputs = buildZeroSignals(info.Outputs);
 
     % Build parameters from dialog params 3..N+2
@@ -130,9 +120,9 @@ function Start(block)
     % Create InterfaceInstance (packs inputs/outputs/params into byte buffers)
     instance = cigre.dll.InterfaceInstance(inputs, outputs, parameters);
 
-    % Create CigreDLL using the already-loaded alias
+    % Wrap in CigreDLL pointing at the already-loaded alias
     dll = cigre.dll.CigreDLL(dllPath, 'Header', headerPath);
-    dll.Name_  = alias;   % point at the already-loaded library
+    dll.Name_    = alias;
     dll.IsLoaded = true;
 
     % Lifecycle calls
@@ -201,11 +191,13 @@ end
 %  Helper functions
 % ======================================================================= %
 
-function alias = loadDLLForInfo(dllPath, headerPath)
-% Load the DLL with a unique alias.  Returns the alias string.
+function alias = loadDLLForSim(dllPath, headerPath)
+% Load the CIGRE DLL for simulation via loadlibrary.
+% Returns the unique library alias string.
     cigreSrc = fullfile(cigreRoot(), 'src', 'CIGRESource');
-    alias    = "cigredll_" + matlab.lang.makeValidName(fileparts(dllPath)) ...
-               + "_" + cigre.util.uuid();
+    [~, base] = fileparts(dllPath);
+    alias = "cigredll_" + matlab.lang.makeValidName(base) ...
+            + "_" + cigre.util.uuid();
     unloadIfLoaded(alias);
     loadlibrary(char(dllPath), char(headerPath), ...
         'includepath', cigreSrc, ...
@@ -263,13 +255,16 @@ end
 function id = cigreTypeToSimulinkID(cigreDataType)
 % Map CIGRE DataType enum value to Simulink DatatypeID (integer).
 %   double=0, single=1, int8=2, uint8=3, int16=4, uint16=5, int32=6, uint32=7
-    slType = cigre.importer.ModelInfo.cigreTypeToSimulink(cigreDataType);
-    typeMap = dictionary( ...
-        ["double","single","int8","uint8","int16","uint16","int32","uint32"], ...
-        [0, 1, 2, 3, 4, 5, 6, 7]);
-    if typeMap.isKey(slType)
-        id = typeMap(slType);
-    else
-        id = 0; % default to double
+    slType = char(cigre.importer.ModelInfo.cigreTypeToSimulink(cigreDataType));
+    switch slType
+        case 'double',  id = 0;
+        case 'single',  id = 1;
+        case 'int8',    id = 2;
+        case 'uint8',   id = 3;
+        case 'int16',   id = 4;
+        case 'uint16',  id = 5;
+        case 'int32',   id = 6;
+        case 'uint32',  id = 7;
+        otherwise,      id = 0;
     end
 end
