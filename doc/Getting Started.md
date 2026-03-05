@@ -13,7 +13,7 @@ This guide walks you through installing the CIGRE Toolbox, setting up your compi
 5. [Checking the Model](#5-checking-the-model)
 6. [Building a CIGRE DLL](#6-building-a-cigre-dll)
 7. [Parameter Override](#7-parameter-override)
-8. [Importing a CIGRE DLL into Simulink](#8-importing-a-cigre-dll-into-simulink)
+8. [Importing a CIGRE DLL into Simulink (Prototype)](#8-importing-a-cigre-dll-into-simulink-prototype)
 9. [Running a CIGRE DLL in MATLAB](#9-running-a-cigre-dll-in-matlab)
 
 ---
@@ -43,6 +43,8 @@ mex -setup C
 
 The CIGRE Toolbox is distributed as a MATLAB Toolbox file (`.mltbx`). Because this file is generated from the source project, you must create it before installing.
 
+*NOTE*: **DO NOT** install the toolbox if you are developing the target. This will cause conflicts.
+
 ### 2.1 Generate the `.mltbx` file
 
 1. In MATLAB, select **Open > Project** and open **`CIGRE.prj`** from the repository root.
@@ -69,21 +71,21 @@ CIGRE needs to know which compiler to use when building DLLs. Run `cigre.install
 ### Visual Studio
 
 ```matlab
-cigre.install('Toolchain', 'Visual C++ 2017')
+cigre.install(Toolchain="Visual C++ 2017")
 ```
 
-Replace `'Visual C++ 2017'` with the version you have installed:
+Replace `"Visual C++ 2017"` with the version you have installed:
 
 | Visual Studio version | `Toolchain` argument |
 |---|---|
-| Visual Studio 2017 | `'Visual C++ 2017'` |
-| Visual Studio 2019 | `'Visual C++ 2019'` |
-| Visual Studio 2022 | `'Visual C++ 2022'` |
+| Visual Studio 2017 | `"Visual C++ 2017"` |
+| Visual Studio 2019 | `"Visual C++ 2019"` |
+| Visual Studio 2022 | `"Visual C++ 2022"` |
 
 ### MinGW
 
 ```matlab
-cigre.install('Toolchain', 'MinGW')
+cigre.install(Toolchain="MinGW")
 ```
 
 ### Registering a specific bit-width
@@ -91,11 +93,11 @@ cigre.install('Toolchain', 'MinGW')
 By default, both 32-bit and 64-bit toolchain entries are registered. To register only one:
 
 ```matlab
-cigre.install('Toolchain', 'MinGW', 'Type', '64')   % 64-bit only
-cigre.install('Toolchain', 'MinGW', 'Type', '32')   % 32-bit only
+cigre.install(Toolchain="MinGW", Type="64")   % 64-bit only
+cigre.install(Toolchain="MinGW", Type="32")   % 32-bit only
 ```
 
-> **Note:** Earlier documentation referred to a `'VSVersion'` argument — this is incorrect. The current parameter name is `'Toolchain'`.
+> **Note:** Earlier documentation referred to a `'VSVersion'` argument — this is incorrect. The current parameter name is `Toolchain`.
 
 ---
 
@@ -118,7 +120,7 @@ The model must use a **fixed-step** solver. Configure this under **Solver** in M
 Run the CIGRE Model Advisor checks to verify that your model conforms to the CIGRE requirements:
 
 ```matlab
-cigre.checkModel('MyModel')
+cigre.checkModel("MyModel")
 ```
 
 A report opens showing which checks pass or fail. Address any failures before proceeding to build. Common issues include incorrect interface types, virtual bus usage, or missing trigger subsystems.
@@ -130,7 +132,7 @@ A report opens showing which checks pass or fail. Address any failures before pr
 ### Basic build
 
 ```matlab
-[desc, dll] = cigre.buildDLL('MyModel')
+[desc, dll] = cigre.buildDLL("MyModel")
 ```
 
 This generates `MyModel_CIGRE.dll` (and an associated `.h` header) in the current Simulink code generation folder.
@@ -143,7 +145,7 @@ This generates `MyModel_CIGRE.dll` (and an associated `.h` header) in the curren
 ### Specifying an output folder
 
 ```matlab
-cigre.buildDLL('MyModel', 'CodeGenFolder', 'C:\output\MyModel')
+cigre.buildDLL("MyModel", CodeGenFolder="C:\output\MyModel")
 ```
 
 ### Generating code without compiling
@@ -151,7 +153,7 @@ cigre.buildDLL('MyModel', 'CodeGenFolder', 'C:\output\MyModel')
 Use `SkipBuild` to run only the code generation step (useful with Visual Studio manual builds or CI pipelines that compile separately):
 
 ```matlab
-cigre.buildDLL('MyModel', 'SkipBuild', true)
+cigre.buildDLL("MyModel", SkipBuild=true)
 ```
 
 ### Bus signal handling
@@ -159,8 +161,8 @@ cigre.buildDLL('MyModel', 'SkipBuild', true)
 When the model has bus signals on its interface, use `BusAs` to control how they are flattened:
 
 ```matlab
-cigre.buildDLL('MyModel', 'BusAs', 'Vector')   % default — flatten to vector
-cigre.buildDLL('MyModel', 'BusAs', 'Ports')    % one port per bus element
+cigre.buildDLL("MyModel", BusAs="Vector")   % default — flatten to vector
+cigre.buildDLL("MyModel", BusAs="Ports")    % one port per bus element
 ```
 
 ### Preserving the wrapper model
@@ -168,7 +170,7 @@ cigre.buildDLL('MyModel', 'BusAs', 'Ports')    % one port per bus element
 By default the intermediate wrapper model (used to flatten buses) is deleted after the build. To keep it:
 
 ```matlab
-cigre.buildDLL('MyModel', 'PreserveWrapper', true)
+cigre.buildDLL("MyModel", PreserveWrapper=true)
 ```
 
 ---
@@ -205,26 +207,28 @@ In this example:
 - `InternalGain` is hidden and hard-coded as `100.0` inside the DLL
 - `DeadBand` is hidden using the value from the model
 
-Parameters that do not appear in the spreadsheet are treated as **visible** with their model defaults.
+Parameters that do not appear in the spreadsheet are treated as **visible** with default values taken from Simulink.
 
 ### Passing the configuration file to `buildDLL`
 
 ```matlab
-cigre.buildDLL('MyModel', 'ParameterConfigFile', 'ParameterConfig.xlsx')
+cigre.buildDLL("MyModel", ParameterConfigFile="ParameterConfig.xlsx")
 ```
 
 Place the `.xlsx` file alongside the model or provide an absolute path.
 
 ---
 
-## 8. Importing a CIGRE DLL into Simulink
+## 8. Importing a CIGRE DLL into Simulink (Prototype)
+
+*Note*: This is a prototype under development so may be unstable.
 
 `cigre.importDLL` reads the metadata from any IEEE CIGRE-compliant DLL and creates a Simulink model containing a pre-configured block.
 
 ### Basic import
 
 ```matlab
-modelPath = cigre.importDLL('MyController.dll')
+modelPath = cigre.importDLL("MyController.dll")
 ```
 
 MATLAB reads the DLL's `Model_GetInfo()` function to discover:
@@ -238,16 +242,14 @@ A Simulink model is created and opened automatically.
 ### Specifying options
 
 ```matlab
-modelPath = cigre.importDLL('MyController.dll', ...
-    'Header',       'C:\dlls\MyController.h', ...
-    'OutputFolder', 'C:\models',              ...
-    'BlockName',    'MyControllerBlock',       ...
-    'OpenModel',    false)
+modelPath = cigre.importDLL("MyController.dll", ...
+    OutputFolder="C:\models", ...
+    BlockName="MyControllerBlock", ...
+    OpenModel=false)
 ```
 
 | Option | Default | Description |
 |---|---|---|
-| `Header` | Same-named `.h` next to DLL | Path to the DLL header file |
 | `OutputFolder` | Current directory | Where the generated `.slx` is saved |
 | `BlockName` | Derived from DLL `ModelName` | Name for the block and the Simulink model |
 | `OpenModel` | `true` | Open the model in Simulink after creation |
@@ -269,16 +271,16 @@ For testing or scripted validation outside of Simulink, use the `cigre.dll` clas
 
 ```matlab
 % Load the DLL
-dll = cigre.dll.CigreDLL('MyModel_CIGRE');
+dll = cigre.dll.CigreDLL("MyModel_CIGRE");
 cleanObj = dll.load();   % cleanObj unloads the DLL when it goes out of scope
 
 % Create an interface instance with input data, output structure, and parameters
-params = struct('Name', {'Kp', 'Ki'}, 'Value', {1.0, 0.5});
+params = struct("Name", {"Kp", "Ki"}, "Value", {1.0, 0.5});
 instance = cigre.dll.InterfaceInstance(inputCell, outputStruct, params);
 
 % Initialise and step
 dll.initialise(instance);
-result = dll.run(instance, 'NSteps', 10);
+result = dll.run(instance, NSteps=10);
 ```
 
 See the test file `test/+test/+system/tGenerateCigre.m` for a complete example.
@@ -289,7 +291,7 @@ See the test file `test/+test/+system/tGenerateCigre.m` for a complete example.
 
 | Function | Description |
 |---|---|
-| `cigre.install('Toolchain', name)` | Register a compiler toolchain (run once) |
+| `cigre.install(Toolchain=name)` | Register a compiler toolchain (run once) |
 | `cigre.checkModel(model)` | Run CIGRE compliance checks via Model Advisor |
 | `cigre.buildDLL(model, ...)` | Generate a CIGRE-compliant DLL from a Simulink model |
 | `cigre.importDLL(dllPath, ...)` | Import a CIGRE DLL as a Simulink block |

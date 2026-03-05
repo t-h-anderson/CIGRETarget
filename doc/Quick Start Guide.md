@@ -17,6 +17,8 @@
 4. Double-click `CIGRE.mltbx` inside MATLAB to install
 5. **Close the MATLAB project** before continuing
 
+*NOTE*: **DO NOT** install the toolbox if you are developing the target. This will cause conflicts.
+
 ---
 
 ## Step 2 — Register Your Compiler
@@ -25,14 +27,13 @@ Run one of the following in the MATLAB Command Window:
 
 ```matlab
 % Visual Studio
-cigre.install('Toolchain', 'Visual C++ 2017')   % or 2019 / 2022
+cigre.install(Toolchain="Visual C++ 2017")   % or 2019 / 2022
 
 % MinGW
-cigre.install('Toolchain', 'MinGW')
+cigre.install(Toolchain="MinGW")
 ```
 
-> **Note:** The parameter is `'Toolchain'`, not `'VSVersion'`.
-> To register only 64-bit: add `'Type', '64'` to the call.
+> To register only 64-bit: add `Type="64"` to the call.
 
 ---
 
@@ -44,7 +45,7 @@ cigre.install('Toolchain', 'MinGW')
 4. (Optional) Run the CIGRE compliance check:
 
 ```matlab
-cigre.checkModel('MyModel')
+cigre.checkModel("MyModel")
 ```
 
 ---
@@ -52,7 +53,7 @@ cigre.checkModel('MyModel')
 ## Step 4 — Build the CIGRE DLL
 
 ```matlab
-[desc, dll] = cigre.buildDLL('MyModel')
+[desc, dll] = cigre.buildDLL("MyModel")
 ```
 
 On success, `MyModel_CIGRE.dll` appears in the code generation folder.
@@ -61,21 +62,23 @@ On success, `MyModel_CIGRE.dll` appears in the code generation folder.
 
 ```matlab
 % Specify an output folder
-cigre.buildDLL('MyModel', 'CodeGenFolder', 'C:\output')
+cigre.buildDLL("MyModel", CodeGenFolder="C:\output")
 
 % Generate code only (no compile step)
-cigre.buildDLL('MyModel', 'SkipBuild', true)
+cigre.buildDLL("MyModel", SkipBuild=true)
 
 % Control parameter visibility
-cigre.buildDLL('MyModel', 'ParameterConfigFile', 'ParameterConfig.xlsx')
+cigre.buildDLL("MyModel", ParameterConfigFile="ParameterConfig.xlsx")
 ```
 
 ---
 
-## Step 5 — (Optional) Import a CIGRE DLL into Simulink
+## Step 5 — (Optional) Import a CIGRE DLL into Simulink (Prototype)
+
+*Note*: This is a prototype under development so may be unstable.
 
 ```matlab
-cigre.importDLL('MyController.dll')
+cigre.importDLL("MyController.dll")
 ```
 
 This generates a Simulink model with a masked block that wraps the DLL. Inputs, outputs, and parameters are configured automatically from the DLL metadata.
@@ -94,6 +97,7 @@ Create `ParameterConfig.xlsx` to control which model parameters are exposed in t
 
 - `IsVisible = 0` hard-codes the parameter inside the DLL (not tunable at runtime)
 - `OverrideDefault` replaces the model's default value when the DLL is built
+- Parameters absent from the spreadsheet are visible with default values taken from Simulink
 
 ---
 
@@ -101,10 +105,10 @@ Create `ParameterConfig.xlsx` to control which model parameters are exposed in t
 
 | Compiler | `Toolchain` argument |
 |---|---|
-| Visual Studio 2017 | `'Visual C++ 2017'` |
-| Visual Studio 2019 | `'Visual C++ 2019'` |
-| Visual Studio 2022 | `'Visual C++ 2022'` |
-| MinGW-w64 | `'MinGW'` |
+| Visual Studio 2017 | `"Visual C++ 2017"` |
+| Visual Studio 2019 | `"Visual C++ 2019"` |
+| Visual Studio 2022 | `"Visual C++ 2022"` |
+| MinGW-w64 | `"MinGW"` |
 
 ---
 
