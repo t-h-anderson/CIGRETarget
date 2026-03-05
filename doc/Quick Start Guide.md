@@ -11,13 +11,9 @@
 
 ## Step 1 — Install the Toolbox
 
-1. Open MATLAB and select **Open > Project** (`CIGRE.prj`)
-2. In the project, open **`ToolboxPackagingConfiguration.prj`**
-3. Click **Package** — this produces `CIGRE.mltbx`
-4. Double-click `CIGRE.mltbx` inside MATLAB to install
-5. **Close the MATLAB project** before continuing
-
-*NOTE*: **DO NOT** install the toolbox if you are developing the target. This will cause conflicts.
+1. In the repository, open the `releases/` folder
+2. Double-click the latest **`.mltbx`** file (e.g. `Simulink to CIGRE Export Tool 2.0.mltbx`) inside MATLAB to install
+3. Click **Install** in the installation dialog
 
 ---
 
@@ -116,7 +112,7 @@ Create `ParameterConfig.xlsx` to control which model parameters are exposed in t
 
 | Problem | Solution |
 |---|---|
-| `mltbx` file not in repo | Generate it from `ToolboxPackagingConfiguration.prj` (Step 1) |
+| `mltbx` file not found | Check the `releases/` folder in the repository root |
 | `cigre.install` fails | Run `mex -setup C` and confirm your compiler is installed |
 | `cigre.tlc` target missing | Toolbox must be installed and project must be closed before building |
 | MEX compile error on first `importDLL` | Run `mex -setup C` to configure a C compiler for MEX |

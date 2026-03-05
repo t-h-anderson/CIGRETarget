@@ -41,26 +41,11 @@ mex -setup C
 
 ## 2. Installing the Toolbox
 
-The CIGRE Toolbox is distributed as a MATLAB Toolbox file (`.mltbx`). Because this file is generated from the source project, you must create it before installing.
+Pre-built releases of the CIGRE Toolbox are provided as MATLAB Toolbox files (`.mltbx`) in the `releases/` folder of the repository.
 
-*NOTE*: **DO NOT** install the toolbox if you are developing the target. This will cause conflicts.
-
-### 2.1 Generate the `.mltbx` file
-
-1. In MATLAB, select **Open > Project** and open **`CIGRE.prj`** from the repository root.
-2. Inside the project, open **`ToolboxPackagingConfiguration.prj`** (also in the repository root).
-3. Click **Package**. MATLAB generates `CIGRE.mltbx` in the repository root folder.
-
-### 2.2 Install the toolbox
-
-4. Double-click **`CIGRE.mltbx`** in the MATLAB Current Folder browser (or from the File Explorer).
-5. MATLAB opens an installation dialog — click **Install**.
-
-### 2.3 Close the project
-
-6. **Close the MATLAB project** (`CIGRE.prj`) before using the toolbox functions.
-
-> **Important:** The toolbox must be installed and the project closed before running `cigre.install`, `cigre.buildDLL`, or any other `cigre.*` functions. Leaving the project open can shadow the installed toolbox.
+1. In the repository, open the **`releases/`** folder.
+2. Double-click the latest **`.mltbx`** file (e.g. `Simulink to CIGRE Export Tool 2.0.mltbx`) in the MATLAB Current Folder browser or File Explorer.
+3. MATLAB opens an installation dialog — click **Install**.
 
 ---
 
