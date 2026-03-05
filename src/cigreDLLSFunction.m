@@ -103,18 +103,18 @@ end
 %  CheckParameters / ProcessParameters
 % ======================================================================= %
 function CheckParameters(block) %#ok<DEFNU>
-    if block.NumDialogPrms < 2
-        error('CIGRE:cigreDLLSFunction:BadParams', ...
-            'Block requires at least 2 dialog parameters (DLLPath, HeaderPath).');
-    end
-    if ~isfile(string(block.DialogPrm(1).Data))
-        error('CIGRE:cigreDLLSFunction:DLLNotFound', ...
-            'CIGRE DLL not found: %s', block.DialogPrm(1).Data);
-    end
-    if ~isfile(string(block.DialogPrm(2).Data))
-        error('CIGRE:cigreDLLSFunction:HeaderNotFound', ...
-            'CIGRE DLL header not found: %s', block.DialogPrm(2).Data);
-    end
+    % if block.NumDialogPrms < 2
+    %     error('CIGRE:cigreDLLSFunction:BadParams', ...
+    %         'Block requires at least 2 dialog parameters (DLLPath, HeaderPath).');
+    % end
+    % if ~isfile(string(block.DialogPrm(1).Data))
+    %     error('CIGRE:cigreDLLSFunction:DLLNotFound', ...
+    %         'CIGRE DLL not found: %s', block.DialogPrm(1).Data);
+    % end
+    % if ~isfile(string(block.DialogPrm(2).Data))
+    %     error('CIGRE:cigreDLLSFunction:HeaderNotFound', ...
+    %         'CIGRE DLL header not found: %s', block.DialogPrm(2).Data);
+    % end
 end
 
 function ProcessParameters(block) %#ok<DEFNU>

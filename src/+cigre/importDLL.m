@@ -210,19 +210,19 @@ function paramVarNames = applyMask(blockPath, info, dllPath, headerPath)
     mask = Simulink.Mask.create(char(blockPath));
 
     % Description panel
-    descLines = {"CIGRE DLL Block", ""};
+    descLines = ["CIGRE DLL Block", ""];
     if info.Name ~= ""
-        descLines{end+1} = sprintf("Model   : %s", info.Name);
+        descLines(end+1) = sprintf("Model   : %s", info.Name);
     end
     if info.Version ~= ""
-        descLines{end+1} = sprintf("Version : %s", info.Version);
+        descLines(end+1) = sprintf("Version : %s", info.Version);
     end
     if info.SampleTime > 0
-        descLines{end+1} = sprintf("Ts      : %g s", info.SampleTime);
+        descLines(end+1) = sprintf("Ts      : %g s", info.SampleTime);
     end
     if strtrim(info.Description) ~= ""
-        descLines{end+1} = "";
-        descLines{end+1} = char(info.Description);
+        descLines(end+1) = "";
+        descLines(end+1) = char(info.Description);
     end
     mask.Description = strjoin(descLines, newline);
 
@@ -288,14 +288,14 @@ function paramVarNames = applyMask(blockPath, info, dllPath, headerPath)
     end
 
     % ---- Port labels on block icon ---- %
-    displayLines = {};
+    displayLines = string.empty(1,0);
     for i = 1:numel(info.Inputs)
         lbl = strrep(char(string(info.Inputs(i).Name)), "'", "''");
-        displayLines{end+1} = sprintf("port_label('input',%d,'%s')", i, lbl); %#ok<AGROW>
+        displayLines(end+1) = sprintf("port_label('input',%d,'%s')", i, lbl); %#ok<AGROW>
     end
     for i = 1:numel(info.Outputs)
         lbl = strrep(char(string(info.Outputs(i).Name)), "'", "''");
-        displayLines{end+1} = sprintf("port_label('output',%d,'%s')", i, lbl); %#ok<AGROW>
+        displayLines(end+1) = sprintf("port_label('output',%d,'%s')", i, lbl); %#ok<AGROW>
     end
     if ~isempty(displayLines)
         mask.Display = strjoin(displayLines, newline);
