@@ -7,7 +7,7 @@
     <param.summary />
     <param.description>Enables developers to create CIGRE compatible DLLs from Simulink models</param.description>
     <param.screenshot>${PROJECT_ROOT}\src\resources\Logo.png</param.screenshot>
-    <param.version>1.2</param.version>
+    <param.version>2.0</param.version>
     <param.output>${PROJECT_ROOT}\Simulink to CIGRE Export Tool.mltbx</param.output>
     <param.products.name />
     <param.products.id />
@@ -33,20 +33,31 @@
 % All files matching a pattern in all subfolders of the toolbox folder:
 % **/*.bak
 %
+
+% Project
 resources/project/*
 .SimulinkProject/*
 _SimulinkProject/*
-resources/.Project/*
-resources/_Project/*
+resources
 **/*.prj
+*.mlproj
+ToolboxPackaging*
+
+% git files
 **/.git
+**/.git*
+gitlab-ci.yml
+
+% Temp files
 **/*.asv
-**/*Toolchain VS*.mat
-CIGRE DLL Manual Proof of Concept Findings.docx
-InterOpera.docx
-slprj
-test/VS_Build
-work</param.exclude.filters>
+
+% Generated code
+**/slprj/
+
+% Tests
+test
+
+releases</param.exclude.filters>
     <param.exclude.pcodedmfiles>true</param.exclude.pcodedmfiles>
     <param.examples />
     <param.demosxml />
@@ -107,15 +118,9 @@ work</param.exclude.filters>
       <file>${PROJECT_ROOT}</file>
     </fileset.rootdir>
     <fileset.rootfiles>
-      <file>${PROJECT_ROOT}\.gitattributes</file>
-      <file>${PROJECT_ROOT}\.gitignore</file>
-      <file>${PROJECT_ROOT}\CIGRE.mlproj</file>
       <file>${PROJECT_ROOT}\doc</file>
-      <file>${PROJECT_ROOT}\gitlab-ci.yml</file>
       <file>${PROJECT_ROOT}\README.md</file>
-      <file>${PROJECT_ROOT}\resources</file>
       <file>${PROJECT_ROOT}\src</file>
-      <file>${PROJECT_ROOT}\test</file>
     </fileset.rootfiles>
     <fileset.depfun.included />
     <fileset.depfun.excluded />
@@ -125,11 +130,12 @@ work</param.exclude.filters>
     </build-deliverables>
     <workflow />
     <matlab>
-      <root>C:\Program Files\MATLAB\R2024b</root>
+      <root>C:\Program Files\MATLAB\R2023b</root>
       <toolboxes>
         <toolbox name="matlabcoder" />
         <toolbox name="embeddedcoder" />
         <toolbox name="fixedpoint" />
+        <toolbox name="neuralnetwork" />
       </toolboxes>
       <toolbox>
         <matlabcoder>
@@ -145,6 +151,11 @@ work</param.exclude.filters>
         <fixedpoint>
           <enabled>true</enabled>
         </fixedpoint>
+      </toolbox>
+      <toolbox>
+        <neuralnetwork>
+          <enabled>true</enabled>
+        </neuralnetwork>
       </toolbox>
     </matlab>
     <platform>
