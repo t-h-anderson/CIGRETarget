@@ -43,7 +43,7 @@ function [modelPath, info] = importDLL(dllPath, nvp)
 
     arguments
         dllPath          (1,1) string
-        nvp.Header       (1,1) string  = string(missing)
+        nvp.Header       (1,1) string  = fullfile(cigreRoot, "src", "CIGRESource", "IEEE_Cigre_DLLInterface.h")
         nvp.OutputFolder (1,1) string  = string(pwd)
         nvp.BlockName    (1,1) string  = string(missing)
         nvp.OpenModel    (1,1) logical = true

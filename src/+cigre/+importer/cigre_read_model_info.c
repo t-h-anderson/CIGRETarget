@@ -32,8 +32,9 @@
  *   - Windows only (uses LoadLibrary / GetProcAddress).
  *   - The DLL is loaded and immediately freed; it does NOT remain resident.
  *   - Parameter union values (DefaultValue / MinValue / MaxValue) are read
- *     as real64_T (the largest scalar member).  The caller re-casts to the
- *     declared DataType if required.
+ *     using the union member that matches the declared DataType, then cast
+ *     to double.  For c_string_T parameters DefaultValue is returned as a
+ *     MATLAB string; MinValue and MaxValue are returned as 0.
  */
 
 #include "mex.h"
@@ -87,6 +88,42 @@ static mxArray* buildSignalArray(
     return arr;
 }
 
+/* Read a DefaultValueU union into a double using the correct member for dt. */
+static double readDefaultValue(const union DefaultValueU* u,
+                               enum IEEE_Cigre_DLLInterface_DataType dt)
+{
+    switch (dt) {
+        case IEEE_Cigre_DLLInterface_DataType_char_T:   return (double)u->Char_Val;
+        case IEEE_Cigre_DLLInterface_DataType_int8_T:   return (double)u->Int8_Val;
+        case IEEE_Cigre_DLLInterface_DataType_uint8_T:  return (double)u->Uint8_Val;
+        case IEEE_Cigre_DLLInterface_DataType_int16_T:  return (double)u->Int16_Val;
+        case IEEE_Cigre_DLLInterface_DataType_uint16_T: return (double)u->Uint16_Val;
+        case IEEE_Cigre_DLLInterface_DataType_int32_T:  return (double)u->Int32_Val;
+        case IEEE_Cigre_DLLInterface_DataType_uint32_T: return (double)u->Uint32_Val;
+        case IEEE_Cigre_DLLInterface_DataType_real32_T: return (double)u->Real32_Val;
+        case IEEE_Cigre_DLLInterface_DataType_real64_T: return (double)u->Real64_Val;
+        default:                                        return 0.0;
+    }
+}
+
+/* Read a MinMaxValueU union into a double using the correct member for dt. */
+static double readMinMaxValue(const union MinMaxValueU* u,
+                              enum IEEE_Cigre_DLLInterface_DataType dt)
+{
+    switch (dt) {
+        case IEEE_Cigre_DLLInterface_DataType_char_T:   return (double)u->Char_Val;
+        case IEEE_Cigre_DLLInterface_DataType_int8_T:   return (double)u->Int8_Val;
+        case IEEE_Cigre_DLLInterface_DataType_uint8_T:  return (double)u->Uint8_Val;
+        case IEEE_Cigre_DLLInterface_DataType_int16_T:  return (double)u->Int16_Val;
+        case IEEE_Cigre_DLLInterface_DataType_uint16_T: return (double)u->Uint16_Val;
+        case IEEE_Cigre_DLLInterface_DataType_int32_T:  return (double)u->Int32_Val;
+        case IEEE_Cigre_DLLInterface_DataType_uint32_T: return (double)u->Uint32_Val;
+        case IEEE_Cigre_DLLInterface_DataType_real32_T: return (double)u->Real32_Val;
+        case IEEE_Cigre_DLLInterface_DataType_real64_T: return (double)u->Real64_Val;
+        default:                                        return 0.0;
+    }
+}
+
 static mxArray* buildParameterArray(
     const IEEE_Cigre_DLLInterface_Parameter* params, int32_T n)
 {
@@ -105,20 +142,32 @@ static mxArray* buildParameterArray(
     if (arr == NULL) return mxCreateStructMatrix(1, 0, 9, fields);
 
     for (i = 0; i < n; i++) {
-        /* Read union value as real64_T (largest scalar member). */
-        double defVal = (double)params[i].DefaultValue.Real64_Val;
-        double minVal = (double)params[i].MinValue.Real64_Val;
-        double maxVal = (double)params[i].MaxValue.Real64_Val;
+        enum IEEE_Cigre_DLLInterface_DataType dt = params[i].DataType;
+        mxArray* defMx;
+        double minVal, maxVal;
+
+        /* c_string_T: DefaultValue is a char pointer; min/max not applicable. */
+        if (dt == IEEE_Cigre_DLLInterface_DataType_c_string_T) {
+            const char_T* s = params[i].DefaultValue.Char_Ptr;
+            defMx  = mxCreateString((s != NULL) ? s : "");
+            minVal = 0.0;
+            maxVal = 0.0;
+        } else {
+            defMx  = mxCreateDoubleScalar(
+                         readDefaultValue(&params[i].DefaultValue, dt));
+            minVal = readMinMaxValue(&params[i].MinValue, dt);
+            maxVal = readMinMaxValue(&params[i].MaxValue, dt);
+        }
 
         mxSetField(arr, (mwIndex)i, "Name",         makeString(params[i].Name));
         mxSetField(arr, (mwIndex)i, "GroupName",    makeString(params[i].GroupName));
         mxSetField(arr, (mwIndex)i, "Description",  makeString(params[i].Description));
         mxSetField(arr, (mwIndex)i, "Unit",         makeString(params[i].Unit));
         mxSetField(arr, (mwIndex)i, "DataType",
-            mxCreateDoubleScalar((double)params[i].DataType));
+            mxCreateDoubleScalar((double)dt));
         mxSetField(arr, (mwIndex)i, "FixedValue",
             mxCreateDoubleScalar((double)params[i].FixedValue));
-        mxSetField(arr, (mwIndex)i, "DefaultValue", mxCreateDoubleScalar(defVal));
+        mxSetField(arr, (mwIndex)i, "DefaultValue", defMx);
         mxSetField(arr, (mwIndex)i, "MinValue",     mxCreateDoubleScalar(minVal));
         mxSetField(arr, (mwIndex)i, "MaxValue",     mxCreateDoubleScalar(maxVal));
     }

@@ -103,18 +103,19 @@ end
 %  CheckParameters / ProcessParameters
 % ======================================================================= %
 function CheckParameters(block) %#ok<DEFNU>
-    % if block.NumDialogPrms < 2
-    %     error('CIGRE:cigreDLLSFunction:BadParams', ...
-    %         'Block requires at least 2 dialog parameters (DLLPath, HeaderPath).');
-    % end
-    % if ~isfile(string(block.DialogPrm(1).Data))
-    %     error('CIGRE:cigreDLLSFunction:DLLNotFound', ...
-    %         'CIGRE DLL not found: %s', block.DialogPrm(1).Data);
-    % end
-    % if ~isfile(string(block.DialogPrm(2).Data))
-    %     error('CIGRE:cigreDLLSFunction:HeaderNotFound', ...
-    %         'CIGRE DLL header not found: %s', block.DialogPrm(2).Data);
-    % end
+    % Guard: during the first setup() pass (before the mask is applied)
+    % NumDialogPrms is 0.  Nothing to check yet.
+    if block.NumDialogPrms < 2
+        return
+    end
+    if ~isfile(string(block.DialogPrm(1).Data))
+        error('CIGRE:cigreDLLSFunction:DLLNotFound', ...
+            'CIGRE DLL not found: %s', block.DialogPrm(1).Data);
+    end
+    if ~isfile(string(block.DialogPrm(2).Data))
+        error('CIGRE:cigreDLLSFunction:HeaderNotFound', ...
+            'CIGRE DLL header not found: %s', block.DialogPrm(2).Data);
+    end
 end
 
 function ProcessParameters(block) %#ok<DEFNU>
@@ -159,7 +160,7 @@ function Start(block)
     userData.dll      = dll;
     userData.instance = instance;
     userData.info     = info;
-    block.UserData    = userData;
+    set_param(block.BlockHandle, "UserData", userData)
 end
 
 % ======================================================================= %
@@ -167,7 +168,7 @@ end
 % ======================================================================= %
 function Outputs(block)
 
-    userData = block.UserData;
+    userData = get_param(block.BlockHandle, "UserData");
     instance = userData.instance;
     dll      = userData.dll;
     info     = userData.info;
@@ -195,7 +196,7 @@ end
 % ======================================================================= %
 function Terminate(block)
 
-    userData = block.UserData;
+    userData = get_param(block.BlockHandle, "UserData");
     if isempty(userData)
         return
     end
@@ -209,7 +210,7 @@ function Terminate(block)
     end
 
     dll.unload();
-    block.UserData = [];
+    set_param(block.BlockHandle, "UserData", userData);
 end
 
 % ======================================================================= %
