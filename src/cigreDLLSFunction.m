@@ -32,10 +32,19 @@ end
 % ======================================================================= %
 function setup(block)
 
-    dllPath = string(block.DialogPrm(1).Data);
+    % Level-2 S-Functions must set block.NumDialogPrms before accessing any
+    % block.DialogPrm(i).  Our count is variable (2 fixed paths plus one per
+    % CIGRE parameter), so we read the DLL path from the mask workspace —
+    % available immediately via get_param, before the parameter count is
+    % declared — call fromDLL() to learn how many CIGRE parameters there are,
+    % then declare the total count.
+    dllPath = readDLLPathFromMask(block);
 
     % Read model info via MEX — no loadlibrary required in setup.
     info = cigre.importer.ModelInfo.fromDLL(dllPath);
+
+    % Declare parameter count: 2 fixed (DLLPath, HeaderPath) + one per param.
+    block.NumDialogPrms = 2 + numel(info.Parameters);
 
     % ---- Configure sample time ---- %
     if info.SampleTime > 0
@@ -190,6 +199,20 @@ end
 % ======================================================================= %
 %  Helper functions
 % ======================================================================= %
+
+function dllPath = readDLLPathFromMask(block)
+% Read the DLLPath value from the block's mask workspace.
+% Used in setup() before NumDialogPrms is declared.
+    bh       = block.BlockHandle;
+    maskVars = get_param(bh, 'MaskWSVariables');
+    idx      = strcmp({maskVars.Name}, 'DLLPath');
+    if ~any(idx)
+        error('CIGRE:cigreDLLSFunction:NoDLLPath', ...
+            'Block mask does not define a DLLPath variable. ' ...
+            'Create the block with cigre.importDLL().');
+    end
+    dllPath = string(maskVars(idx).Value);
+end
 
 function alias = loadDLLForSim(dllPath, headerPath)
 % Load the CIGRE DLL for simulation via loadlibrary.
