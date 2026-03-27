@@ -100,7 +100,7 @@ classdef CodeDescriptor < cigre.description.ICodeDescriptor
             desc = obj.getCIGREDescriptor();
             inports = desc.getDataInterfaces(obj.DataInterfaceInports);
             inports = removeUnimplemented(inports);
-            vars = cigre.description.Variable.fromDataInterface(inports, obj.ModelName_, string.empty(1,0), HasDefaultValue=false);
+            vars = cigre.description.Variable.fromDataInterface(inports, obj.ModelName_, string.empty(1,0), "HasDefaultValue", false);
         end
 
         function vars = getOutports(obj)
@@ -108,14 +108,14 @@ classdef CodeDescriptor < cigre.description.ICodeDescriptor
             desc = obj.getCIGREDescriptor();
             outports = desc.getDataInterfaces(obj.DataInterfaceOutports);
             outports = removeUnimplemented(outports);
-            vars = cigre.description.Variable.fromDataInterface(outports, obj.ModelName_, string.empty(1,0), HasDefaultValue=false);
+            vars = cigre.description.Variable.fromDataInterface(outports, obj.ModelName_, string.empty(1,0), "HasDefaultValue",false);
         end
 
         function vars = getParameters(obj)
             % Return Variable array for the referenced model parameters.
             desc = obj.getModelDescriptor();
             parameters = desc.getDataInterfaces(obj.DataInterfaceParameters);
-            vars = cigre.description.Variable.fromDataInterface(parameters, obj.ModelName_, string.empty(1,0), HasDefaultValue=true);
+            vars = cigre.description.Variable.fromDataInterface(parameters, obj.ModelName_, string.empty(1,0), "HasDefaultValue" ,true);
         end
 
         function [internalVars, inputVars, outputVars] = getCodeInfoVariables(obj)

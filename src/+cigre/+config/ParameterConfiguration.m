@@ -8,7 +8,7 @@ classdef ParameterConfiguration
 
         function obj = fromFile(filePath)
             arguments
-                filePath (1,1) string {mustBeFile}
+                filePath (1,1) string %{mustBeFile}
             end
 
             raw = readtable(filePath, "TextType", "string");

@@ -218,6 +218,13 @@ classdef CIGREWriter
             else
                 modelRefHeader = "";
             end
+            
+            if isfile(fullfile(here, desc.CIGREInterfaceName + "_data.c"))
+                modelRefHeader = modelRefHeader + newline + "#include """ + desc.CIGREInterfaceName + "_data.c""";
+            else
+                modelRefHeader = "";
+            end
+            
             results = strrep(results, "<<model_reference_types>>", modelRefHeader);
         end
 
@@ -407,7 +414,7 @@ for i = 1:numel(visibleParams)
 
     % Derive the union field name from the CIGRE type, e.g. real64_T -> Real64_Val
     valType = strrep(cigreParamTypes(i), "_T", "_Val");
-    valType = replaceBetween(valType, 1, 1, upper(extract(valType, 1)));
+    valType = replaceBetween(valType, 1, 1, upper(extractString(valType, 1)));
 
     entry = template;
     entry = strrep(entry, "<<Num>>",         string(i-1));
@@ -494,7 +501,8 @@ else
     paramMaps = "";
 end
 
-
+% Should be defined as globals. If parameter isn't found, likely a header
+% is not being included, e.g. mdl_data
 for i = 1:numel(globalVisible)
     p = globalVisible(i);
     paramMaps = paramMaps + p.ERTName + " = parameters->" + p.CIGREName + ";" + newline;

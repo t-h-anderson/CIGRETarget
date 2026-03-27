@@ -1,7 +1,14 @@
-function [outputArg1,outputArg2] = extractString(inputArg1,inputArg2)
-%EXTRACTSTRING Summary of this function goes here
-%   Detailed explanation goes here
-outputArg1 = inputArg1;
-outputArg2 = inputArg2;
+function val = extractString(str, arg)
+
+if verLessThan("MATLAB", "9.9")
+    if isnumeric(arg)
+        val = str{1}(arg);
+    else
+        error("Not yest supported")
+    end
+else
+    val = extract(str, arg);
+end
+
 end
 

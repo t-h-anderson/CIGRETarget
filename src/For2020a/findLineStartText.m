@@ -1,11 +1,12 @@
-function idx = findLineStartText(txt, toMatch)
+function [idxs, idx] = findLineStartText(txt, toMatch)
 
 if verLessThan("MATLAB", "9.9")
-    idx = find(cellfun(@(x) sum(x) > 0, regexp(txt, "^" + toMatch)));
+    idx = cellfun(@(x) sum(x) > 0, regexp(txt, "^" + toMatch));
 else
-    idx = find(contains(txt, lineBoundary + toMatch));
+    idx = contains(txt, lineBoundary + toMatch);
 end
 
+idxs = find(idx);
 
 end
 

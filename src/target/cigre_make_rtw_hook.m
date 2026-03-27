@@ -167,7 +167,7 @@ if ~endsWith(modelName, wrapSuffix)
 end
 
 wrapperName = modelName;
-modelName = erase(wrapperName, wrapSuffix + textBoundary);
+modelName = erase(wrapperName, wrapSuffix + textBoundaryPattern);
 buildDir = fullfile(here, "slprj", "cigre");
 
 replaceRtwTypes(buildDir);
@@ -243,7 +243,7 @@ if ~endsWith(modelName, wrapSuffix)
 end
 
 wrapperName = modelName;
-modelName = erase(wrapperName, wrapSuffix + textBoundary);
+modelName = erase(wrapperName, wrapSuffix + textBoundaryPattern);
 
 dll = fullfile(here, wrapperName + ".dll");
 if ~isfile(dll)

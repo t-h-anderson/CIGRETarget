@@ -5,5 +5,5 @@ function buildCodeOnly(modelName)
     % Build the model generating code only, without invoking the C compiler.
     % The before_make hook still fires, so CIGRE source is generated and
     % can be compiled manually (e.g. in Visual Studio).
-    slbuild(modelName, "GenerateCodeOnly", true);
+    slbuild(modelName, "generateCodeOnly", true);
 end

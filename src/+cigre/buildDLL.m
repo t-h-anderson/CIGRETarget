@@ -42,9 +42,13 @@ if ~isfolder(codeGenFolder)
     mkdir(codeGenFolder);
 end
 cfg = Simulink.fileGenControl('getConfig');
-cfg.CodeGenFolder = codeGenFolder;
-Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir', true);
-
+cfg.CodeGenFolder = char(codeGenFolder);
+try
+    Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir', true);
+catch
+    % Not valid in older versions of MATLAB
+    warning("Setting the code gen folder during the build is not supported in older versions of MATLAB");
+end
 
 % Write build context so the cigre_make_rtw_hook can access options
 buildContext = struct();
@@ -59,7 +63,7 @@ if ~nvp.SkipBuild
 else
     % Generate code without compiling, so the hook still fires and
     % produces the CIGRE source, but make is not invoked
-    cigre.internal.buildCodeOnly(wrapper);
+    buildModel(wrapper);
 end
 
 % Analyse the model after the build so buildDLL can return the description.

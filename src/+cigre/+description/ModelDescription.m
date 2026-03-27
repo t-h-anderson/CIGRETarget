@@ -210,7 +210,7 @@ classdef ModelDescription < handle
             % RTMStruct is populated later by classifyRTMFields once the
             % step function interface is available for discrimination.
             internalNames = string({obj.InternalData.ERTName});
-            idx = find(endsWith(internalNames, cigre.description.ModelDescription.RtmVarSuffix + textBoundary), 1);
+            idx = find(endsWith(internalNames, cigre.description.ModelDescription.RtmVarSuffix + textBoundaryPattern), 1);
             if isempty(idx)
                 idx = find(contains(internalNames, cigre.description.ModelDescription.RtmVarFallback, "IgnoreCase", true), 1);
             end
@@ -378,6 +378,7 @@ classdef ModelDescription < handle
                         % Convert to C-style base 0 indexing
                         cIdx = (j-1);
                         thisParam.SimulinkName = thisParam.SimulinkName + "[" + cIdx + "]";
+                        thisParam.ERTName = thisParam.ERTName + "[" + cIdx + "]";
                     end
                     names = [names, thisParam.CIGREName]; %#ok<AGROW>
                     value(end+1) = thisParam; %#ok<AGROW>
@@ -572,7 +573,8 @@ classdef ModelDescription < handle
                 srcCode = strsplit(srcCode, newline)';
             end
 
-            idxStart = find(contains(srcCode, "rate_scheduler") & ~contains(srcCode,  lineBoundary + "/*"));
+            [~, idxStart] = findLineStartText(srcCode, "/*");
+            idxStart = find(contains(srcCode, "rate_scheduler") & ~idxStart);
             if numel(idxStart) > 1
                 idxStart = idxStart(2); % first occurrence is the declaration
             end

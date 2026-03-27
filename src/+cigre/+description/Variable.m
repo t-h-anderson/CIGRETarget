@@ -141,11 +141,12 @@ classdef Variable
 
         % Output of cigre names allows us to easily keep track of what
         % cigre names have been used in nested structs
-        function [objs, usedCIGRENames] = fromDataInterface(dis, modelName, nameroot, nvp)
+        function [objs, usedCIGRENames] = fromDataInterface(dis, modelName, nameroot, ertNameRoot, nvp)
             arguments
                 dis
                 modelName (1,1) string = string(nan) % Required to find default param value
                 nameroot (1,:) string = string.empty % Allow nested parameter search
+                ertNameRoot (1,:) string = string.empty
                 nvp.OverloadStorage (1,1) string = string(nan)
                 nvp.UsedCIGRENames (1,:) string = string.empty(1,0)
                 nvp.HasDefaultValue (1,1) logical = false 
@@ -161,7 +162,7 @@ classdef Variable
                 di = dis(i);
 
                 simulinkName = cigre.description.Variable.extractSimulinkName(di);
-                ertName = cigre.description.Variable.extractExternalName(di, "NameRoot", nameroot);
+                ertName = strjoin([ertNameRoot, cigre.description.Variable.extractExternalName(di)], ".");
                 type = cigre.description.Variable.extractType(di);
                 baseType = cigre.description.Variable.extractBaseType(di);
                 minVal = cigre.description.Variable.extract(di, "Min");
@@ -201,7 +202,7 @@ classdef Variable
                         end
                         % Pass the storage onto the children in the case of
                         % a struct
-                        [sub, subCIGRENames] = cigre.description.Variable.fromDataInterface(elements, modelName, [nameroot, simulinkName], ...
+                        [sub, subCIGRENames] = cigre.description.Variable.fromDataInterface(elements, modelName, [nameroot, simulinkName], ertName, ...
                             "OverloadStorage", storage, ...
                             "UsedCIGRENames", usedCIGRENames, ...
                             "HasDefaultValue", nvp.HasDefaultValue);
