@@ -7,7 +7,7 @@
     <param.summary />
     <param.description>Enables developers to create CIGRE compatible DLLs from Simulink models</param.description>
     <param.screenshot>${PROJECT_ROOT}\src\resources\Logo.png</param.screenshot>
-    <param.version>2.0</param.version>
+    <param.version>2.1</param.version>
     <param.output>${PROJECT_ROOT}\Simulink to CIGRE Export Tool.mltbx</param.output>
     <param.products.name />
     <param.products.id />
@@ -121,6 +121,7 @@ releases</param.exclude.filters>
       <file>${PROJECT_ROOT}\doc</file>
       <file>${PROJECT_ROOT}\README.md</file>
       <file>${PROJECT_ROOT}\src</file>
+      <file>${PROJECT_ROOT}\TestConfig.sldd</file>
     </fileset.rootfiles>
     <fileset.depfun.included />
     <fileset.depfun.excluded />
@@ -130,12 +131,10 @@ releases</param.exclude.filters>
     </build-deliverables>
     <workflow />
     <matlab>
-      <root>C:\Program Files\MATLAB\R2023b</root>
+      <root>C:\Program Files\MATLAB\R2020a</root>
       <toolboxes>
         <toolbox name="matlabcoder" />
         <toolbox name="embeddedcoder" />
-        <toolbox name="fixedpoint" />
-        <toolbox name="neuralnetwork" />
       </toolboxes>
       <toolbox>
         <matlabcoder>
@@ -146,16 +145,6 @@ releases</param.exclude.filters>
         <embeddedcoder>
           <enabled>true</enabled>
         </embeddedcoder>
-      </toolbox>
-      <toolbox>
-        <fixedpoint>
-          <enabled>true</enabled>
-        </fixedpoint>
-      </toolbox>
-      <toolbox>
-        <neuralnetwork>
-          <enabled>true</enabled>
-        </neuralnetwork>
       </toolbox>
     </matlab>
     <platform>
