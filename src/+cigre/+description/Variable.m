@@ -409,7 +409,8 @@ classdef Variable
             end
 
             % Assumes we never have e.g. -inf on a max
-            if string(limitVal) == "-inf" || (string(limitVal) == "" && lim == "Min")
+            lvs = string(limitVal);
+            if lvs == "-inf" || ((lvs == "" || lvs == "[]") && lim == "Min")
                 if isInt
                     limitVal = intmin(type);
                 else
@@ -417,7 +418,7 @@ classdef Variable
                 end
             end
 
-            if string(limitVal) == "inf" || (string(limitVal) == "" && lim == "Max")
+            if lvs == "inf" || ((lvs == "" || lvs == "[]") && lim == "Max")
                 if isInt
                     limitVal = intmax(type);
                 else
