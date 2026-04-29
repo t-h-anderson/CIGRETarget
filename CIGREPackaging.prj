@@ -1,5 +1,5 @@
 <deployment-project plugin="plugin.toolbox" plugin-version="1.0">
-  <configuration file="C:\Users\toma\Documents\CIGRETarget\CIGREPackaging.prj" location="C:\Users\toma\Documents\CIGRETarget" name="CIGREPackaging" target="target.toolbox" target-name="Package Toolbox">
+  <configuration build-checksum="2502548991" file="C:\Users\toma\Work\CIGRETarget\CIGREPackaging.prj" location="C:\Users\toma\Work\CIGRETarget" name="CIGREPackaging" target="target.toolbox" target-name="Package Toolbox">
     <param.appname>Simulink to CIGRE Export Tool</param.appname>
     <param.authnamewatermark>Tom Anderson</param.authnamewatermark>
     <param.email>toma@mathworks.com</param.email>
@@ -7,11 +7,23 @@
     <param.summary />
     <param.description>Enables developers to create CIGRE compatible DLLs from Simulink models</param.description>
     <param.screenshot>${PROJECT_ROOT}\src\resources\Logo.png</param.screenshot>
-    <param.version>2.1</param.version>
+    <param.version>2.2</param.version>
     <param.output>${PROJECT_ROOT}\Simulink to CIGRE Export Tool.mltbx</param.output>
-    <param.products.name />
-    <param.products.id />
-    <param.products.version />
+    <param.products.name>
+      <item>MATLAB</item>
+      <item>Simulink</item>
+      <item>Embedded Coder</item>
+    </param.products.name>
+    <param.products.id>
+      <item>1</item>
+      <item>2</item>
+      <item>65</item>
+    </param.products.id>
+    <param.products.version>
+      <item>24.2</item>
+      <item>24.2</item>
+      <item>24.2</item>
+    </param.products.version>
     <param.platforms />
     <param.guid>2e38c43e-de46-4c2e-acf2-d67dda57cadc</param.guid>
     <param.exclude.filters>% List files contained in your toolbox folder that you would like to exclude
@@ -87,9 +99,6 @@ releases</param.exclude.filters>
     <unset>
       <param.summary />
       <param.output />
-      <param.products.name />
-      <param.products.id />
-      <param.products.version />
       <param.platforms />
       <param.exclude.pcodedmfiles />
       <param.examples />
@@ -118,23 +127,24 @@ releases</param.exclude.filters>
       <file>${PROJECT_ROOT}</file>
     </fileset.rootdir>
     <fileset.rootfiles>
+      <file>${PROJECT_ROOT}\CIGREPackaging.prj.bak</file>
       <file>${PROJECT_ROOT}\doc</file>
       <file>${PROJECT_ROOT}\README.md</file>
       <file>${PROJECT_ROOT}\src</file>
-      <file>${PROJECT_ROOT}\TestConfig.sldd</file>
     </fileset.rootfiles>
     <fileset.depfun.included />
     <fileset.depfun.excluded />
     <fileset.package />
     <build-deliverables>
-      <file location="${PROJECT_ROOT}" name="Simulink to CIGRE Export Tool.mltbx" optional="false">C:\Users\toma\Documents\CIGRETarget\Simulink to CIGRE Export Tool.mltbx</file>
+      <file location="${PROJECT_ROOT}" name="Simulink to CIGRE Export Tool.mltbx" optional="false">C:\Users\toma\Work\CIGRETarget\Simulink to CIGRE Export Tool.mltbx</file>
     </build-deliverables>
     <workflow />
     <matlab>
-      <root>C:\Program Files\MATLAB\R2020a</root>
+      <root>C:\Program Files\MATLAB\R2024b</root>
       <toolboxes>
         <toolbox name="matlabcoder" />
         <toolbox name="embeddedcoder" />
+        <toolbox name="fixedpoint" />
       </toolboxes>
       <toolbox>
         <matlabcoder>
@@ -145,6 +155,11 @@ releases</param.exclude.filters>
         <embeddedcoder>
           <enabled>true</enabled>
         </embeddedcoder>
+      </toolbox>
+      <toolbox>
+        <fixedpoint>
+          <enabled>true</enabled>
+        </fixedpoint>
       </toolbox>
     </matlab>
     <platform>

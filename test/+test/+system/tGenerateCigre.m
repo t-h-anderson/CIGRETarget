@@ -252,6 +252,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         function dll = doVSBuild(testCase, modelName)
 
             dll = modelName + "_CIGRE.dll";
+            clipboard("copy", dll);
 
             src = fullfile(cigreRoot, "src\CIGRESource");
             clipboard("copy", src);
@@ -350,7 +351,13 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 input = testCase.InputData;
             end
 
+            warning("Custom input")
+
+            input.Var1(:) = 0;
+            input.Var1(thisInput.Time > seconds(50)) = 100;
+            input.Var2(:) = 0;
             testCase.Inputs = input;
+            
 
             %% Parameters
             testCase.SimulinkParameters = struct("Name", {}, "Value", {});
@@ -388,7 +395,11 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 cigreParam = visibleParams(j);
                 cigreVal   = cigreParam.DefaultValue;
                 try
-                    cigreVal = cast(cigreVal, cigreParam.BaseType);
+                    if cigreParam.BaseType == "boolean"
+                        cigreVal = boolean(cigreVal);
+                    else
+                        cigreVal = cast(cigreVal, cigreParam.BaseType);
+                    end
                 catch
                     warning("Could not cast CIGRE parameter " + cigreParam.CIGREName + " to type " + cigreParam.BaseType);
                 end
@@ -438,6 +449,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                         input = input.setinterpmethod('nearest');
                         input = input.setuniformtime("StartTime", 0, "EndTime", seconds(max(testCase.Inputs.Time(end))));
                         input.Name = testCase.Inputs.Properties.VariableNames{i};
+
                     end
                     inDS{i} = input;
                 end

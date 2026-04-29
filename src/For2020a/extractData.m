@@ -34,15 +34,16 @@ if verLessThan("MATLAB", "9.9")
 else
     
     try
-        baseline = results.yout.extractTimetable();
+        baseline = results.yout.extractTimetable("OutputFormat", "cell-by-signal");
     catch
         % TODO: This should probably just be an empty timetable
-        baseline = results.logsout.extractTimetable();
+        baseline = results.logsout.extractTimetable("OutputFormat", "cell-by-signal");
     end
     
 end
 
-baseline = fillmissing(baseline, "previous");
+% Retime to the output timestep (not the rate of the outputs)
+baseline = retime(baseline{:}, seconds(results.tout));
 
 end
 

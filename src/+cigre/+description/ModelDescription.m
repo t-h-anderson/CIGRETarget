@@ -45,6 +45,7 @@ classdef ModelDescription < handle
         % Patterns used to identify the RTM struct variable in InternalData
         RtmVarSuffix (1,1) string = "_M"
         RtmVarFallback (1,1) string = "MODEL"
+        RtmVarTypeFallback (1,1) string = "RT_MODEL_"
     end
 
     % Build info properties
@@ -215,6 +216,11 @@ classdef ModelDescription < handle
                 idx = find(contains(internalNames, cigre.description.ModelDescription.RtmVarFallback, "IgnoreCase", true), 1);
             end
 
+            if isempty(idx)
+                types = string({obj.InternalData.Type});
+                idx = find(contains(types, cigre.description.ModelDescription.RtmVarTypeFallback, "IgnoreCase", true), 1);
+            end
+            
             if isempty(idx)
                 error("CIGRE:ModelDescription:RTMStructNotFound", ...
                     "Could not identify the Real-Time Model struct in the internal data for model '%s'. " + ...
