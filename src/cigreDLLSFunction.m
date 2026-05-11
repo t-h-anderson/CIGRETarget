@@ -237,13 +237,23 @@ end
 function alias = loadDLLForSim(dllPath, headerPath)
 % Load the CIGRE DLL for simulation via loadlibrary.
 % Returns the unique library alias string.
+%
+% MATLAB's loadlibrary parser/MinGW thunk compiler chokes on the Windows
+% annotations (__declspec, __cdecl, __stdcall, __attribute__) used in the
+% IEEE/Cigre header on some MATLAB releases (notably R2023b).  We work
+% around that by feeding loadlibrary a tiny wrapper header that
+% #define's those tokens to nothing before including the real header.
     cigreSrc = fullfile(cigreRoot(), 'src', 'CIGRESource');
     [~, base] = fileparts(dllPath);
     alias = "cigredll_" + matlab.lang.makeValidName(base) ...
             + "_" + cigre.util.uuid();
     unloadIfLoaded(alias);
-    loadlibrary(char(dllPath), char(headerPath), ...
+
+    [wrapperHeader, headerDir] = cigre.util.sanitiseLoadlibraryHeader(headerPath);
+
+    loadlibrary(char(dllPath), char(wrapperHeader), ...
         'includepath', cigreSrc, ...
+        'includepath', headerDir, ...
         'alias',       char(alias));
 end
 
