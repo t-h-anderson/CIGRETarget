@@ -43,9 +43,11 @@ By default, both 32-bit and 64-bit toolchains are registered. To register only o
 cigre.install(Toolchain="MinGW", Type="64")
 ```
 
-### 3. Check Your Model
+### 3. Check Your Model (Optional)
 
-Before building, verify that your Simulink model meets the CIGRE requirements:
+> Requires the **Simulink Check** toolbox. Skip this step if Simulink Check is not installed.
+
+Before building, you can verify that your Simulink model meets the CIGRE requirements:
 
 ```matlab
 cigre.checkModel("MyModel")

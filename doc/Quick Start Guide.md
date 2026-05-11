@@ -38,7 +38,7 @@ cigre.install(Toolchain="MinGW")
 1. Open your Simulink model
 2. Go to **Modeling > Model Settings > Code Generation**
 3. Set **System target file** to `cigre.tlc`
-4. (Optional) Run the CIGRE compliance check:
+4. (Optional, requires **Simulink Check**) Run the CIGRE compliance check:
 
 ```matlab
 cigre.checkModel("MyModel")
