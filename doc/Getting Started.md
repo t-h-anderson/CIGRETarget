@@ -102,6 +102,8 @@ The model must use a **fixed-step** solver. Configure this under **Solver** in M
 
 ## 5. Checking the Model
 
+> **Optional.** This step requires the **Simulink Check** toolbox. If you do not have Simulink Check installed, you can skip this section and proceed directly to building.
+
 Run the CIGRE Model Advisor checks to verify that your model conforms to the CIGRE requirements:
 
 ```matlab
