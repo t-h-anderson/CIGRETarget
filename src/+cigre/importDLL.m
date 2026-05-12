@@ -377,10 +377,20 @@ function ok = addTestSequenceSource(modelName, blockName, inputs)
     nIn    = numel(inputs);
 
     height = max(120, 40 * nIn + 40);
-    try
-        add_block('simulinktest/Test Sequence', tsPath, ...
-            'Position', mat2str([-200, 80, -50, 80 + height]));
-    catch
+    posArg = mat2str([-200, 80, -50, 80 + height]);
+    libCandidates = {'sltestlib/Test Sequence', ...
+                     'simulinktest/Test Sequence', ...
+                     'sltest/Test Sequence'};
+    added = false;
+    for k = 1:numel(libCandidates)
+        try
+            add_block(libCandidates{k}, tsPath, 'Position', posArg);
+            added = true;
+            break
+        catch
+        end
+    end
+    if ~added
         return
     end
 
