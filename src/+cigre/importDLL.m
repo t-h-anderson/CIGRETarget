@@ -385,12 +385,11 @@ function ok = addTestSequenceSource(modelName, blockName, inputs)
     end
 
     try
-        % Documented sltest API.  Required call shape is
-        %   addSymbol(blockPath, name, 'Data', 'Scope', scope, ...)
-        % - third arg is the symbol *kind* ('Data');
-        % - 'Scope' is required and selects port direction ('Output' makes
-        %   it appear as a block output port);
-        % - 'DataType' / 'Size' set the port type and width.
+        % Documented sltest API.  Signature is
+        %   addSymbol(blockPath, name, kind, scope, 'Prop', val, ...)
+        % - kind is positional 3 ('Data');
+        % - scope is positional 4 ('Output' makes it a block output port);
+        % - DataType/Size are name-value pairs that follow.
         % No Step1 action is needed: an Output data symbol initialises to
         % 0 of its declared type/size, which is what the harness wants.
         for i = 1:nIn
@@ -399,8 +398,7 @@ function ok = addTestSequenceSource(modelName, blockName, inputs)
             dt  = char(cigre.importer.ModelInfo.cigreTypeToSimulink(sig.DataType));
             w   = max(1, sig.Width);
 
-            sltest.testsequence.addSymbol(tsPath, sym, 'Data', ...
-                'Scope', 'Output', ...
+            sltest.testsequence.addSymbol(tsPath, sym, 'Data', 'Output', ...
                 'DataType', dt, ...
                 'Size', sprintf('[1 %d]', w));
         end
