@@ -251,10 +251,30 @@ function alias = loadDLLForSim(dllPath, headerPath)
 
     [wrapperHeader, headerDir] = cigre.util.sanitiseLoadlibraryHeader(headerPath);
 
-    loadlibrary(char(dllPath), char(wrapperHeader), ...
+    [~, notfound] = loadlibrary(char(dllPath), char(wrapperHeader), ...
         'includepath', cigreSrc, ...
         'includepath', headerDir, ...
         'alias',       char(alias));
+
+    assertInstanceTypeRegistered(char(alias), notfound);
+end
+
+function assertInstanceTypeRegistered(alias, notfound)
+% Verify loadlibrary actually registered the Instance struct type.  On some
+% MATLAB releases loadlibrary returns without error even when the header
+% parse failed partway, in which case `libpointer('s_..._Instance', ...)`
+% later dies with the unhelpful "Type was not found".
+    if ~ismember('IEEE_Cigre_DLLInterface_Instance', libstructs(alias))
+        if isempty(notfound)
+            extra = '';
+        else
+            extra = sprintf(' (unregistered prototypes: %s)', ...
+                strjoin(cellstr(notfound), ', '));
+        end
+        error('CIGRE:cigreDLLSFunction:TypeNotRegistered', ...
+            ['loadlibrary did not register IEEE_Cigre_DLLInterface_Instance ' ...
+             'for alias ''%s''%s.'], alias, extra);
+    end
 end
 
 function unloadIfLoaded(alias)
