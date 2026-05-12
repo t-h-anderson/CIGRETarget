@@ -33,6 +33,11 @@ function [modelPath, info] = importDLL(dllPath, nvp)
 %   OpenModel    (logical) Open the model in Simulink after creation.
 %                Default: true.
 %
+%   Harness      (logical) Add a default test harness around the imported
+%                block: a Test Sequence (or Constant fallback) driving 0
+%                into each input, and one Outport per DLL output.
+%                Default: true.
+%
 % Example
 % -------
 %   modelPath = cigre.importDLL('C:\dlls\MyController.dll');
@@ -47,6 +52,7 @@ function [modelPath, info] = importDLL(dllPath, nvp)
         nvp.OutputFolder (1,1) string  = string(pwd)
         nvp.BlockName    (1,1) string  = string(missing)
         nvp.OpenModel    (1,1) logical = true
+        nvp.Harness      (1,1) logical = true
     end
 
     % ------------------------------------------------------------------ %
@@ -128,6 +134,11 @@ function [modelPath, info] = importDLL(dllPath, nvp)
         %   1 = DLLPath (char), 2 = HeaderPath (char), 3..N+2 = param values
         set_param(char(blockPath), 'Parameters', ...
             char(strjoin(paramVarNames, ', ')));
+
+        % ---- Default harness (Test Sequence inputs, Outport outputs) ----
+        if nvp.Harness
+            addDefaultHarness(modelName, blockName, info);
+        end
 
         % ---- Save ----
         save_system(hModel, char(modelPath));
@@ -299,5 +310,152 @@ function paramVarNames = applyMask(blockPath, info, dllPath, headerPath)
     end
     if ~isempty(displayLines)
         mask.Display = strjoin(displayLines, newline);
+    end
+end
+
+% ======================================================================= %
+%  Default harness
+% ======================================================================= %
+
+function addDefaultHarness(modelName, blockName, info)
+% Add a default harness around the imported DLL block.
+%
+%   Inputs : a single Test Sequence block emitting 0 on each input
+%            (correctly typed and sized).  If Simulink Test isn't licensed
+%            or configuration fails, fall back to one Constant=0 block per
+%            input.
+%   Outputs: one Outport per DLL output, named after the port.
+
+    modelName = char(modelName);
+    blockName = char(blockName);
+
+    if numel(info.Inputs) > 0
+        added = false;
+        try
+            added = addTestSequenceSource(modelName, blockName, info.Inputs);
+        catch
+            added = false;
+        end
+        if ~added
+            addConstantSources(modelName, blockName, info.Inputs);
+        end
+    end
+
+    for i = 1:numel(info.Outputs)
+        sig     = info.Outputs(i);
+        outName = char(matlab.lang.makeValidName(string(sig.Name)) + "_out");
+        outPath = [modelName '/' outName];
+
+        y0 = 80 + 40*(i - 1);
+        add_block('built-in/Outport', outPath, ...
+            'Position', mat2str([450, y0, 480, y0 + 14]));
+
+        try
+            dt = char(cigre.importer.ModelInfo.cigreTypeToSimulink(sig.DataType));
+            set_param(outPath, 'OutDataTypeStr', dt);
+        catch
+        end
+
+        add_line(modelName, ...
+            sprintf('%s/%d', blockName, i), ...
+            sprintf('%s/1', outName), ...
+            'autorouting', 'on');
+    end
+end
+
+function ok = addTestSequenceSource(modelName, blockName, inputs)
+% Try to add and configure a single Test Sequence block driving zeros.
+% On any failure, remove the partially-built block and return false so the
+% caller can fall back to Constants.
+    ok = false;
+    if ~license('test', 'Simulink_Test')
+        return
+    end
+
+    tsName = 'TestSequence';
+    tsPath = [modelName '/' tsName];
+    nIn    = numel(inputs);
+
+    height = max(120, 40 * nIn + 40);
+    try
+        add_block('simulinktest/Test Sequence', tsPath, ...
+            'Position', mat2str([-200, 80, -50, 80 + height]));
+    catch
+        return
+    end
+
+    try
+        actionLines = strings(0,1);
+        for i = 1:nIn
+            sig = inputs(i);
+            sym = char(matlab.lang.makeValidName(string(sig.Name)));
+            dt  = char(cigre.importer.ModelInfo.cigreTypeToSimulink(sig.DataType));
+            w   = max(1, sig.Width);
+
+            sltest.testsequence.addSymbol(tsPath, sym, 'Output');
+            try
+                sltest.testsequence.editSymbol(tsPath, sym, ...
+                    'DataType', dt, 'Size', mat2str([1 w]));
+            catch
+            end
+
+            if w == 1
+                actionLines(end+1) = string(sym) + " = " + string(dt) + "(0);"; %#ok<AGROW>
+            else
+                actionLines(end+1) = string(sym) + " = zeros(1, " + w + ", '" + string(dt) + "');"; %#ok<AGROW>
+            end
+        end
+
+        action = char(strjoin(actionLines, newline));
+        try
+            sltest.testsequence.editStep(tsPath, 'Step1', 'Action', action);
+        catch
+            sltest.testsequence.addStep(tsPath, 'Step1', 'Action', action);
+        end
+
+        for i = 1:nIn
+            add_line(modelName, ...
+                sprintf('%s/%d', tsName, i), ...
+                sprintf('%s/%d', blockName, i), ...
+                'autorouting', 'on');
+        end
+
+        ok = true;
+    catch
+        try
+            delete_block(tsPath);
+        catch
+        end
+    end
+end
+
+function addConstantSources(modelName, blockName, inputs)
+% Fallback: one Constant=0 block per input, correctly typed and sized.
+    for i = 1:numel(inputs)
+        sig     = inputs(i);
+        srcName = char(matlab.lang.makeValidName(string(sig.Name)) + "_zero");
+        srcPath = [modelName '/' srcName];
+        dt      = char(cigre.importer.ModelInfo.cigreTypeToSimulink(sig.DataType));
+        w       = max(1, sig.Width);
+
+        y0 = 80 + 40*(i - 1);
+        add_block('built-in/Constant', srcPath, ...
+            'Position', mat2str([-180, y0, -80, y0 + 30]));
+
+        if w == 1
+            valStr = '0';
+        else
+            valStr = sprintf('zeros(1, %d)', w);
+        end
+        set_param(srcPath, 'Value', valStr);
+        try
+            set_param(srcPath, 'OutDataTypeStr', dt);
+        catch
+        end
+
+        add_line(modelName, ...
+            sprintf('%s/1', srcName), ...
+            sprintf('%s/%d', blockName, i), ...
+            'autorouting', 'on');
     end
 end
