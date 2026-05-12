@@ -385,16 +385,18 @@ function ok = addTestSequenceSource(modelName, blockName, inputs)
     end
 
     try
-        % The sltest.testsequence.addSymbol/editSymbol API has been brittle
-        % across releases and naming conventions; talk to the underlying
-        % Stateflow chart directly, which is the stable lower-level API.
+        % The sltest.testsequence.addSymbol API has been brittle across
+        % releases and naming conventions; talk to the underlying Stateflow
+        % chart directly, which is the stable lower-level API.  No explicit
+        % Step1 action is needed: Stateflow.Data defaults to 0 of its
+        % declared type/size, which is exactly what we want for a zero
+        % harness.
         chart = sfroot.find('Path', tsPath, '-isa', 'Stateflow.Chart');
         if isempty(chart)
             error('CIGRE:NoChart', ...
                 'Could not locate Stateflow chart for Test Sequence at %s.', tsPath);
         end
 
-        actionLines = strings(0,1);
         for i = 1:nIn
             sig = inputs(i);
             sym = char(matlab.lang.makeValidName(string(sig.Name)));
@@ -408,19 +410,6 @@ function ok = addTestSequenceSource(modelName, blockName, inputs)
             if w > 1
                 d.Props.Array.Size = sprintf('[1 %d]', w);
             end
-
-            if w == 1
-                actionLines(end+1) = string(sym) + " = " + string(dt) + "(0);"; %#ok<AGROW>
-            else
-                actionLines(end+1) = string(sym) + " = zeros(1, " + w + ", '" + string(dt) + "');"; %#ok<AGROW>
-            end
-        end
-
-        action = char(strjoin(actionLines, newline));
-        try
-            sltest.testsequence.editStep(tsPath, 'Step1', 'Action', action);
-        catch
-            sltest.testsequence.addStep(tsPath, 'Step1', 'Action', action);
         end
 
         for i = 1:nIn
