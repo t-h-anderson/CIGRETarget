@@ -260,20 +260,27 @@ function alias = loadDLLForSim(dllPath, headerPath)
 end
 
 function assertInstanceTypeRegistered(alias, notfound)
-% Verify loadlibrary actually registered the Instance struct type.  On some
-% MATLAB releases loadlibrary returns without error even when the header
-% parse failed partway, in which case `libpointer('s_..._Instance', ...)`
-% later dies with the unhelpful "Type was not found".
-    if ~ismember('IEEE_Cigre_DLLInterface_Instance', libstructs(alias))
+% Verify loadlibrary actually registered the prototypes that take an
+% IEEE_Cigre_DLLInterface_Instance*.  On some MATLAB releases loadlibrary
+% returns without error even when the header parse failed partway, in which
+% case `libpointer('s_..._Instance', ...)` later dies with the unhelpful
+% "Type was not found".  If the Model_* prototypes registered, the struct
+% they reference must also have registered.
+    fns = libfunctions(alias);
+    required = {'Model_FirstCall', 'Model_CheckParameters', ...
+                'Model_Initialize', 'Model_Outputs', 'Model_Terminate'};
+    missing = required(~ismember(required, fns));
+    if ~isempty(missing)
         if isempty(notfound)
             extra = '';
         else
-            extra = sprintf(' (unregistered prototypes: %s)', ...
+            extra = sprintf(' (loadlibrary notfound: %s)', ...
                 strjoin(cellstr(notfound), ', '));
         end
         error('CIGRE:cigreDLLSFunction:TypeNotRegistered', ...
-            ['loadlibrary did not register IEEE_Cigre_DLLInterface_Instance ' ...
-             'for alias ''%s''%s.'], alias, extra);
+            ['loadlibrary did not register required prototypes %s ' ...
+             'for alias ''%s''%s.'], ...
+            strjoin(missing, ', '), alias, extra);
     end
 end
 
