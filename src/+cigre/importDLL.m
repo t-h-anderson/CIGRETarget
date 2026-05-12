@@ -385,31 +385,24 @@ function ok = addTestSequenceSource(modelName, blockName, inputs)
     end
 
     try
-        % The sltest.testsequence.addSymbol API has been brittle across
-        % releases and naming conventions; talk to the underlying Stateflow
-        % chart directly, which is the stable lower-level API.  No explicit
-        % Step1 action is needed: Stateflow.Data defaults to 0 of its
-        % declared type/size, which is exactly what we want for a zero
-        % harness.
-        chart = sfroot.find('Path', tsPath, '-isa', 'Stateflow.Chart');
-        if isempty(chart)
-            error('CIGRE:NoChart', ...
-                'Could not locate Stateflow chart for Test Sequence at %s.', tsPath);
-        end
-
+        % Documented sltest API.  Required call shape is
+        %   addSymbol(blockPath, name, 'Data', 'Scope', scope, ...)
+        % - third arg is the symbol *kind* ('Data');
+        % - 'Scope' is required and selects port direction ('Output' makes
+        %   it appear as a block output port);
+        % - 'DataType' / 'Size' set the port type and width.
+        % No Step1 action is needed: an Output data symbol initialises to
+        % 0 of its declared type/size, which is what the harness wants.
         for i = 1:nIn
             sig = inputs(i);
             sym = char(matlab.lang.makeValidName(string(sig.Name)));
             dt  = char(cigre.importer.ModelInfo.cigreTypeToSimulink(sig.DataType));
             w   = max(1, sig.Width);
 
-            d = Stateflow.Data(chart);
-            d.Name     = sym;
-            d.Scope    = 'Output';
-            d.DataType = dt;
-            if w > 1
-                d.Props.Array.Size = sprintf('[1 %d]', w);
-            end
+            sltest.testsequence.addSymbol(tsPath, sym, 'Data', ...
+                'Scope', 'Output', ...
+                'DataType', dt, ...
+                'Size', sprintf('[1 %d]', w));
         end
 
         for i = 1:nIn
