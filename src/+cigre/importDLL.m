@@ -392,13 +392,9 @@ function ok = addTestSequenceSource(modelName, blockName, inputs)
             dt  = char(cigre.importer.ModelInfo.cigreTypeToSimulink(sig.DataType));
             w   = max(1, sig.Width);
 
-            sltest.testsequence.addSymbol(tsPath, sym, 'Data');
-            try
-                sltest.testsequence.editSymbol(tsPath, sym, ...
-                    'Scope', 'Output', 'DataType', dt, ...
-                    'Size', mat2str([1 w]));
-            catch
-            end
+            sltest.testsequence.addSymbol(tsPath, sym, 'Data', ...
+                'Scope', 'Output', 'DataType', dt, ...
+                'Size', mat2str([1 w]));
 
             if w == 1
                 actionLines(end+1) = string(sym) + " = " + string(dt) + "(0);"; %#ok<AGROW>
