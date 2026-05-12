@@ -106,7 +106,7 @@ function [modelPath, info] = importDLL(dllPath, nvp)
         mkdir(outputFolder);
     end
 
-    modelName = blockName;
+    modelName = blockName + "_ImportedCIGREDLL";
     modelPath = fullfile(outputFolder, modelName + ".slx");
 
     % ------------------------------------------------------------------ %
