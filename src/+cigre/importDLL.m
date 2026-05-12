@@ -385,6 +385,15 @@ function ok = addTestSequenceSource(modelName, blockName, inputs)
     end
 
     try
+        % The sltest.testsequence.addSymbol/editSymbol API has been brittle
+        % across releases and naming conventions; talk to the underlying
+        % Stateflow chart directly, which is the stable lower-level API.
+        chart = sfroot.find('Path', tsPath, '-isa', 'Stateflow.Chart');
+        if isempty(chart)
+            error('CIGRE:NoChart', ...
+                'Could not locate Stateflow chart for Test Sequence at %s.', tsPath);
+        end
+
         actionLines = strings(0,1);
         for i = 1:nIn
             sig = inputs(i);
@@ -392,9 +401,13 @@ function ok = addTestSequenceSource(modelName, blockName, inputs)
             dt  = char(cigre.importer.ModelInfo.cigreTypeToSimulink(sig.DataType));
             w   = max(1, sig.Width);
 
-            sltest.testsequence.addSymbol(tsPath, sym, 'Data', ...
-                'Scope', 'Output', 'DataType', dt, ...
-                'Size', mat2str([1 w]));
+            d = Stateflow.Data(chart);
+            d.Name     = sym;
+            d.Scope    = 'Output';
+            d.DataType = dt;
+            if w > 1
+                d.Props.Array.Size = sprintf('[1 %d]', w);
+            end
 
             if w == 1
                 actionLines(end+1) = string(sym) + " = " + string(dt) + "(0);"; %#ok<AGROW>
