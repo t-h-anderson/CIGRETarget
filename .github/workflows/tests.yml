@@ -28,7 +28,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        release: [R2020b, R2025a]
+        release: [R2020b, R2026a]
     steps:
       - uses: actions/checkout@v4
 
