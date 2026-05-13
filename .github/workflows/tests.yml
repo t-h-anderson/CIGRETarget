@@ -56,7 +56,7 @@ jobs:
           # Batch token from a MathWorks Account; authenticates the
           # hosted runner to MathWorks licensing for the duration of
           # the job.
-          MLM_LICENSE_TOKEN: ${{ secrets.MATLAB_Licence }}
+          MLM_LICENSE_TOKEN: ${{ secrets.MATLAB_LICENCE }}
 
       # runAllTests.m opens CIGRE.prj (which sets the path) and writes
       # JUnit + Cobertura artefacts to artifacts/. Invoking via run()
