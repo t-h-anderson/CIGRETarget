@@ -61,6 +61,11 @@ jobs:
         uses: matlab-actions/setup-matlab@v2
         with:
           release: ${{ matrix.release }}
+          # cache: true reuses the MATLAB install across runs when the
+          # release + product set is unchanged, saving ~3-5 min per
+          # cache hit. The cache key is keyed on these inputs so
+          # changing the product list invalidates it automatically.
+          cache: true
           products: >
             Simulink
             Simulink_Coder

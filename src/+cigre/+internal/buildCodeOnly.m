@@ -6,7 +6,14 @@ function buildCodeOnly(modelName)
     % The before_make hook still fires, so CIGRE source is generated and
     % can be compiled manually (e.g. in Visual Studio).
     %
-    % Both args have to be char on R2020b: slbuild's input parser
-    % rejects strings for the model name and the N-V pair name.
-    slbuild(char(modelName), 'generateCodeOnly', true);
+    % The slbuild N-V pair 'GenerateCodeOnly' was introduced in a release
+    % later than R2020b, which only accepts the model parameter form.
+    % Setting GenCodeOnly directly works across every release we care
+    % about, so use it unconditionally and restore the original value on
+    % exit so the model state is unchanged for any caller that follows.
+    modelChar = char(modelName);
+    origGenCodeOnly = get_param(modelChar, 'GenCodeOnly');
+    cleanup = onCleanup(@() set_param(modelChar, 'GenCodeOnly', origGenCodeOnly)); %#ok<NASGU>
+    set_param(modelChar, 'GenCodeOnly', 'on');
+    slbuild(modelChar);
 end
