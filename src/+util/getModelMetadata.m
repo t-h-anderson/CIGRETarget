@@ -34,6 +34,6 @@ function modelMetadataTable = getModelMetadata(modelName)
         end
     end
 
-    modelMetadataTable = table(paramNames, paramValues, 'VariableNames', {'Parameter', 'Value'});
+    modelMetadataTable = table(paramNames, paramValues, 'VariableNames', ["Parameter", "Value"]);
 
 end
