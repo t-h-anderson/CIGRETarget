@@ -4,7 +4,10 @@ arguments
     file (1,1) string
 end
 
-if verLessThan("MATLAB", "9.9")
+% writelines was introduced in R2022a (9.12); on every earlier
+% release fall back to manual fopen/fwrite. readlines (used in the
+% sibling readFromFile.m) came in R2020b so its gate stays at 9.9.
+if verLessThan("MATLAB", "9.12")
     fid = fopen(file, "w");
     if fid ~= -1
         for i = 1:numel(text)
