@@ -12,6 +12,11 @@ suite = TestSuite.fromFolder(pwd, "IncludeSubFolders", true);
 
 runner = TestRunner.withTextOutput();
 resultsDir = "artifacts";
+% XMLPlugin and CoberturaFormat write straight into resultsDir and won't
+% create it themselves, so ensure it exists before any plugin is added.
+if ~isfolder(resultsDir)
+    mkdir(resultsDir);
+end
 
 resultsFile = fullfile(resultsDir, "JunitXMLResults.xml");
 runner.addPlugin(XMLPlugin.producingJUnitFormat(resultsFile));
