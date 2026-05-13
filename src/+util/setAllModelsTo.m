@@ -93,13 +93,26 @@ for i = 1:numel(slxFiles)
         c = onCleanup(@() rmpath(modelDir)); %#ok<NASGU>
         addpath(modelDir);
 
-        Simulink.exportToVersion(char(baseName), char(slxPath), char(targetRelease));
-        try
-            bdclose(baseName);
-        catch
-            % Model may not be loaded if exportToVersion handles its
-            % own lifecycle on this release; safe to ignore.
+        % Simulink.exportToVersion requires the model to be loaded and
+        % refuses to write back to the file it was loaded from. Load
+        % explicitly, export to a sibling temp file, close the model
+        % so it releases its file handle, then move the temp file into
+        % place over the original.
+        load_system(char(baseName));
+        tempPath = fullfile(modelDir, baseName + "_exportTmp.slx");
+        cleanupTemp = onCleanup(@() deleteIfExists(tempPath)); %#ok<NASGU>
+
+        Simulink.exportToVersion(char(baseName), char(tempPath), char(targetRelease));
+
+        % Close before moving so Simulink isn't holding the original
+        % file open on Windows (Linux is more forgiving but the same
+        % code path runs everywhere).
+        bdclose(char(baseName));
+
+        if isfile(slxPath)
+            delete(slxPath);
         end
+        movefile(char(tempPath), char(slxPath));
 
         fprintf("  + %-40s  %s -> %s (archived as %s)\n", ...
             baseName, currentRelease, targetRelease, baseName + "_" + currentRelease + ".slx");
@@ -173,4 +186,16 @@ if isempty(tokens)
 end
 year = double(string(tokens{1}));
 letter = tokens{2};
+end
+
+
+function deleteIfExists(p)
+% Best-effort cleanup of a stale temp .slx left behind if export fails
+% partway through. Silent if the file is already gone.
+if isfile(p)
+    try
+        delete(char(p));
+    catch
+    end
+end
 end
