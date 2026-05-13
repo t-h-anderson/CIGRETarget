@@ -1,4 +1,9 @@
-openProject(".");
+% Resolve all paths relative to this script so the suite can be invoked
+% from any working directory (e.g. via run('test/runAllTests.m') which
+% cd's into test/ before executing).
+here = fileparts(mfilename("fullpath"));
+projectRoot = fullfile(here, "..");
+openProject(projectRoot);
 
 import matlab.unittest.TestSuite
 import matlab.unittest.TestRunner
@@ -8,10 +13,10 @@ import matlab.unittest.plugins.ToFile
 import matlab.unittest.plugins.CodeCoveragePlugin
 import matlab.unittest.plugins.codecoverage.CoberturaFormat
 
-suite = TestSuite.fromFolder(pwd, "IncludeSubFolders", true);
+suite = TestSuite.fromFolder(here, "IncludeSubFolders", true);
 
 runner = TestRunner.withTextOutput();
-resultsDir = "artifacts";
+resultsDir = fullfile(projectRoot, "artifacts");
 % XMLPlugin and CoberturaFormat write straight into resultsDir and won't
 % create it themselves, so ensure it exists before any plugin is added.
 if ~isfolder(resultsDir)
@@ -22,7 +27,7 @@ resultsFile = fullfile(resultsDir, "JunitXMLResults.xml");
 runner.addPlugin(XMLPlugin.producingJUnitFormat(resultsFile));
 
 coverageFile = fullfile(resultsDir, "cobertura-coverage.xml");
-src = fullfile("src");
+src = fullfile(projectRoot, "src");
 runner.addPlugin(CodeCoveragePlugin.forFolder(src, "IncludingSubfolders", true, ...
     "Producing", CoberturaFormat(coverageFile)));
 
