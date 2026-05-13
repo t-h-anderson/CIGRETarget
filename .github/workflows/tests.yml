@@ -26,6 +26,12 @@ jobs:
     name: MATLAB ${{ matrix.release }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
+    # Set the licence token at job scope so every step (setup, run,
+    # checkout, dorny/test-reporter) sees it. MATLAB does a per-product
+    # licence checkout at runtime and falls back to the GitHub-hosted
+    # free licence (no Embedded Coder) without it.
+    env:
+      MLM_LICENSE_TOKEN: ${{ secrets.MATLAB_LICENCE }}
     strategy:
       fail-fast: false
       matrix:
@@ -61,11 +67,6 @@ jobs:
             Embedded_Coder
             Simulink_Check
             Parallel_Computing_Toolbox
-        env:
-          # Batch token from a MathWorks Account; authenticates the
-          # hosted runner to MathWorks licensing for the duration of
-          # the job.
-          MLM_LICENSE_TOKEN: ${{ secrets.MATLAB_LICENCE }}
 
       # runAllTests.m opens CIGRE.prj (which sets the path) and writes
       # JUnit + Cobertura artefacts to artifacts/. Invoking via run()
