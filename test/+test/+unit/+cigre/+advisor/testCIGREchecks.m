@@ -9,9 +9,14 @@ classdef testCIGREchecks < matlab.unittest.TestCase
     methods (TestClassSetup)
 
         function setup(testCase)
-            % R2020a's ModelAdvisor API does not understand the newer
-            % check definitions, so test artefacts are split per release.
-            if verLessThan("MATLAB", "9.9.0")
+            % The Test2023b advisor artefacts cannot be loaded on
+            % R2020b (the model file format is too new), and the
+            % Test2020a artefacts cannot drive newer ModelAdvisor
+            % behaviour. Choose the artefact set whose vintage
+            % matches the current release - R2021a (9.10) is the
+            % boundary because R2020b is the latest release that
+            % cannot open the Test2023b models.
+            if verLessThan("MATLAB", "9.10")
                 pth = fullfile(cigreRoot(), "test", "artefacts", "advisor", "Test2020a");
             else
                 pth = fullfile(cigreRoot(), "test", "artefacts", "advisor", "Test2023b");

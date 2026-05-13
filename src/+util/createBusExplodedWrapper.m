@@ -39,7 +39,15 @@ setActiveConfigSet(wrapperName, newConfig.Name);
 
 cm = coder.mapping.utils.create(wrapperName);
 if ~verLessThan("MATLAB", "9.9")
-    cm.setDataDefault("ModelParameterArguments", "StorageClass", "MultiInstance");
+    try
+        cm.setDataDefault("ModelParameterArguments", "StorageClass", "MultiInstance");
+    catch
+        % "MultiInstance" was added to the coder.mapping storage-class
+        % vocabulary after R2020b (R2020b only accepts "Default"). On
+        % releases where it isn't recognised, fall through and let the
+        % default storage class stand - codegen still succeeds, but
+        % model arguments behave as plain global data.
+    end
 end
 
 dd = get_param(model, "DataDictionary");
