@@ -158,32 +158,47 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 paramConfig = cigre.config.ParameterConfiguration.fromFile(configPath);
             end
 
-            % Build the model
-            here = pwd;
-            [desc, dll, c] = cigre.buildDLL(ModelName, "SkipBuild", false, "CodeGenFolder", here, "BusAs", BusAs, buildArgs{:}); %#ok<ASGLU>
+            % The registered CIGRE toolchains produce a Windows DLL, so
+            % only the Windows leg can compile and run the artefact.
+            % Off-Windows we still want to exercise code generation
+            % (catches TLC and analyseModel regressions) but stop short
+            % of the make step and skip the baseline comparison.
+            doCompile = ispc;
 
-            % Get the simulink baseline
+            here = pwd;
+            [desc, dll, c] = cigre.buildDLL(ModelName, ...
+                "SkipBuild", ~doCompile, ...
+                "CodeGenFolder", here, ...
+                "BusAs", BusAs, ...
+                buildArgs{:}); %#ok<ASGLU>
+
             testCase.ModelDescription = desc;
 
-            testCase.defineInputsAndParameters(desc, "ParameterConfig", paramConfig);
+            if doCompile
+                % Get the simulink baseline
+                testCase.defineInputsAndParameters(desc, "ParameterConfig", paramConfig);
+                baseline = testCase.captureBaseline(desc.CIGREInterfaceName);
 
-            % Run the wrapper to easily support buses
-            baseline = testCase.captureBaseline(desc.CIGREInterfaceName);
+                testCase.assertTrue(isfile(dll + ".dll"));
 
-            testCase.assertTrue(isfile(dll + ".dll"));
+                if Bits ~= "32"
+                    doRun = @() runDLL(testCase, dll, Snapshot);
+                    result = testCase.runParallel(doRun);
 
-            % Run the dll if
-            if Bits ~= "32"
-                doRun = @() runDLL(testCase, dll, Snapshot);
-                result = testCase.runParallel(doRun);
+                    baseline = timetable2table(baseline, 'ConvertRowTimes', false);
+                    baseline.Properties.VariableNames = result.Properties.VariableNames;
+                    baseline.Properties.VariableContinuity = [];
+                    baseline.Properties.VariableUnits = {};
 
-                % Compare the results
-                baseline = timetable2table(baseline, 'ConvertRowTimes', false);
-                baseline.Properties.VariableNames = result.Properties.VariableNames;
-                baseline.Properties.VariableContinuity = [];
-                baseline.Properties.VariableUnits = {};
-
-                testCase.verifyEqual(result, baseline, "reltol", 1e-2)
+                    testCase.verifyEqual(result, baseline, "reltol", 1e-2)
+                end
+            else
+                % Codegen-only: verify the CIGRE-side C source landed in
+                % the expected build folder. The cigre_make_rtw_hook
+                % writes it under slprj/cigre.
+                generatedC = fullfile(here, "slprj", "cigre", desc.ModelName + "_CIGRE.c");
+                testCase.assertTrue(isfile(generatedC), ...
+                    "Expected generated CIGRE source not found: " + generatedC);
             end
 
             clear c;
