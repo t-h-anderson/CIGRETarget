@@ -29,8 +29,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        release: [R2020b, R2026a]
+        # R2020b's bundled FreeType is older than what ubuntu-24.04 (the
+        # current ubuntu-latest) ships in libharfbuzz, producing an
+        # undefined-symbol error at MATLAB startup. Pin R2020b to
+        # ubuntu-22.04 where the system libraries are still compatible.
+        include:
+          - release: R2020b
+            os: ubuntu-22.04
+          - release: R2026a
+            os: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
