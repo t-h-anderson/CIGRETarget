@@ -11,7 +11,7 @@ classdef ParameterConfiguration
                 filePath (1,1) string %{mustBeFile}
             end
 
-            raw = readtable(filePath, "TextType", "string");
+            raw = readtable(filePath, 'TextType', 'string');
 
             % Validate expected columns are present
             requiredColumns = ["Name", "IsVisible"];

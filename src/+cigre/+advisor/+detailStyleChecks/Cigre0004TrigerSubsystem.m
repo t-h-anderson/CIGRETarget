@@ -16,6 +16,10 @@ classdef Cigre0004TrigerSubsystem < cigre.advisor.common.CustomCheck
 
     methods (Static)
         function checkCallback(model, checkObj)
+            arguments
+                model (1,1) string
+                checkObj
+            end
 
             violatingBlocks = {};
             blks = find_system(model, "FollowLinks", "on", ...

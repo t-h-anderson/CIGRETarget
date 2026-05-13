@@ -1,4 +1,9 @@
 function cigre_callback_handler(hDlg, hSrc, action)
+arguments
+    hDlg
+    hSrc
+    action (1,1) string
+end
 % cigre_callback_handler
 % Group all settings for the target into one place. Sets default options
 % and locks the ones the user must not change.

@@ -21,6 +21,10 @@ classdef Cigre0001ConfigSet < cigre.advisor.common.CustomCheck
 
     methods (Static)
         function checkCallback(model, checkObj)
+            arguments
+                model (1,1) string
+                checkObj
+            end
 
             % The cigre.tlc target file enforces every other required
             % setting, so this is the only configuration to verify here.

@@ -1,4 +1,13 @@
-function cigre_make_rtw_hook(hookMethod, modelName,~, ~, ~, buildArgs, buildInfo)
+function cigre_make_rtw_hook(hookMethod, modelName, rtwroot, templateMakefile, buildOpts, buildArgs, buildInfo) %#ok<INUSD>
+arguments
+    hookMethod (1,:) char
+    modelName (1,:) char
+    rtwroot
+    templateMakefile
+    buildOpts
+    buildArgs
+    buildInfo
+end
 % CIGRE RTW build hook - called by Simulink at each stage of the RTW build.
 %
 % ert_make_rtw_hook(hookMethod, modelName, rtwroot, templateMakefile,
@@ -92,6 +101,9 @@ end
 
 
 function option = LocalParseArgList(args)
+arguments
+    args
+end
 % Recognise the two supported make_rtw buildArgs:
 %   optimized_fixed_point=1
 %   optimized_floating_point=1
@@ -106,6 +118,10 @@ end
 end
 
 function locReportDifference(cs1, cs2)
+arguments
+    cs1
+    cs2
+end
 % Report any configuration-set differences introduced by ert_auto_configuration.
 [iseq, diffs] = slprivate("diff_config_sets", cs1, cs2, "string");
 if ~iseq
@@ -121,6 +137,9 @@ end
 
 
 function buildContext = loadBuildContext(codeGenFolder)
+arguments
+    codeGenFolder (1,1) string
+end
 % Load build options written by buildDLL before invoking slbuild.
 % buildDLL serialises options to a .mat file because the hook has no
 % direct parameter channel from user code.
@@ -133,6 +152,10 @@ end
 end
 
 function handleBeforeMake(modelName, buildInfo)
+arguments
+    modelName (1,1) string
+    buildInfo
+end
 
 here = Simulink.fileGenControl("getConfig").CodeGenFolder;
 buildContext = loadBuildContext(here);
@@ -156,6 +179,9 @@ end
 
 
 function replaceRtwTypes(buildDir)
+arguments
+    buildDir (1,1) string
+end
 % Replace the Simulink-generated rtwtypes.h with the CIGRE-compatible
 % version to resolve type definition conflicts at link time.
 replacement = fullfile(cigreRoot, "src", "CIGRESource", "rtwtypes.h");
@@ -165,6 +191,9 @@ end
 
 
 function paramConfig = loadParameterConfig(buildContext)
+arguments
+    buildContext (1,1) struct
+end
 % Load the ParameterConfiguration from the file path stored in the build
 % context. Returns an empty (all-visible) config if no file was specified.
 paramConfig = cigre.config.ParameterConfiguration();
@@ -179,6 +208,11 @@ end
 
 
 function generateCigreSource(modelName, wrapperName, paramConfig)
+arguments
+    modelName (1,1) string
+    wrapperName (1,1) string
+    paramConfig (1,1) cigre.config.ParameterConfiguration
+end
 % Analyse the generated model code and write the CIGRE wrapper C source.
 try
     desc = cigre.description.ModelDescription.analyseModel(modelName, wrapperName);
@@ -194,6 +228,11 @@ end
 
 
 function configureBuildPaths(buildInfo, buildDir, modelName)
+arguments
+    buildInfo
+    buildDir (1,1) string
+    modelName (1,1) string
+end
 % Add CIGRE-specific include paths and source files so the compiler can
 % find the generated wrapper and the CIGRE runtime support files.
 sourceRoot = fullfile(cigreRoot, "src", "CIGRESource");
@@ -209,6 +248,9 @@ end
 
 
 function handleAfterMake(modelName)
+arguments
+    modelName (1,1) string
+end
 
 here = Simulink.fileGenControl("getConfig").CodeGenFolder;
 buildContext = loadBuildContext(here);
@@ -243,6 +285,11 @@ end
 
 
 function value = getFieldOrDefault(s, field, default)
+arguments
+    s (1,1) struct
+    field (1,1) string
+    default
+end
 % Return s.(field) if present, otherwise return default.
 if isfield(s, field)
     value = s.(field);

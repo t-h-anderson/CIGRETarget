@@ -615,6 +615,9 @@ testCase.assignOutputsWhen(behavior.getTerminateInterface.withAnyInputs(), ...
 end
 
 function iface = makeFunctionInterface(name)
+arguments
+    name (1,1) string
+end
 % Build a zero-argument FunctionInterface, or empty if name is "".
 if name == ""
     iface = cigre.description.FunctionInterface();

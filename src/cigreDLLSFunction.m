@@ -1,4 +1,7 @@
 function cigreDLLSFunction(block)
+arguments
+    block (1,1)
+end
 % CIGREDLLSFUNCTION  Level-2 MATLAB S-Function that executes a CIGRE DLL.
 %
 % This file is shared by every CIGRE DLL block created by cigre.importDLL.
@@ -28,6 +31,9 @@ function cigreDLLSFunction(block)
 end
 
 function setup(block)
+arguments
+    block (1,1)
+end
 
     % Level-2 S-Functions must set block.NumDialogPrms before accessing any
     % block.DialogPrm(i). The count is variable (2 fixed paths + one per
@@ -91,6 +97,9 @@ function setup(block)
 end
 
 function CheckParameters(block) %#ok<DEFNU>
+arguments
+    block (1,1)
+end
     % NumDialogPrms is 0 during the first setup() pass before the mask is
     % applied; nothing to check at that point.
     if block.NumDialogPrms < 2
@@ -107,10 +116,16 @@ function CheckParameters(block) %#ok<DEFNU>
 end
 
 function ProcessParameters(block) %#ok<DEFNU>
+arguments
+    block (1,1)
+end
     block.AutoUpdateRuntimePrms();
 end
 
 function Start(block)
+arguments
+    block (1,1)
+end
 
     dllPath = string(block.DialogPrm(1).Data);
     headerPath = string(block.DialogPrm(2).Data);
@@ -144,6 +159,9 @@ function Start(block)
 end
 
 function Outputs(block)
+arguments
+    block (1,1)
+end
 
     userData = get_param(block.BlockHandle, "UserData");
     instance = userData.instance;
@@ -166,6 +184,9 @@ function Outputs(block)
 end
 
 function Terminate(block)
+arguments
+    block (1,1)
+end
 
     userData = get_param(block.BlockHandle, "UserData");
     if isempty(userData)
@@ -187,6 +208,9 @@ function Terminate(block)
 end
 
 function dllPath = tryReadDLLPathFromMask(block)
+arguments
+    block (1,1)
+end
 % Read the DLLPath value from the block's mask workspace.
 % Returns "" if the mask does not exist yet or DLLPath is not defined.
     dllPath = "";
@@ -204,6 +228,10 @@ function dllPath = tryReadDLLPathFromMask(block)
 end
 
 function alias = loadDLLForSim(dllPath, headerPath)
+arguments
+    dllPath (1,1) string
+    headerPath (1,1) string
+end
 % MATLAB's loadlibrary parser (and the MinGW thunk compiler) reject the
 % Windows annotations (__declspec, __cdecl, __stdcall, __attribute__) used
 % in the IEEE/Cigre header on some releases (notably R2023b).
@@ -224,6 +252,9 @@ function alias = loadDLLForSim(dllPath, headerPath)
 end
 
 function unloadIfLoaded(alias)
+arguments
+    alias (1,1) string
+end
     if libisloaded(char(alias))
         try
             unloadlibrary(char(alias));
@@ -233,6 +264,9 @@ function unloadIfLoaded(alias)
 end
 
 function signals = buildZeroSignals(sigInfoArray)
+arguments
+    sigInfoArray (1,:) struct
+end
 % Build a cell array of zero-valued typed arrays, one per signal descriptor.
     signals = cell(1, numel(sigInfoArray));
     for i = 1:numel(sigInfoArray)
@@ -244,6 +278,10 @@ function signals = buildZeroSignals(sigInfoArray)
 end
 
 function parameters = buildParameters(block, paramInfoArray)
+arguments
+    block (1,1)
+    paramInfoArray (1,:) struct
+end
 % Build a struct array with .Value fields for InterfaceInstance.
 % Values come from dialog parameters 3..N+2; defaults are used if absent.
     n = numel(paramInfoArray);
@@ -262,6 +300,10 @@ function parameters = buildParameters(block, paramInfoArray)
 end
 
 function out = castToPort(data, datatypeID)
+arguments
+    data
+    datatypeID (1,1) double
+end
 % Cast data to the MATLAB type matching a Simulink DatatypeID.
     typeNames = ["double", "single", "int8", "uint8", "int16", "uint16", "int32", "uint32", "logical"];
     if datatypeID >= 0 && datatypeID < numel(typeNames)
@@ -272,6 +314,9 @@ function out = castToPort(data, datatypeID)
 end
 
 function id = cigreTypeToSimulinkID(cigreDataType)
+arguments
+    cigreDataType (1,1) double
+end
 % Map CIGRE DataType enum value to Simulink DatatypeID (integer).
 %   double=0, single=1, int8=2, uint8=3, int16=4, uint16=5, int32=6, uint32=7
     slType = string(cigre.importer.ModelInfo.cigreTypeToSimulink(cigreDataType));

@@ -3,9 +3,9 @@ classdef DataMap
     properties
         Data
         Words (1,:)
-        DataType 
-        Sizes
-        Dims
+        DataType (1,:) string = string.empty
+        Sizes (1,:) double = []
+        Dims (1,:) cell = {}
     end
 
     methods

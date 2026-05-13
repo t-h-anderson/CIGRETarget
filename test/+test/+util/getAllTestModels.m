@@ -46,6 +46,9 @@ ModelName = struct(ModelName{:});
 end
 
 function tf = isLibrary(mdl)
+arguments
+    mdl (1,1) string
+end
 try
     tf = bdIsLibrary(mdl);
 catch me

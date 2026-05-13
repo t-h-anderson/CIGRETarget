@@ -59,6 +59,9 @@ classdef Variable
         end
 
         function leaves = getLeaves(objs)
+            arguments
+                objs (1,:) cigre.description.Variable
+            end
 
             idx = [objs.IsLeaf];
             leaves = objs(idx);
@@ -431,6 +434,9 @@ classdef Variable
         end
 
         function [storage, getMethod] = extractStorageSpecifier(interface)
+            arguments
+                interface (1,1)
+            end
 
             getMethod = "";
             if isa(interface, "coder.descriptor.types.AggregateElement")
@@ -494,6 +500,9 @@ classdef Variable
 end
 
 function [type, pointers] = getPointerType(type)
+arguments
+    type
+end
 
 pointers = "";
 if meta.class.fromName(class(type)) <= ?coder.types.Pointer || ...

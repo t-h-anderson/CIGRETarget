@@ -86,6 +86,9 @@ end
 end
 
 function deleteIfExists(path)
+arguments
+    path (1,1) string
+end
     if isfile(path)
         delete(path);
     end

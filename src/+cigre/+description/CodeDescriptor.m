@@ -259,6 +259,10 @@ classdef CodeDescriptor < cigre.description.ICodeDescriptor
         end
 
         function code = readWrapperFile(obj, extension)
+            arguments
+                obj
+                extension (1,1) string
+            end
             % Read a generated wrapper file (.h or .c) as a string array of lines.
             filePath = fullfile(obj.CodeGenFolder_, ...
                 obj.CIGREInterfaceName_ + obj.CigreRtwFolderSuffix, ...
@@ -276,6 +280,9 @@ end
 % --- Local helper functions -----------------------------------------------
 
 function interfaces = removeUnimplemented(interfaces)
+    arguments
+        interfaces
+    end
     % Remove data interfaces with no code implementation, which arise when a
     % port exists in the model but generates no corresponding C variable.
     isUnimplemented = arrayfun(@(x) isempty(x.Implementation), interfaces);
@@ -283,6 +290,9 @@ function interfaces = removeUnimplemented(interfaces)
 end
 
 function names = applyReservedNameFallbacks(names)
+    arguments
+        names (1,:) string
+    end
     % Append a suffix to any name that clashes with a reserved CIGRE interface
     % identifier to prevent C struct field name conflicts.
     reserved = cigre.description.ICodeDescriptor.ReservedCigreIdentifiers;

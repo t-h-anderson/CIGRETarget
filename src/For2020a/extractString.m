@@ -1,4 +1,8 @@
 function val = extractString(str, arg)
+arguments
+    str
+    arg
+end
 
 if verLessThan("MATLAB", "9.9")
     if isnumeric(arg)

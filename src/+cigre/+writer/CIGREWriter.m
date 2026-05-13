@@ -64,6 +64,10 @@ classdef CIGREWriter
         % --- writeDLL helpers ---
 
         function results = applyInitializeOnly(results, desc)
+            arguments
+                results (:,1) string
+                desc (1,1) cigre.description.ModelDescription
+            end
             % Substitute the initialize-only code block, or a placeholder comment
             % if the model has no initialize-only section.
             code = desc.InitializeOnlyCode;
@@ -75,6 +79,10 @@ classdef CIGREWriter
         end
 
         function results = applyHeapAndMemoryDeclarations(results, desc)
+            arguments
+                results (:,1) string
+                desc (1,1) cigre.description.ModelDescription
+            end
             % Substitute the heap size expression, the RTM struct declaration,
             % and generate heap_malloc / heap_get_address calls for each internal
             % state, input, and output variable.
@@ -100,6 +108,10 @@ classdef CIGREWriter
         end
 
         function results = applyInternalStateMapping(results, desc)
+            arguments
+                results (:,1) string
+                desc (1,1) cigre.description.ModelDescription
+            end
             % Wire the heap-allocated state pointers into the RTM struct fields
             % and initialise the local error status string.
             mapping = ...
@@ -117,6 +129,11 @@ classdef CIGREWriter
         end
 
         function results = applyParameterMappings(results, desc, paramConfig)
+            arguments
+                results (:,1) string
+                desc (1,1) cigre.description.ModelDescription
+                paramConfig (1,1) cigre.config.ParameterConfiguration
+            end
             % Generate C code that writes CIGRE parameter struct values into the
             % model's internal parameter storage. Visible parameters are read from
             % the instance; hidden parameters are hardcoded as literal defaults.
@@ -127,6 +144,10 @@ classdef CIGREWriter
         end
 
         function results = applyStateBackupRestore(results, rtmStructs)
+            arguments
+                results (:,1) string
+                rtmStructs (1,:) cigre.description.Variable
+            end
             % Generate malloc/free-based backup and restore code for RTM structs,
             % used in Model_FirstCall to preserve state across snapshot reinitialisation.
             backupCode  = "";
@@ -151,6 +172,10 @@ classdef CIGREWriter
         end
 
         function results = applyIOUnpacking(results, desc)
+            arguments
+                results (:,1) string
+                desc (1,1) cigre.description.ModelDescription
+            end
             % Generate casts from the instance void pointers to typed model structs,
             % and the copy statements that move data between instance and model.
             inputType = string([desc.InputData.Type]);
@@ -188,6 +213,10 @@ classdef CIGREWriter
         end
 
         function results = applyFunctionSignatures(results, desc)
+            arguments
+                results (:,1) string
+                desc (1,1) cigre.description.ModelDescription
+            end
             % Substitute the generated model initialize and step function names
             % and their argument lists.
             initInputs = strjoin( ...
@@ -229,6 +258,11 @@ classdef CIGREWriter
         end
 
         function results = applyInputSection(results, desc, cigreInterface)
+            arguments
+                results (:,1) string
+                desc (1,1) cigre.description.ModelDescription
+                cigreInterface (1,1) string
+            end
             % Substitute the #define count, the struct field declarations,
             % and the InputSignals array for all model inputs.
             simulinkNames = string([desc.Inputs.SimulinkName]');
@@ -258,6 +292,11 @@ classdef CIGREWriter
         end
 
         function results = applyOutputSection(results, desc, cigreInterface)
+            arguments
+                results (:,1) string
+                desc (1,1) cigre.description.ModelDescription
+                cigreInterface (1,1) string
+            end
             % Substitute the #define count, the struct field declarations,
             % and the OutputSignals array for all model outputs.
             simulinkNames = string([desc.Outputs.SimulinkName]');
@@ -285,6 +324,11 @@ classdef CIGREWriter
         end
 
         function results = applyParameterSection(results, visibleParams, cigreInterface)
+            arguments
+                results (:,1) string
+                visibleParams (1,:) cigre.description.Variable
+                cigreInterface (1,1) string
+            end
             % Substitute the #define count, the struct field declarations,
             % and the Parameters array for all visible model parameters.
             nParams = numel(visibleParams);
@@ -308,6 +352,10 @@ classdef CIGREWriter
         end
 
         function results = applyGetSetMethodDeclarations(results, parameters)
+            arguments
+                results (:,1) string
+                parameters (1,:) cigre.description.Variable
+            end
             % Generate forward declarations for any GetSet parameter methods,
             % which have implementations provided outside the generated code.
             getSetParams = parameters(string([parameters.StorageSpecifier]) == "GetSet");
@@ -320,6 +368,11 @@ classdef CIGREWriter
         end
 
         function results = applyModelInfoStruct(results, desc, numVisibleParams)
+            arguments
+                results (:,1) string
+                desc (1,1) cigre.description.ModelDescription
+                numVisibleParams (1,1) double
+            end
             % Substitute all fields of the Model_Info struct: metadata strings,
             % signal counts, sample time, and the integer state heap size.
             results = strrep(results, "<<ModelName>>", desc.ModelName);
@@ -352,6 +405,12 @@ end
 % --- Local helper functions (not class methods) ---
 
 function [results, nextIdx] = insertMemoryEntry(results, state, varName, idx)
+arguments
+    results (:,1) string
+    state (1,1) cigre.description.Variable
+    varName (1,1) string
+    idx (1,1) double
+end
 % Append one heap_malloc / heap_get_address line to the accumulating
 % placeholder lists, using incremental strrep to build up the list.
 % The (void) cast after each declaration suppresses MSVC C4189 for variables
@@ -376,6 +435,13 @@ end
 
 
 function defs = buildSignalDefinitions(cigreNames, simulinkNames, types, dims, template)
+arguments
+    cigreNames (:,1) string
+    simulinkNames (:,1) string
+    types (:,1) string
+    dims (:,1) string
+    template (1,1) string
+end
 % Build a comma-separated list of CIGRE signal definition structs.
 
 defs = strings(numel(cigreNames), 1);
@@ -393,6 +459,10 @@ end
 
 
 function paramDef = buildParameterDefinitions(visibleParams, cigreParamTypes)
+arguments
+    visibleParams (1,:) cigre.description.Variable
+    cigreParamTypes (:,1) string
+end
 % Build the array of IEEE_Cigre_DLLInterface_Parameter structs describing
 % each visible parameter's name, type, and default/min/max values.
 template = strjoin([ ...
@@ -432,6 +502,9 @@ end
 
 
 function literal = formatCNumericLiteral(value)
+arguments
+    value (1,1) double
+end
 % Format a numeric value as a safe C literal.
 % Integer minimum values (e.g. -2147483648 for int32) cannot be written
 % as a negative literal in C because the positive part overflows the signed
@@ -455,6 +528,10 @@ end
 
 
 function paramMaps = buildModelArgMappings(visibleParams, hiddenParams)
+arguments
+    visibleParams (1,:) cigre.description.Variable
+    hiddenParams (1,:) cigre.description.Variable
+end
 % Generate C assignments for model-argument parameters. Visible ones read
 % from the CIGRE parameters struct; hidden ones use hardcoded literal defaults
 % to exclude them from the DLL interface without changing model behaviour.
@@ -485,6 +562,10 @@ end
 
 
 function paramMaps = buildGlobalParamMappings(visibleParams, hiddenParams)
+arguments
+    visibleParams (1,:) cigre.description.Variable
+    hiddenParams (1,:) cigre.description.Variable
+end
 % Generate C assignments for global (non-model-argument) parameters.
 % Global parameters are warned about because they are shared across instances,
 % creating a risk of non-determinism when the DLL is called in parallel.
@@ -514,6 +595,9 @@ end
 
 
 function heap = heapSize(modelDescriptions)
+arguments
+    modelDescriptions (1,1) cigre.description.ModelDescription
+end
 % Compute a C sizeof() expression summing all state variable types,
 % so the CIGRE runtime can allocate the correct heap at initialisation.
 % <<RTMType>> is left unresolved here and substituted by the caller.

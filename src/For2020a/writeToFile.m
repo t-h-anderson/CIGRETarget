@@ -1,4 +1,8 @@
 function writeToFile(text, file)
+arguments
+    text (:,1) string
+    file (1,1) string
+end
 
 if verLessThan("MATLAB", "9.9")
     fid = fopen(file, "w");

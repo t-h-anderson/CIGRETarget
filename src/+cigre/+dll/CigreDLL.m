@@ -7,7 +7,7 @@ classdef CigreDLL < handle
     end
 
     properties (Hidden)
-        Name_
+        Name_ (1,1) string = ""
     end
 
     methods
@@ -129,6 +129,9 @@ classdef CigreDLL < handle
 end
 
 function unloadIfLoaded(dllName)
+arguments
+    dllName (1,1) string
+end
 if libisloaded(dllName)
     try
         unloadlibrary(dllName)

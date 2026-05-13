@@ -1,4 +1,7 @@
 function lines = readFromFile(file)
+arguments
+    file (1,1) string
+end
 
 if verLessThan("MATLAB", "9.9")
     fid = fopen(file, "r");

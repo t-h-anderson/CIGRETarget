@@ -39,6 +39,9 @@ classdef ModelInfo
     methods (Static)
 
         function info = fromDLL(dllPath)
+            arguments
+                dllPath (1,1) string
+            end
         % FROMDLL  Read ModelInfo from a CIGRE DLL file.
         %
         %   info = cigre.importer.ModelInfo.fromDLL(dllPath)
@@ -72,6 +75,9 @@ classdef ModelInfo
         end
 
         function slType = cigreTypeToSimulink(cigreDataType)
+            arguments
+                cigreDataType (1,1) {mustBeNumeric}
+            end
         % CIGRETYPETOSIMULNK  Map a CIGRE DataType integer to a MATLAB/Simulink
         % type name string.
         %

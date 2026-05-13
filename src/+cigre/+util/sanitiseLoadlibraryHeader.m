@@ -1,4 +1,7 @@
 function [wrapperPath, headerDir] = sanitiseLoadlibraryHeader(headerPath)
+arguments
+    headerPath (1,1) string
+end
 %SANITISELOADLIBRARYHEADER  Wrap a C header so MATLAB loadlibrary can parse it.
 %
 %   [wrapperPath, headerDir] = cigre.util.sanitiseLoadlibraryHeader(headerPath)

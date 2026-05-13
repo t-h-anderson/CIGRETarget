@@ -26,14 +26,19 @@ classdef Cigre0003InterfaceTypes < cigre.advisor.common.CustomCheck
 
     methods (Static)
         function [ok, b] = isSupportedType(dt)
-            dt = string(dt);
+            arguments
+                dt (1,1) string
+            end
             ok = any(ismember(util.TranslateTypes.StandardTypes, dt));
             b = dt == "boolean";
         end
 
         function [bo, found] = getBusObject(modelVars, dt)
+            arguments
+                modelVars (1,1)
+                dt (1,1) string
+            end
             sourceType = string(modelVars.SourceType);
-            dt = string(dt);
 
             if sourceType == "data dictionary"
                 sldd_object = Simulink.data.dictionary.open(modelVars.Source);
@@ -72,6 +77,10 @@ classdef Cigre0003InterfaceTypes < cigre.advisor.common.CustomCheck
         end
 
         function [isok, isbool, mess] = checkBusTypes(modelVars, bo)
+            arguments
+                modelVars (1,1)
+                bo (1,1)
+            end
             mess = "";
             isbool = false;
             for idx = 1:numel(bo.Elements)
@@ -102,6 +111,11 @@ classdef Cigre0003InterfaceTypes < cigre.advisor.common.CustomCheck
         end
 
         function [isok, isbus, isbool, found, mess] = checkType(modelVariables, busType, dt)
+            arguments
+                modelVariables
+                busType
+                dt
+            end
             if string(busType) == "NOT_BUS"
                 [isok, isbool] = cigre.advisor.detailStyleChecks.Cigre0003InterfaceTypes.isSupportedType(dt);
                 found = true;
@@ -135,6 +149,10 @@ classdef Cigre0003InterfaceTypes < cigre.advisor.common.CustomCheck
         end
 
         function checkCallback(model, checkObj)
+            arguments
+                model (1,1) string
+                checkObj
+            end
 
             invalidPorts = {};
             statusFail = {};

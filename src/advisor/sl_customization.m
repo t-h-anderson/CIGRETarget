@@ -1,4 +1,7 @@
 function sl_customization(cm)
+arguments
+    cm (1,1)
+end
 % Copyright 2024 The MathWorks, Inc.
 %
 % To pick up new checks: Advisor.Manager.refresh_customizations().

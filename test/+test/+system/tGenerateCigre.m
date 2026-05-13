@@ -114,6 +114,10 @@ classdef tGenerateCigre < test.util.WithParallelFixture
     methods (Access = protected)
 
         function loadData(testCase, ModelName)
+            arguments
+                testCase
+                ModelName (1,1) string
+            end
 
             file = ModelName + "_input.mat";
             if string(which(file)) ~= ""
@@ -174,7 +178,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 result = testCase.runParallel(doRun);
 
                 % Compare the results
-                baseline = timetable2table(baseline, "ConvertRowTimes",false);
+                baseline = timetable2table(baseline, 'ConvertRowTimes', false);
                 baseline.Properties.VariableNames = result.Properties.VariableNames;
                 baseline.Properties.VariableContinuity = [];
                 baseline.Properties.VariableUnits = {};
@@ -238,7 +242,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
 
             result = testCase.runParallel(doRun, "PauseBeforeRun", true);
 
-            baseline = timetable2table(baseline, "ConvertRowTimes",false);
+            baseline = timetable2table(baseline, 'ConvertRowTimes', false);
             baseline.Properties.VariableNames = result.Properties.VariableNames;
             baseline.Properties.VariableContinuity = [];
 
@@ -251,6 +255,10 @@ classdef tGenerateCigre < test.util.WithParallelFixture
     methods
 
         function dll = doVSBuild(testCase, modelName)
+            arguments
+                testCase
+                modelName (1,1) string
+            end
 
             dll = modelName + "_CIGRE.dll";
             clipboard("copy", dll);
@@ -341,7 +349,9 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                     iVals = cat(3, iVals{:});
                     iVals = permute(iVals, [3,1,2]);
 
-                    thisInput = timetable(iVals, "RowTimes", time, "VariableNames", "Var" + i);
+                    % timetable/table constructors require their N-V
+                    % pair names as char vectors in legacy syntax.
+                    thisInput = timetable(iVals, 'RowTimes', time, 'VariableNames', "Var" + i);
 
                     input{i} = thisInput;
                 end
@@ -410,6 +420,10 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         end
 
         function baseline = captureBaseline(testCase, mdlName)
+            arguments
+                testCase
+                mdlName (1,1) string
+            end
 
             %% Create an input object to match the input and parameter test data
             testCase.tempLoad(mdlName);
@@ -532,7 +546,9 @@ classdef tGenerateCigre < test.util.WithParallelFixture
 
             % Two parallel datasets verify that DLL instances do not
             % share state through hidden globals.
-            inputs = retime(testCase.Inputs, "regular", "nearest", "TimeStep", seconds(testCase.TimeStep));
+            % retime parses N-V parameter names as char vectors in
+            % older releases; keep TimeStep quoted to match.
+            inputs = retime(testCase.Inputs, 'regular', 'nearest', 'TimeStep', seconds(testCase.TimeStep));
             % Indexing into a timetable per timestep is much slower than
             % into a cell, so convert once up front.
             inputs = table2cell(timetable2table(inputs));
@@ -608,6 +624,10 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         end
 
         function tempLoad(testCase, mdlName)
+            arguments
+                testCase
+                mdlName (1,1) string
+            end
 
             wasLoaded = bdIsLoaded(mdlName);
             load_system(mdlName);
@@ -618,6 +638,10 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         end
 
         function applyCodeGenFixture(testCase, pth)
+            arguments
+                testCase
+                pth (1,1) string
+            end
             cfg = Simulink.fileGenControl("getConfig");
 
             oldCodeGenFolder = cfg.CodeGenFolder; %#ok<NASGU>

@@ -141,6 +141,9 @@ end
 % ======================================================================= %
 
 function p = resolvePath(p)
+arguments
+    p (1,1) string
+end
     resolved = which(p);
     if ~isempty(resolved)
         p = string(resolved);
@@ -150,6 +153,9 @@ function p = resolvePath(p)
 end
 
 function addLevel2SFBlock(blockPath)
+arguments
+    blockPath (1,1) string
+end
 % Adds a Level-2 MATLAB S-Function block whose library path was renamed
 % between releases. The new name is tried first; the older name remains
 % as a fallback for legacy installs.
@@ -174,6 +180,12 @@ function addLevel2SFBlock(blockPath)
 end
 
 function paramVarNames = applyMask(blockPath, info, dllPath, headerPath)
+arguments
+    blockPath (1,1) string
+    info (1,1) cigre.importer.ModelInfo
+    dllPath (1,1) string
+    headerPath (1,1) string
+end
 % applyMask Configure the import block's mask.
 %
 % Hidden DLLPath/HeaderPath parameters are stored on the mask so the

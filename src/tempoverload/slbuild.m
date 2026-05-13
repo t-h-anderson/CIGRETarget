@@ -1,4 +1,10 @@
 function slbuild(modelName, varargin)
+arguments
+    modelName (1,1) string
+end
+arguments (Repeating)
+    varargin
+end
 % SLBUILD builds a Simulink model based on the specified parameters.
 % Usage: slbuild(modelName, varargin)
 %   modelName - Name of the Simulink model to build.

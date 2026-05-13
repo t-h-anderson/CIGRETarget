@@ -21,6 +21,10 @@ classdef Cigre0002VirtualBus < cigre.advisor.common.CustomCheck
 
     methods (Static)
         function checkCallback(model, checkObj)
+            arguments
+                model (1,1) string
+                checkObj
+            end
 
             invalidPorts = {};
 

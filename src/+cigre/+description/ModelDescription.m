@@ -6,8 +6,8 @@ classdef ModelDescription < handle
     end
 
     properties
-        CodeGenFolder
-        WorkFolder
+        CodeGenFolder (1,1) string = ""
+        WorkFolder (1,1) string = ""
     end
 
     % Model metadata properties
@@ -32,7 +32,7 @@ classdef ModelDescription < handle
 
         SystemTargetFile (1,1) string = "cigre"
 
-        RTMStructName = "RealTimeModel_T" % Real-time Model Data Structure
+        RTMStructName (1,1) string = "RealTimeModel_T"
         RTMVarType (1,1) string
         RTMStruct (1,:) cigre.description.Variable % Variable and name in RTM Struct
     end
@@ -232,6 +232,10 @@ classdef ModelDescription < handle
         end
 
         function classifyRTMFields(obj, rtmFieldNames)
+            arguments
+                obj
+                rtmFieldNames (1,:) string
+            end
             % Phase 2 of RTM classification: populate RTMStruct with the subset
             % of InternalData entries that are pointer fields of the RTM struct.
             %
@@ -270,27 +274,47 @@ classdef ModelDescription < handle
         end
 
         function loadModelRefInitialiseFunctionInterface(obj, descriptor)
+            arguments
+                obj
+                descriptor (1,1) cigre.description.ICodeDescriptor
+            end
             iface = descriptor.getModelRefInitializeInterface();
             [obj.ModelRefInitialiseName, obj.ModelRefInitialiseInputs] = ...
                 obj.processInterface(iface);
         end
 
         function loadInitialiseFunctionInterface(obj, descriptor)
+            arguments
+                obj
+                descriptor (1,1) cigre.description.ICodeDescriptor
+            end
             iface = descriptor.getInitializeInterface();
             [obj.InitializeName, obj.InitialiseInputs] = obj.processInterface(iface);
         end
 
         function loadStepFunctionInterface(obj, descriptor)
+            arguments
+                obj
+                descriptor (1,1) cigre.description.ICodeDescriptor
+            end
             iface = descriptor.getOutputInterface();
             [obj.StepName, obj.StepInputs] = obj.processInterface(iface);
         end
 
         function loadTerminateFunctionInterface(obj, descriptor)
+            arguments
+                obj
+                descriptor (1,1) cigre.description.ICodeDescriptor
+            end
             iface = descriptor.getTerminateInterface();
             [obj.TerminateName, obj.TerminateInputs] = obj.processInterface(iface);
         end
 
         function [name, inputs] = processInterface(obj, iface)
+            arguments
+                obj
+                iface
+            end
             % Convert a FunctionInterface into a name and Variable array,
             % resolving argument names via translateNames.
             if isempty(iface) || iface.IsEmpty

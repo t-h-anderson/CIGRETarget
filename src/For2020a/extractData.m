@@ -1,4 +1,7 @@
 function baseline = extractData(results)
+arguments
+    results (1,1)
+end
 
 if verLessThan("MATLAB", "9.9")
 
@@ -24,18 +27,18 @@ if verLessThan("MATLAB", "9.9")
         thisName = string(y{i}.BlockPath.convertToCell);
         [~, thisName] = fileparts(thisName);
 
-        tt{i} = timetable(t, yvals, "VariableNames", thisName);
+        tt{i} = timetable(t, yvals, 'VariableNames', thisName);
     end
 
-    baseline = synchronize(tt{:}, "union", "previous");
-    baseline = fillmissing(baseline, "previous");
+    baseline = synchronize(tt{:}, 'union', 'previous');
+    baseline = fillmissing(baseline, 'previous');
 
 else
 
     try
-        baseline = results.yout.extractTimetable("OutputFormat", "cell-by-signal");
+        baseline = results.yout.extractTimetable('OutputFormat', 'cell-by-signal');
     catch
-        baseline = results.logsout.extractTimetable("OutputFormat", "cell-by-signal");
+        baseline = results.logsout.extractTimetable('OutputFormat', 'cell-by-signal');
     end
 
 end
