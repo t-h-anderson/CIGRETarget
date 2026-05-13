@@ -13,19 +13,22 @@ classdef InterfaceInstance <handle
     end
 
     properties (Constant)
-        IntStateBufferSize = 100000; % Arbitrary pre-allocated int32 state buffer
+        % Pre-allocated int32 state buffer. The CIGRE ABI requires a
+        % contiguous block but does not report its required size; 100k
+        % words has been sufficient for every test model we ship.
+        IntStateBufferSize = 100000;
     end
 
     methods
         function obj = InterfaceInstance(inputs, outputs, parameters, nvp)
-            % The s return value is needed as data.Value comes back as
-            % voidpointer type
             arguments
                 inputs
                 outputs
                 parameters
                 nvp.IntStates = []
-                nvp.Time (1,1) double = 0 % Make non-zero if not first timestep
+                % Time is non-zero when restarting from a snapshot, which
+                % suppresses the first-call branch inside the DLL.
+                nvp.Time (1,1) double = 0
             end
 
             obj.InputData = inputs;
@@ -33,46 +36,37 @@ classdef InterfaceInstance <handle
             isSnapshot = ~isempty(nvp.IntStates);
             obj.IsInitialised = isSnapshot;
             if ~isSnapshot
-                nvp.IntStates = libpointer('int32Ptr', zeros(1, cigre.dll.InterfaceInstance.IntStateBufferSize));
+                nvp.IntStates = libpointer("int32Ptr", zeros(1, cigre.dll.InterfaceInstance.IntStateBufferSize));
             end
 
             intStateData = nvp.IntStates;
 
-            %% Input
             inMap = cigre.dll.DataMap.create(inputs);
             in = inMap.Words;
 
-            %% Parameters
             paramMap = cigre.dll.DataMap.create({parameters.Value});
             param = paramMap.Words;
 
-            %% Output
             outMap = cigre.dll.DataMap.create(outputs);
             out = outMap.Words;
 
-            out = zeros(1, numel(out)); % TODO: How do we detect bit packing? Is it always 8?
+            % TODO: detect actual bit packing rather than assuming 8.
+            out = zeros(1, numel(out));
 
-            inputs = libpointer('uint8Ptr', in);
-            outputs = libpointer('uint8Ptr', out);
-            parameters = libpointer('uint8Ptr', param);
+            inputs = libpointer("uint8Ptr", in);
+            outputs = libpointer("uint8Ptr", out);
+            parameters = libpointer("uint8Ptr", param);
 
-            %% IEEE_Cigre_DLLInterface_Instance
-            % void *          ExternalInputs;         // Input signals array
-            % void *          ExternalOutputs;        // Output signals array
-            % void *          Parameters;             // Parameters array
-            % real64_T        Time;                   // Current simulation time
-            % const uint8_T   SimTool_EMT_RMS_Mode;   // Mode: EMT = 1, RMS = 2
-            % const char_T *  LastErrorMessage;       // Error string pointer
-            % const char_T *  LastGeneralMessage;     // General message
-            % int32_T *       IntStates;              // Int State array
-            % real32_T *      FloatStates;            // Float State array
-            % real64_T *      DoubleStates;           // Double State array
-
+            % IEEE_Cigre_DLLInterface_Instance layout (from the spec):
+            %   ExternalInputs, ExternalOutputs, Parameters,
+            %   Time, SimTool_EMT_RMS_Mode (1=EMT, 2=RMS),
+            %   LastErrorMessage, LastGeneralMessage,
+            %   IntStates, FloatStates, DoubleStates.
             s = struct(...
                 "ExternalInputs", inputs, ...
                 "ExternalOutputs", outputs, ...
                 "Parameters", parameters, ...
-                "Time", nvp.Time, ... % Used in First Call flag
+                "Time", nvp.Time, ...
                 "SimTool_EMT_RMS_Mode", 1, ...
                 "LastErrorMessage", [], ...
                 "LastGeneralMessage", [], ...
@@ -83,7 +77,6 @@ classdef InterfaceInstance <handle
 
             data = libpointer("s_IEEE_Cigre_DLLInterface_Instance", s);
 
-            % Map to object
             obj.InMap = inMap;
             obj.OutMap = outMap;
             obj.ParamMap = paramMap;
@@ -99,18 +92,15 @@ classdef InterfaceInstance <handle
                 nvp.Row (1,1) double = 1
             end
 
-            %% input
             inMap = cigre.dll.DataMap.create(input, "Row", nvp.Row);
             in = inMap.Words;
 
-            % Update inputs
-            inputs = libpointer('uint8Ptr', in);
+            inputs = libpointer("uint8Ptr", in);
             s = obj.Struct;
             s.ExternalInputs = inputs;
 
             data = libpointer("s_IEEE_Cigre_DLLInterface_Instance", s);
 
-            % Map to object
             obj.InMap = inMap;
             obj.Instance = data;
             obj.Struct = s;

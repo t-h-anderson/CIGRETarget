@@ -28,12 +28,14 @@ for j = 1:numel(busElementOutput)
     if ~contains(me.DataType, "Bus:")
         sigs(end+1) = add_block("simulink/Quick Insert/Signal Attributes/Cast To Single", mdl + "/" + portName); %#ok<AGROW>
         add_line(mdl, selectorName + "/" + j, portName + "/1");
-        
+
         if all(element.Dimensions ~= 1)
+            % Matrix-valued bus elements need an explicit reshape before
+            % the concat, otherwise the vector layout is ambiguous.
             sigs(end) = add_block("simulink/Math Operations/Reshape", mdl + "/" + portName + "Reshape");
             add_line(mdl, portName + "/" + 1, portName + "Reshape/1");
         end
-        
+
     else
 
         bus = util.sl.loadBus(mdl, me.DataType);
@@ -43,10 +45,10 @@ for j = 1:numel(busElementOutput)
     end
 end
 
-s = add_block("simulink/Signal Routing/Vector Concatenate", mdl + "/ToVector" , "MakeNameUnique", 'on');
+s = add_block("simulink/Signal Routing/Vector Concatenate", mdl + "/ToVector", "MakeNameUnique", "on");
 vCast = get_param(s, "Name");
 
-set_param(mdl + "/" + vCast, "NumInputs", string(numel(sigs))); % Ensure we have enough ports
+set_param(mdl + "/" + vCast, "NumInputs", string(numel(sigs)));
 for i = 1:numel(sigs)
     block = get_param(sigs(i), "Name");
     add_line(mdl, block + "/1", vCast + "/" + i);

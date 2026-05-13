@@ -6,14 +6,13 @@ end
 
 [~, co] = util.loadSystem(mdl); %#ok<ASGLU>
 
-% Probably should be missing, but not supported for e.g. integers
-
 paramPath = strsplit(param, ".");
 paramRoot = extractBefore(param + ".", ".");
 
 try
     where = Simulink.findVars(mdl, "Name", paramRoot, "SearchMethod", "cached");
 catch
+    % SearchMethod="cached" is missing on older MATLAB releases.
     where = Simulink.findVars(mdl, "Name", paramRoot);
 end
 
@@ -27,10 +26,9 @@ switch where.SourceType
         param = getVariable(mw, paramPath(1));
         value = param.Value;
     case "base workspace"
-        param = evalin('base', param);
+        param = evalin("base", param);
         value = param.Value;
     otherwise
-        % Try in a data dictionary
         sldd = where.Source;
         try
             dd = Simulink.data.dictionary.open(sldd);
@@ -46,7 +44,7 @@ switch where.SourceType
         end
 end
 
-% Access parameters in a struct
+% Dotted access into nested struct parameters (e.g. ctrl.pid.Kp).
 for i = 2:numel(paramPath)
     try
         value = value.(paramPath(i));

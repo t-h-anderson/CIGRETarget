@@ -11,7 +11,7 @@ classdef ParameterConfiguration
                 filePath (1,1) string %{mustBeFile}
             end
 
-            raw = readtable(filePath, "TextType", "string");
+            raw = readtable(filePath, 'TextType', 'string');
 
             % Validate expected columns are present
             requiredColumns = ["Name", "IsVisible"];
@@ -108,7 +108,7 @@ classdef ParameterConfiguration
             isVisibleMask = arrayfun(@(p) obj.isVisible(p.SimulinkName), allParams);
 
             visibleParams = allParams(isVisibleMask);
-            hiddenParams  = allParams(~isVisibleMask);
+            hiddenParams = allParams(~isVisibleMask);
 
             % Apply effective defaults so the writer doesn't need to call back
             % into the config for each parameter individually
@@ -133,11 +133,11 @@ classdef ParameterConfiguration
                 allParams (1,:) cigre.description.Variable
             end
 
-            modelNames  = string([allParams.SimulinkName]);
+            modelNames = string([allParams.SimulinkName]);
             configNames = string([obj.Parameters.Name]);
 
-            missingFromConfig    = modelNames(~ismember(modelNames, configNames));
-            superfluousInConfig  = configNames(~ismember(configNames, modelNames));
+            missingFromConfig = modelNames(~ismember(modelNames, configNames));
+            superfluousInConfig = configNames(~ismember(configNames, modelNames));
         end
 
     end

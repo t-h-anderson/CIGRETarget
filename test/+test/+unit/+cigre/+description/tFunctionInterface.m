@@ -157,11 +157,16 @@ end
 % --- Local helper ---------------------------------------------------------
 
 function buildDir = makeTempSourceFile(testCase, modelName, lines)
+    arguments
+        testCase
+        modelName (1,1) string
+        lines (:,1) string
+    end
     % Write a minimal .c file to a temporary directory and register cleanup.
     buildDir = string(tempname());
     mkdir(buildDir);
-    testCase.addTeardown(@() rmdir(buildDir, 's'));
-    fid = fopen(fullfile(buildDir, modelName + ".c"), 'w');
-    fprintf(fid, '%s\n', lines);
+    testCase.addTeardown(@() rmdir(buildDir, "s"));
+    fid = fopen(fullfile(buildDir, modelName + ".c"), "w");
+    fprintf(fid, "%s\n", lines);
     fclose(fid);
 end

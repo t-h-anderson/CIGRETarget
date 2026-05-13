@@ -1,7 +1,10 @@
 function str = valToString(val)
-% Take "any" input and convert it to a string
+% valToString converts a scalar, matrix, or struct into MATLAB-evaluable
+% source text. Used when emitting default parameter values into Simulink
+% InstanceParameters and CIGRE descriptions, where the receiver expects a
+% literal that can be eval'd back to the original value.
 arguments
-    val % Could be anything
+    val
 end
 
 if ~isscalar(val)
@@ -18,14 +21,12 @@ if ~isscalar(val)
     str = "[";
     for i = 1:size(val, 1)
         str = str + strjoin([p{i,:}], ", ");
-        
-        % Not the final row, so add a semicolon
         if i < size(val, 1)
             str = str + "; ";
         end
     end
     str = str + "]";
-        
+
     return
 end
 
@@ -53,8 +54,10 @@ if isstruct(val)
 elseif isstring(val) || ischar(val)
     str = """" + val + """";
 else
-    c = class(val);
-    if ~strcmp(c, "double")
+    c = string(class(val));
+    if c ~= "double"
+        % Wrap non-double numeric literals with a cast so the eval'd value
+        % round-trips back to the same class (Simulink defaults to double).
         str = str + c + "(" + val + ")";
     else
         str = str + string(val);

@@ -19,9 +19,13 @@ for ii = 1:numel(mdls)
     try
         refs{ii} = find_mdlrefs(mdl, "ReturnTopModelAsLastElement", false, "KeepModelsLoaded", true);
     catch me
-        % Mark as model ref so it is removed
-        refs{ii} = mdl;
-        disp("Skipping " + mdl + " because of error: " + me.message);
+        % Can't introspect references because the model itself failed
+        % to load (typically a version-mismatch error). Leave it in
+        % the parameter list with an empty reference set so tBuild
+        % can report Incomplete rather than the model being silently
+        % dropped.
+        refs{ii} = string.empty(0, 1);
+        disp("Could not introspect " + mdl + ": " + me.message);
     end
     
     if isempty(refs{ii})
@@ -46,6 +50,9 @@ ModelName = struct(ModelName{:});
 end
 
 function tf = isLibrary(mdl)
+arguments
+    mdl (1,1) string
+end
 try
     tf = bdIsLibrary(mdl);
 catch me

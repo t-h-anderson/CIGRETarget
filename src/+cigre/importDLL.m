@@ -42,46 +42,36 @@ function [modelPath, info] = importDLL(dllPath, nvp)
 %       'OutputFolder', 'C:\models');
 
     arguments
-        dllPath          (1,1) string
-        nvp.Header       (1,1) string  = fullfile(cigreRoot, "src", "CIGRESource", "IEEE_Cigre_DLLInterface.h")
-        nvp.OutputFolder (1,1) string  = string(pwd)
-        nvp.BlockName    (1,1) string  = string(missing)
-        nvp.OpenModel    (1,1) logical = true
+        dllPath (1,1) string
+        nvp.Header (1,1) string = fullfile(cigreRoot, "src", "CIGRESource", "IEEE_Cigre_DLLInterface.h")
+        nvp.OutputFolder (1,1) string = string(pwd)
+        nvp.BlockName (1,1) string = string(missing)
+        nvp.OpenModel (1,1) logical = true
     end
 
-    % ------------------------------------------------------------------ %
-    %  Resolve DLL path
-    % ------------------------------------------------------------------ %
     dllPath = resolvePath(dllPath);
     if ~isfile(dllPath)
-        error('CIGRE:importDLL:DLLNotFound', ...
-            'CIGRE DLL not found: %s', dllPath);
+        error("CIGRE:importDLL:DLLNotFound", ...
+            "CIGRE DLL not found: %s", dllPath);
     end
 
     [dllDir, dllBase, ~] = fileparts(dllPath);
 
-    % ------------------------------------------------------------------ %
-    %  Resolve header path (needed at simulation time by the S-Function)
-    % ------------------------------------------------------------------ %
     if ismissing(nvp.Header)
         headerPath = fullfile(dllDir, dllBase + ".h");
     else
         headerPath = resolvePath(nvp.Header);
     end
     if ~isfile(headerPath)
-        error('CIGRE:importDLL:HeaderNotFound', ...
-            'DLL header not found: %s\nSpecify it explicitly via the Header argument.', ...
+        error("CIGRE:importDLL:HeaderNotFound", ...
+            "DLL header not found: %s\nSpecify it explicitly via the Header argument.", ...
             headerPath);
     end
 
-    % ------------------------------------------------------------------ %
-    %  Read model info via MEX (DLL is not kept loaded)
-    % ------------------------------------------------------------------ %
+    % ModelInfo.fromDLL uses a MEX helper so the DLL is read once and not
+    % kept loaded; the S-Function reloads it via loadlibrary at sim time.
     info = cigre.importer.ModelInfo.fromDLL(dllPath);
 
-    % ------------------------------------------------------------------ %
-    %  Determine block / model name
-    % ------------------------------------------------------------------ %
     if ismissing(nvp.BlockName)
         if strtrim(info.Name) ~= ""
             blockName = matlab.lang.makeValidName(info.Name);
@@ -92,9 +82,6 @@ function [modelPath, info] = importDLL(dllPath, nvp)
         blockName = nvp.BlockName;
     end
 
-    % ------------------------------------------------------------------ %
-    %  Ensure output folder exists
-    % ------------------------------------------------------------------ %
     outputFolder = nvp.OutputFolder;
     if ~isfolder(outputFolder)
         mkdir(outputFolder);
@@ -103,33 +90,24 @@ function [modelPath, info] = importDLL(dllPath, nvp)
     modelName = blockName;
     modelPath = fullfile(outputFolder, modelName + ".slx");
 
-    % ------------------------------------------------------------------ %
-    %  Create Simulink model
-    % ------------------------------------------------------------------ %
     if bdIsLoaded(modelName)
         close_system(modelName, 0);
     end
 
-    hModel    = new_system(modelName);
+    hModel = new_system(modelName);
     blockPath = modelName + "/" + blockName;
 
     try
-        % ---- Add Level-2 MATLAB S-Function block ----
-        % Try the modern library path; fall back to the older MATLAB name.
         addLevel2SFBlock(blockPath);
 
-        % ---- Apply mask (defines mask workspace variables) ----
-        % Returns the ordered list of mask parameter variable names.
         paramVarNames = applyMask(blockPath, info, dllPath, headerPath);
 
-        % ---- Wire S-Function dialog params to mask variables ----
-        % Simulink evaluates each variable name in the mask workspace and
-        % passes the result as the corresponding block.DialogPrm(i):
-        %   1 = DLLPath (char), 2 = HeaderPath (char), 3..N+2 = param values
-        set_param(char(blockPath), 'Parameters', ...
-            char(strjoin(paramVarNames, ', ')));
+        % Simulink resolves each name in the mask workspace and feeds the
+        % result to block.DialogPrm(i) in order:
+        %   1 = DLLPath, 2 = HeaderPath, 3..N+2 = parameter values.
+        set_param(char(blockPath), "Parameters", ...
+            char(strjoin(paramVarNames, ", ")));
 
-        % ---- Save ----
         save_system(hModel, char(modelPath));
 
         if nvp.OpenModel
@@ -150,12 +128,12 @@ function [modelPath, info] = importDLL(dllPath, nvp)
 
     modelPath = string(modelPath);
 
-    fprintf('CIGRE DLL imported successfully.\n');
-    fprintf('  Model      : %s  v%s\n', info.Name, info.Version);
-    fprintf('  Inputs     : %d\n', numel(info.Inputs));
-    fprintf('  Outputs    : %d\n', numel(info.Outputs));
-    fprintf('  Parameters : %d\n', numel(info.Parameters));
-    fprintf('  Saved to   : %s\n', modelPath);
+    fprintf("CIGRE DLL imported successfully.\n");
+    fprintf("  Model      : %s  v%s\n", info.Name, info.Version);
+    fprintf("  Inputs     : %d\n", numel(info.Inputs));
+    fprintf("  Outputs    : %d\n", numel(info.Outputs));
+    fprintf("  Parameters : %d\n", numel(info.Parameters));
+    fprintf("  Saved to   : %s\n", modelPath);
 end
 
 % ======================================================================= %
@@ -163,6 +141,9 @@ end
 % ======================================================================= %
 
 function p = resolvePath(p)
+arguments
+    p (1,1) string
+end
     resolved = which(p);
     if ~isempty(resolved)
         p = string(resolved);
@@ -172,44 +153,50 @@ function p = resolvePath(p)
 end
 
 function addLevel2SFBlock(blockPath)
-% Add a Level-2 MATLAB S-Function block, handling name differences across
-% MATLAB versions.
-    names = { ...
-        'simulink/User-Defined Functions/Level-2 MATLAB S-Function', ...
-        'simulink/User-Defined Functions/Level-2 M-file S-Function'};
+arguments
+    blockPath (1,1) string
+end
+% Adds a Level-2 MATLAB S-Function block whose library path was renamed
+% between releases. The new name is tried first; the older name remains
+% as a fallback for legacy installs.
+    names = [...
+        "simulink/User-Defined Functions/Level-2 MATLAB S-Function", ...
+        "simulink/User-Defined Functions/Level-2 M-file S-Function"];
     added = false;
     for k = 1:numel(names)
         try
-            add_block(names{k}, char(blockPath), ...
-                'FunctionName', 'cigreDLLSFunction', ...
-                'Position',     [100, 100, 300, 200]);
+            add_block(names(k), char(blockPath), ...
+                "FunctionName", "cigreDLLSFunction", ...
+                "Position", [100, 100, 300, 200]);
             added = true;
             break
         catch
         end
     end
     if ~added
-        error('CIGRE:importDLL:BlockNotFound', ...
-            ['Could not add a Level-2 MATLAB S-Function block. ' ...
-             'Check that Simulink is installed.']);
+        error("CIGRE:importDLL:BlockNotFound", ...
+            "Could not add a Level-2 MATLAB S-Function block. Check that Simulink is installed.");
     end
 end
 
 function paramVarNames = applyMask(blockPath, info, dllPath, headerPath)
-% Create a Simulink mask on blockPath.
+arguments
+    blockPath (1,1) string
+    info (1,1) cigre.importer.ModelInfo
+    dllPath (1,1) string
+    headerPath (1,1) string
+end
+% applyMask Configure the import block's mask.
 %
-% Adds:
-%   - Hidden 'DLLPath' and 'HeaderPath' parameters so the S-Function can
-%     reload the library at simulation time via loadlibrary.
-%   - One visible edit parameter per CIGRE DLL parameter.
-%
-% Returns paramVarNames: a string array of mask variable names in order
-% [DLLPath, HeaderPath, p1, p2, ...] used to build the S-Function
-% 'Parameters' string.
+% Hidden DLLPath/HeaderPath parameters are stored on the mask so the
+% S-Function can reload the library at simulation time via loadlibrary.
+% Each CIGRE parameter becomes a visible edit field whose mask variable
+% name is returned in paramVarNames; the caller wires these into the
+% S-Function's 'Parameters' list in order
+% [DLLPath, HeaderPath, p1, p2, ...].
 
     mask = Simulink.Mask.create(char(blockPath));
 
-    % Description panel
     descLines = ["CIGRE DLL Block", ""];
     if info.Name ~= ""
         descLines(end+1) = sprintf("Model   : %s", info.Name);
@@ -226,53 +213,53 @@ function paramVarNames = applyMask(blockPath, info, dllPath, headerPath)
     end
     mask.Description = strjoin(descLines, newline);
 
-    % Helper: escape single quotes in a path for use inside a MATLAB
-    % string literal (e.g.  'C:\it''s\dll.dll')
+    % Path values are stored as MATLAB-quoted char literals (e.g.
+    % 'C:\it''s\dll.dll') because the mask workspace eval's them.
     escapePath = @(p) char("'" + strrep(string(p), "'", "''") + "'");
 
-    % ---- Hidden path parameters ---- %
-    pDLL = mask.addParameter('Type', 'edit', ...
-        'Name',    'DLLPath', ...
-        'Prompt',  'DLL file path', ...
-        'Value',   escapePath(dllPath), ...
-        'Tunable', 'off');
-    pDLL.Visible = 'off';
+    pDLL = mask.addParameter("Type", "edit", ...
+        "Name", "DLLPath", ...
+        "Prompt", "DLL file path", ...
+        "Value", escapePath(dllPath), ...
+        "Tunable", "off");
+    pDLL.Visible = "off";
 
-    pHdr = mask.addParameter('Type', 'edit', ...
-        'Name',    'HeaderPath', ...
-        'Prompt',  'Header file path', ...
-        'Value',   escapePath(headerPath), ...
-        'Tunable', 'off');
-    pHdr.Visible = 'off';
+    pHdr = mask.addParameter("Type", "edit", ...
+        "Name", "HeaderPath", ...
+        "Prompt", "Header file path", ...
+        "Value", escapePath(headerPath), ...
+        "Tunable", "off");
+    pHdr.Visible = "off";
 
     paramVarNames = ["DLLPath", "HeaderPath"];
 
-    % ---- One visible parameter per CIGRE DLL parameter ---- %
     for i = 1:numel(info.Parameters)
-        p   = info.Parameters(i);
+        p = info.Parameters(i);
         vid = matlab.lang.makeValidName(string(p.Name));
 
-        % Guarantee uniqueness across accumulated variable names
+        % Two parameters can sanitise to the same MATLAB identifier;
+        % uniqueness guards prevent overwriting an earlier slot.
         vid = matlab.lang.makeUniqueStrings(vid, paramVarNames);
 
-        % Prompt label with optional unit
         prompt = string(p.Name);
-        unit   = strtrim(string(p.Unit));
+        unit = strtrim(string(p.Unit));
         if unit ~= ""
             prompt = prompt + " [" + unit + "]";
         end
 
-        mp = mask.addParameter('Type',    'edit', ...
-            'Name',    char(vid), ...
-            'Prompt',  char(prompt), ...
-            'Value',   mat2str(p.DefaultValue), ...
-            'Tunable', 'on');
+        mp = mask.addParameter("Type", "edit", ...
+            "Name", char(vid), ...
+            "Prompt", char(prompt), ...
+            "Value", mat2str(p.DefaultValue), ...
+            "Tunable", "on");
 
         desc = strtrim(string(p.Description));
         if desc ~= ""
             try
                 mp.Tooltip = char(desc);
             catch
+                % Tooltip is unsupported on this MATLAB release; mask
+                % is still functional without it.
             end
         end
 
@@ -281,15 +268,17 @@ function paramVarNames = applyMask(blockPath, info, dllPath, headerPath)
             try
                 mp.GroupName = char(grp);
             catch
+                % GroupName is unsupported on this MATLAB release.
             end
         end
 
         paramVarNames(end+1) = vid; %#ok<AGROW>
     end
 
-    % ---- Port labels on block icon ---- %
     displayLines = string.empty(1,0);
     for i = 1:numel(info.Inputs)
+        % Single quotes inside port labels would terminate the
+        % port_label('...') literal; double them up to escape.
         lbl = strrep(char(string(info.Inputs(i).Name)), "'", "''");
         displayLines(end+1) = sprintf("port_label('input',%d,'%s')", i, lbl); %#ok<AGROW>
     end

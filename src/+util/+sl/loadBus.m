@@ -6,7 +6,8 @@ end
 
 [~, cuo] = util.loadSystem(modelName); %#ok<ASGLU>
 
-% Allow search for e.g. "Bus:myBus", "Bus: myBus", or "myBus"
+% Accept either the bare bus name or the "Bus: <name>" form that Simulink
+% stores on port data types, so callers don't have to normalise upfront.
 busName = strtrim(erase(busName, "Bus:"));
 
 try

@@ -1,0 +1,100 @@
+name: Tests
+
+on:
+  # Limit push triggers to main so feature branches with open PRs do not
+  # get two runs per commit (one from push, one from pull_request).
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref to keep the queue short.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+# checks:write is required for dorny/test-reporter to publish the JUnit
+# summary as a check on the PR.
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  test:
+    name: MATLAB ${{ matrix.release }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    # Set the licence token at job scope so every step (setup, run,
+    # checkout, dorny/test-reporter) sees it. MATLAB does a per-product
+    # licence checkout at runtime and falls back to the GitHub-hosted
+    # free licence (no Embedded Coder) without it.
+    env:
+      MLM_LICENSE_TOKEN: ${{ secrets.MATLAB_LICENCE }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # R2020b's bundled FreeType is older than what ubuntu-24.04 (the
+        # current ubuntu-latest) ships in libharfbuzz, producing an
+        # undefined-symbol error at MATLAB startup. Pin R2020b to
+        # ubuntu-22.04 where the system libraries are still compatible.
+        include:
+          - release: R2020b
+            os: ubuntu-22.04
+          - release: R2026a
+            os: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Simulink, Model Advisor and code generation need a graphics
+      # environment even though the runner is headless; Xvfb provides
+      # a virtual X display so model-open and find_system calls succeed.
+      - name: Install and start Xvfb
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y xvfb
+          Xvfb :99 -screen 0 1920x1080x24 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          release: ${{ matrix.release }}
+          # cache: true reuses the MATLAB install across runs when the
+          # release + product set is unchanged, saving ~3-5 min per
+          # cache hit. The cache key is keyed on these inputs so
+          # changing the product list invalidates it automatically.
+          cache: true
+          products: >
+            Simulink
+            Simulink_Coder
+            Embedded_Coder
+            Simulink_Check
+            Parallel_Computing_Toolbox
+
+      # runAllTests.m opens CIGRE.prj (which sets the path) and writes
+      # JUnit + Cobertura artefacts to artifacts/. Invoking via run()
+      # with an explicit path bypasses MATLAB's path resolution and
+      # mirrors what the existing GitLab pipeline does.
+      - name: Run tests
+        uses: matlab-actions/run-command@v2
+        with:
+          command: run('test/runAllTests.m')
+
+      - name: Upload test artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.release }}
+          path: artifacts/
+          if-no-files-found: warn
+
+      - name: Publish test summary
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: MATLAB ${{ matrix.release }} results
+          path: artifacts/JunitXMLResults.xml
+          reporter: java-junit
+          fail-on-error: false

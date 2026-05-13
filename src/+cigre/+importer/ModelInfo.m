@@ -22,23 +22,26 @@ classdef ModelInfo
 %   6=int32_T 7=uint32_T  8=real32_T  9=real64_T  10=c_string_T
 
     properties
-        Name        (1,1) string = ""
-        Version     (1,1) string = ""
+        Name (1,1) string = ""
+        Version (1,1) string = ""
         Description (1,1) string = ""
-        SampleTime  (1,1) double = 0
+        SampleTime (1,1) double = 0
         EMT_RMS_Mode (1,1) uint8 = 1
         % Signal struct arrays (fields: Name, Description, Unit, DataType, Width)
-        Inputs      (1,:) struct
-        Outputs     (1,:) struct
+        Inputs (1,:) struct
+        Outputs (1,:) struct
         % Parameter struct array (fields: Name, GroupName, Description, Unit,
         %   DataType, FixedValue, DefaultValue, MinValue, MaxValue)
-        Parameters  (1,:) struct
+        Parameters (1,:) struct
     end
 
     % ------------------------------------------------------------------ %
     methods (Static)
 
         function info = fromDLL(dllPath)
+            arguments
+                dllPath (1,1) string
+            end
         % FROMDLL  Read ModelInfo from a CIGRE DLL file.
         %
         %   info = cigre.importer.ModelInfo.fromDLL(dllPath)
@@ -61,17 +64,20 @@ classdef ModelInfo
             raw = cigre.importer.cigre_read_model_info(char(dllPath));
 
             info = cigre.importer.ModelInfo();
-            info.Name        = string(raw.Name);
-            info.Version     = string(raw.Version);
+            info.Name = string(raw.Name);
+            info.Version = string(raw.Version);
             info.Description = string(raw.Description);
-            info.SampleTime  = double(raw.SampleTime);
+            info.SampleTime = double(raw.SampleTime);
             info.EMT_RMS_Mode = uint8(raw.EMT_RMS_Mode);
-            info.Inputs      = raw.Inputs;
-            info.Outputs     = raw.Outputs;
-            info.Parameters  = raw.Parameters;
+            info.Inputs = raw.Inputs;
+            info.Outputs = raw.Outputs;
+            info.Parameters = raw.Parameters;
         end
 
         function slType = cigreTypeToSimulink(cigreDataType)
+            arguments
+                cigreDataType (1,1) {mustBeNumeric}
+            end
         % CIGRETYPETOSIMULNK  Map a CIGRE DataType integer to a MATLAB/Simulink
         % type name string.
         %
@@ -92,23 +98,23 @@ classdef ModelInfo
             persistent typeTable
             if isempty(typeTable)
                 typeTable = [ ...
-                    1,  "int8";   % char_T
-                    2,  "int8";   % int8_T
-                    3,  "uint8";  % uint8_T
-                    4,  "int16";  % int16_T
-                    5,  "uint16"; % uint16_T
-                    6,  "int32";  % int32_T
-                    7,  "uint32"; % uint32_T
-                    8,  "single"; % real32_T
-                    9,  "double"; % real64_T
-                    10, "int8";   % c_string_T (char array)
+                    1, "int8";   % char_T
+                    2, "int8";   % int8_T
+                    3, "uint8";  % uint8_T
+                    4, "int16";  % int16_T
+                    5, "uint16"; % uint16_T
+                    6, "int32";  % int32_T
+                    7, "uint32"; % uint32_T
+                    8, "single"; % real32_T
+                    9, "double"; % real64_T
+                    10, "int8";  % c_string_T (char array)
                 ];
             end
             keys = double(typeTable(:, 1));
-            idx  = find(keys == double(cigreDataType), 1);
+            idx = find(keys == double(cigreDataType), 1);
             if isempty(idx)
-                error('CIGRE:ModelInfo:UnknownType', ...
-                    'Unknown CIGRE DataType enum value: %d', cigreDataType);
+                error("CIGRE:ModelInfo:UnknownType", ...
+                    "Unknown CIGRE DataType enum value: %d", cigreDataType);
             end
             slType = typeTable(idx, 2);
         end
@@ -120,30 +126,27 @@ classdef ModelInfo
 
         function ensureMexCompiled()
         % Compile the cigre_read_model_info MEX function if not already built.
-            mexName  = 'cigre_read_model_info';
-            importer = fullfile(cigreRoot(), 'src', '+cigre', '+importer');
-            src      = fullfile(importer, [mexName '.c']);
-            incl     = fullfile(cigreRoot(), 'src', 'CIGRESource');
+            mexName = "cigre_read_model_info";
+            importer = fullfile(cigreRoot(), "src", "+cigre", "+importer");
+            src = fullfile(importer, mexName + ".c");
+            incl = fullfile(cigreRoot(), "src", "CIGRESource");
 
-            % Check whether the MEX binary is already on the path / in the
-            % importer folder.
-            if exist(mexName, 'file') == 3
-                return   % Already compiled and on path
+            if exist(mexName, "file") == 3
+                return
             end
 
             if ~isfile(src)
-                error('CIGRE:ModelInfo:MexSourceMissing', ...
-                    'MEX source not found: %s', src);
+                error("CIGRE:ModelInfo:MexSourceMissing", ...
+                    "MEX source not found: %s", src);
             end
 
-            fprintf('Compiling %s.c (first use)...\n', mexName);
+            fprintf("Compiling %s.c (first use)...\n", mexName);
             try
-                mex('-outdir', importer, src, ['-I' incl]);
-                fprintf('Done.\n');
+                mex("-outdir", char(importer), char(src), char("-I" + incl));
+                fprintf("Done.\n");
             catch ME
-                error('CIGRE:ModelInfo:MexCompileFailed', ...
-                    'Failed to compile %s:\n%s\n\n' + ...
-                    'Run "mex -setup C" to configure a compiler.', ...
+                error("CIGRE:ModelInfo:MexCompileFailed", ...
+                    "Failed to compile %s:\n%s\n\nRun ""mex -setup C"" to configure a compiler.", ...
                     src, ME.message);
             end
         end

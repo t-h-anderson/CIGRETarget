@@ -10,12 +10,14 @@ classdef WithParallelFixture < matlab.unittest.TestCase
                 nvp.PauseBeforeRun (1, 1) logical = false
             end
 
-            delete(gcp('nocreate'));
-            p = parpool(1); % backgroundPool doesn't support dll loading
+            delete(gcp("nocreate"));
+            % backgroundPool runs in-process and cannot host a loaded DLL,
+            % so a real parpool is required for these tests.
+            p = parpool(1);
             try
-                myCluster = parcluster('Processes');
+                myCluster = parcluster("Processes");
             catch
-                myCluster = parcluster('local');
+                myCluster = parcluster("local");
             end
 
             state = warning("query", "parallel:cluster:LocalWorkerCrash").state;
@@ -23,17 +25,19 @@ classdef WithParallelFixture < matlab.unittest.TestCase
             testCase.addTeardown(@() warning(state, "parallel:cluster:LocalWorkerCrash"));
 
             testCase.addTeardown(@() delete(myCluster.Jobs));
-            
+
             if nvp.PauseBeforeRun
                 keyboard %#ok<KEYBOARDFUN>
             end
-            
+
             f = parfeval(p, func, nOut);
             wait(f, "finished", 1000);
-            testCase.assertGreaterThan(p.NumWorkers, 0); % If the dll seg faults, the parpool worker dies
+            % A worker crash would drop NumWorkers to 0; the assertion
+            % catches DLL segfaults that would otherwise look like a hang.
+            testCase.assertGreaterThan(p.NumWorkers, 0);
 
             result = f.fetchOutputs();
-            
+
         end
 
     end

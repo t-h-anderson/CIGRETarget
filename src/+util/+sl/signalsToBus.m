@@ -7,8 +7,6 @@ arguments
     creatorName (1,1) string
 end
 
-% Add the bus creator with an input for each signal
-
 busDef = util.sl.loadBus(mdl, signalInput.BusObject);
 
 busElements = busDef.Elements;
@@ -18,23 +16,25 @@ set_param(busCreator, "OutDataTypeStr", "Bus: " + signalInput.BusObject);
 
 for j = 1:numel(busElements)
 
+    % Inport naming convention: <fromName>_<busElementName> so the leaf
+    % signal stays traceable back to its slot in the original bus.
     portName = fromName + "_" + busElements(j).Name;
 
     if ~contains(busElements(j).DataType, "Bus:")
 
-    % Add the in port with name in - originalName_busElementName
         in = add_block("built-in/Inport", mdl + "/" + portName);
 
-        nextBlock = creatorName + "/" + j;  
+        nextBlock = creatorName + "/" + j;
 
         if startsWith(busElements(j).DataType, "Enum: ")
 
-            % Need to convert enums to integers
+            % External port is int32 (CIGRE ABI); cast back to the enum
+            % class before feeding the bus creator.
             c = add_block("simulink/Quick Insert/Signal Attributes/Cast", mdl + "/Convert" + portName);
             set_param(c, "OutDataTypeStr", busElements(j).DataType);
             l = add_line(mdl, "Convert" + portName + "/1", creatorName + "/" + j);
-            
-            signalName = busElements(j).Name; 
+
+            signalName = busElements(j).Name;
             set_param(l, "Name", signalName);
 
             nextBlock = "Convert" + portName + "/1";
@@ -44,8 +44,7 @@ for j = 1:numel(busElements)
 
         l = add_line(mdl, portName + "/1", nextBlock);
 
-        % Name is element
-        signalName = busElements(j).Name; 
+        signalName = busElements(j).Name;
         set_param(l, "Name", signalName);
     else
         elementCreatorName = creatorName + "_" + j;

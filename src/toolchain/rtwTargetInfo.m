@@ -3,6 +3,10 @@ function rtwTargetInfo(tr)
 
 % Copyright 2012-2017 The MathWorks, Inc.
 
+arguments
+    tr (1,1)
+end
+
 tr.registerTargetInfo(@createToolchainInfoRegs);
 
 end

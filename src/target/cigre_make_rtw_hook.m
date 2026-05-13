@@ -1,4 +1,13 @@
-function cigre_make_rtw_hook(hookMethod, modelName,~, ~, ~, buildArgs, buildInfo)
+function cigre_make_rtw_hook(hookMethod, modelName, rtwroot, templateMakefile, buildOpts, buildArgs, buildInfo) %#ok<INUSD>
+arguments
+    hookMethod (1,:) char
+    modelName (1,:) char
+    rtwroot
+    templateMakefile
+    buildOpts
+    buildArgs
+    buildInfo
+end
 % CIGRE RTW build hook - called by Simulink at each stage of the RTW build.
 %
 % ert_make_rtw_hook(hookMethod, modelName, rtwroot, templateMakefile,
@@ -51,91 +60,76 @@ function cigre_make_rtw_hook(hookMethod, modelName,~, ~, ~, buildArgs, buildInfo
 %   exit        - log completion message
 %   error       - log build failure message
 
-switch hookMethod
-    case 'error'
-        % Called if an error occurs anywhere during the build.  If no error occurs
-        % during the build, then this hook will not be called.  Valid arguments
-        % at this stage are hookMethod and modelName. This enables cleaning up
-        % any static or global data used by this hook file.
-        msg = DAStudio.message('RTW:makertw:buildAborted', modelName);
+switch string(hookMethod)
+    case "error"
+        msg = DAStudio.message("RTW:makertw:buildAborted", modelName);
         disp(msg);
-    case 'entry'
-        % Called at start of code generation process (before anything happens.)
-        % Valid arguments at this stage are hookMethod, modelName, and buildArgs.
-        msg = DAStudio.message('RTW:makertw:enterRTWBuild', modelName);
+    case "entry"
+        msg = DAStudio.message("RTW:makertw:enterRTWBuild", modelName);
         disp(msg);
 
         option = LocalParseArgList(buildArgs);
-        if ~strcmp(option,'none')
+        if option ~= "none"
             ert_unspecified_hardware(modelName);
             cs = getActiveConfigSet(modelName);
             cscopy = cs.copy;
-            ert_auto_configuration(modelName,option);
+            ert_auto_configuration(modelName, option);
             locReportDifference(cscopy, cs);
         end
 
-    case 'before_tlc'
-        % Called just prior to invoking TLC Compiler (actual code generation.)
-        % Valid arguments at this stage are hookMethod, modelName, and
-        % buildArgs
+    case "before_tlc"
 
-    case 'after_tlc'
-        % Called just after to invoking TLC Compiler (actual code generation.)
-        % Valid arguments at this stage are hookMethod, modelName, and
-        % buildArgs
+    case "after_tlc"
 
-    case 'before_make'
-        % Called after code generation is complete, and just prior to kicking
-        % off make process (assuming code generation only is not selected.)  All
-        % arguments are valid at this stage
+    case "before_make"
         handleBeforeMake(modelName, buildInfo);
 
-    case 'after_make'
-        % Called after make process is complete. All arguments are valid at
-        % this stage.
+    case "after_make"
         handleAfterMake(modelName);
 
-    case 'exit'
-        % Called at the end of the build process.  All arguments are valid
-        % at this stage.#
-
-        if strcmp(get_param(modelName,'GenCodeOnly'),'off')
-            msgID = 'RTW:makertw:exitRTWBuild';
+    case "exit"
+        if string(get_param(modelName, "GenCodeOnly")) == "off"
+            msgID = "RTW:makertw:exitRTWBuild";
         else
-            msgID = 'RTW:makertw:exitRTWGenCodeOnly';
+            msgID = "RTW:makertw:exitRTWGenCodeOnly";
         end
-        msg = DAStudio.message(msgID,modelName);
+        msg = DAStudio.message(msgID, modelName);
         disp(msg);
 end
 
 end
 
 
-% Simple parse function to find:
+function option = LocalParseArgList(args)
+arguments
+    args
+end
+% Recognise the two supported make_rtw buildArgs:
 %   optimized_fixed_point=1
 %   optimized_floating_point=1
-function option = LocalParseArgList(args)
-
-if contains(args,'optimized_fixed_point=1')
-    option = 'optimized_fixed_point';
-elseif contains(args,'optimized_floating_point=1')
-    option = 'optimized_floating_point';
+if contains(args, "optimized_fixed_point=1")
+    option = "optimized_fixed_point";
+elseif contains(args, "optimized_floating_point=1")
+    option = "optimized_floating_point";
 else
-    option = 'none';
+    option = "none";
 end
 
 end
 
-% local function: report difference between the configuration set settings
-% before and after running auto-configuration script.
 function locReportDifference(cs1, cs2)
-[iseq, diffs] = slprivate('diff_config_sets', cs1, cs2, 'string');
+arguments
+    cs1
+    cs2
+end
+% Report any configuration-set differences introduced by ert_auto_configuration.
+[iseq, diffs] = slprivate("diff_config_sets", cs1, cs2, "string");
 if ~iseq
-    msg = DAStudio.message('RTW:makertw:incompatibleParamsUpdated', diffs);
-    summary = DAStudio.message('RTW:makertw:autoconfigSummary');
-    rtwprivate('rtw_disp_info',...
-        get_param(cs2.getModel, 'Name'),...
-        summary,...
+    msg = DAStudio.message("RTW:makertw:incompatibleParamsUpdated", diffs);
+    summary = DAStudio.message("RTW:makertw:autoconfigSummary");
+    rtwprivate("rtw_disp_info", ...
+        get_param(cs2.getModel, "Name"), ...
+        summary, ...
         msg);
 end
 
@@ -143,6 +137,9 @@ end
 
 
 function buildContext = loadBuildContext(codeGenFolder)
+arguments
+    codeGenFolder (1,1) string
+end
 % Load build options written by buildDLL before invoking slbuild.
 % buildDLL serialises options to a .mat file because the hook has no
 % direct parameter channel from user code.
@@ -155,8 +152,12 @@ end
 end
 
 function handleBeforeMake(modelName, buildInfo)
+arguments
+    modelName (1,1) string
+    buildInfo
+end
 
-here = Simulink.fileGenControl('getConfig').CodeGenFolder;
+here = Simulink.fileGenControl("getConfig").CodeGenFolder;
 buildContext = loadBuildContext(here);
 
 % Generate CIGRE C source and configure build paths, but only for
@@ -178,6 +179,9 @@ end
 
 
 function replaceRtwTypes(buildDir)
+arguments
+    buildDir (1,1) string
+end
 % Replace the Simulink-generated rtwtypes.h with the CIGRE-compatible
 % version to resolve type definition conflicts at link time.
 replacement = fullfile(cigreRoot, "src", "CIGRESource", "rtwtypes.h");
@@ -187,6 +191,9 @@ end
 
 
 function paramConfig = loadParameterConfig(buildContext)
+arguments
+    buildContext (1,1) struct
+end
 % Load the ParameterConfiguration from the file path stored in the build
 % context. Returns an empty (all-visible) config if no file was specified.
 paramConfig = cigre.config.ParameterConfiguration();
@@ -201,6 +208,11 @@ end
 
 
 function generateCigreSource(modelName, wrapperName, paramConfig)
+arguments
+    modelName (1,1) string
+    wrapperName (1,1) string
+    paramConfig (1,1) cigre.config.ParameterConfiguration
+end
 % Analyse the generated model code and write the CIGRE wrapper C source.
 try
     desc = cigre.description.ModelDescription.analyseModel(modelName, wrapperName);
@@ -216,6 +228,11 @@ end
 
 
 function configureBuildPaths(buildInfo, buildDir, modelName)
+arguments
+    buildInfo
+    buildDir (1,1) string
+    modelName (1,1) string
+end
 % Add CIGRE-specific include paths and source files so the compiler can
 % find the generated wrapper and the CIGRE runtime support files.
 sourceRoot = fullfile(cigreRoot, "src", "CIGRESource");
@@ -231,8 +248,11 @@ end
 
 
 function handleAfterMake(modelName)
+arguments
+    modelName (1,1) string
+end
 
-here = Simulink.fileGenControl('getConfig').CodeGenFolder;
+here = Simulink.fileGenControl("getConfig").CodeGenFolder;
 buildContext = loadBuildContext(here);
 
 % Rename the compiled wrapper DLL to the CIGRE output name and copy the
@@ -265,6 +285,11 @@ end
 
 
 function value = getFieldOrDefault(s, field, default)
+arguments
+    s (1,1) struct
+    field (1,1) string
+    default
+end
 % Return s.(field) if present, otherwise return default.
 if isfield(s, field)
     value = s.(field);

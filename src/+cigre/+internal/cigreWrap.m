@@ -5,7 +5,7 @@ arguments
     nvp.NameSuffix (1,1) string = "_wrap"
     nvp.VectorDataType (1,1) string = "single"
 end
-% Generate the model reference
+
 if nargout > 1
     [wrapper, c] = util.createBusExplodedWrapper(model, "BusAs", nvp.BusAs, "NameSuffix", nvp.NameSuffix, "VectorDataType", nvp.VectorDataType);
 else

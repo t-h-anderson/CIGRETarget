@@ -3,9 +3,9 @@ classdef DataMap
     properties
         Data
         Words (1,:)
-        DataType 
-        Sizes
-        Dims
+        DataType (1,:) string = string.empty
+        Sizes (1,:) double = []
+        Dims (1,:) cell = {}
     end
 
     methods
@@ -66,12 +66,13 @@ classdef DataMap
                 dimensions = dims{iWord};
                 dimensions = num2cell(dimensions);
 
-                % Remove any padding
+                % Trim word-boundary padding so the variable reshapes
+                % back to its original dimensions.
                 nVal = prod([dimensions{:}]);
                 var = var(1:nVal);
 
                 var = reshape(var, dimensions{:});
-                
+
                 data{iWord} = var;
             end
 
@@ -113,7 +114,6 @@ classdef DataMap
 
             for i = 1:size(data, 2)
 
-                % Extract data from cell input
                 if iscell(data)
                     input = data{i};
                 elseif istimetable(data)
@@ -122,36 +122,36 @@ classdef DataMap
                     input = data(:, i);
                 end
 
-                % Extract data from timetabels
                 if istimetable(input)
                     input = input.Variables;
                     if iscell(input)
                         % Each column in the table must be one data type
+                        % for the concat to be type-stable.
                         input = [input{:}];
                     end
                 end
 
                 inputData{i} = input;
 
-                % Capture the input data type so we can cast it back later
                 val = input;
                 dataTypes(i) = class(val);
                 if islogical(val)
-                    % Logical are not supported in PSCAD
+                    % PSCAD's CIGRE consumer does not accept logical;
+                    % coerce to int8 which has the same bit width.
                     val = int8(val);
                 end
 
-                % Save the dimensions before reshaping to a vector
                 dims{i} = size(val);
                 val = reshape(val, 1, []);
 
-                % Convert to target datatype
                 try
                     targetVal = typecast(val, target);
                 catch
-                   
+                    % typecast rejects sizes that aren't a whole number
+                    % of target words; pad the value out to the next
+                    % boundary and retry.
                     n = max(size(typecast(val, "int8")));
-                    
+
                     nTarget = numel(typecast(cast(1, target), "int8"));
 
                     nPad = (nTarget - n)/n;
@@ -167,16 +167,12 @@ classdef DataMap
                     targetVal = typecast(paddedVal, target);
                 end
 
-                % Save the number of target data types per val
                 sizes(i) = numel(targetVal)./numel(val);
 
-                % Pad to word boundaries
                 if sizes(i) > 1
-                    padTo = sizes(i);
-                    words = util.padToBoundary(words, padTo);
+                    words = util.padToBoundary(words, sizes(i));
                 end
 
-                % Store the resulting words
                 words = [words, targetVal]; %#ok<AGROW>
 
             end

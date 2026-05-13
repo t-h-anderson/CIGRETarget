@@ -222,7 +222,7 @@ classdef tModelDescription < matlab.mock.TestCase
                 "} RT_MODEL_T;"
                 ], newline);
             [tbc, nTasks] = cigre.description.ModelDescription.processRTMStructCode(header);
-            testCase.verifyClass(tbc, 'string');
+            testCase.verifyClass(tbc, "string");
             testCase.verifyEqual(nTasks, 1);
         end
 
@@ -615,6 +615,9 @@ testCase.assignOutputsWhen(behavior.getTerminateInterface.withAnyInputs(), ...
 end
 
 function iface = makeFunctionInterface(name)
+arguments
+    name (1,1) string
+end
 % Build a zero-argument FunctionInterface, or empty if name is "".
 if name == ""
     iface = cigre.description.FunctionInterface();

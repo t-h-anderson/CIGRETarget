@@ -7,14 +7,14 @@ classdef CigreDLL < handle
     end
 
     properties (Hidden)
-        Name_
+        Name_ (1,1) string = ""
     end
 
     methods
         function obj = CigreDLL(dllName, nvp)
             arguments
                 dllName (1,1) string
-                nvp.Header (1,1) string = "IEEE_Cigre_DLLInterface.h" % erase(dllName, ".dll") + ".h"
+                nvp.Header (1,1) string = "IEEE_Cigre_DLLInterface.h"
             end
             dllName = erase(dllName, ".dll");
             hfile = nvp.Header;
@@ -22,6 +22,9 @@ classdef CigreDLL < handle
             obj.Name = dllName;
             obj.Header = hfile;
 
+            % loadlibrary uses the alias as the global library handle,
+            % so a UUID suffix lets multiple instances of the same DLL
+            % coexist in one MATLAB session.
             thisDLL = dllName + cigre.util.uuid();
             obj.Name_ = thisDLL;
         end
@@ -33,8 +36,7 @@ classdef CigreDLL < handle
             hfile = obj.Header;
 
             unloadIfLoaded(thisDLL);
-           
-            % Load the dll
+
             if nargout > 0
                 cleanObj = @() obj.unload();
             end
@@ -53,12 +55,14 @@ classdef CigreDLL < handle
         end
 
         function results = run(obj, input, nvp)
+            % Step the model forward NSteps times and return only the
+            % final outputs; useful for advancing a fresh instance past
+            % the first-call transient.
             arguments
                 obj
                 input (1,1) cigre.dll.InterfaceInstance
                 nvp.NSteps (1,1) double {mustBePositive} = 1
             end
-            % Return the result after NSteps
 
             if ~input.IsInitialised
                 obj.initialise(input);
@@ -78,7 +82,7 @@ classdef CigreDLL < handle
 
             data = input.Instance;
 
-            calllib(obj.Name_,'Model_Initialize', data);
+            calllib(obj.Name_, "Model_Initialize", data);
 
             input.IsInitialised = true;
 
@@ -93,7 +97,7 @@ classdef CigreDLL < handle
 
             data = input.Instance;
 
-            calllib(obj.Name_,'Model_FirstCall', data);
+            calllib(obj.Name_, "Model_FirstCall", data);
 
         end
 
@@ -105,7 +109,7 @@ classdef CigreDLL < handle
 
             data = input.Instance;
 
-            calllib(obj.Name_,'Model_Outputs', data);
+            calllib(obj.Name_, "Model_Outputs", data);
 
             result = input.getOutput();
 
@@ -125,6 +129,9 @@ classdef CigreDLL < handle
 end
 
 function unloadIfLoaded(dllName)
+arguments
+    dllName (1,1) string
+end
 if libisloaded(dllName)
     try
         unloadlibrary(dllName)

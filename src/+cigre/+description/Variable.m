@@ -59,6 +59,9 @@ classdef Variable
         end
 
         function leaves = getLeaves(objs)
+            arguments
+                objs (1,:) cigre.description.Variable
+            end
 
             idx = [objs.IsLeaf];
             leaves = objs(idx);
@@ -149,7 +152,7 @@ classdef Variable
                 ertNameRoot (1,:) string = string.empty
                 nvp.OverloadStorage (1,1) string = string(nan)
                 nvp.UsedCIGRENames (1,:) string = string.empty(1,0)
-                nvp.HasDefaultValue (1,1) logical = false 
+                nvp.HasDefaultValue (1,1) logical = false
             end
 
             objs = cigre.description.Variable.empty(1,0);
@@ -290,9 +293,10 @@ classdef Variable
                     || isa(imp, "coder.descriptor.types.AggregateElement")
                 name = imp.Identifier;
             elseif isa(imp, "coder.descriptor.CustomExpression")
-                % We are a get/set parameter
-                % TODO: The get function can be customised. Can we make this more
-                % robust?
+                % Get/set parameter; the underlying field name is
+                % extracted by stripping the "get_" prefix.
+                % TODO: the prefix can be customised in coder mappings;
+                % handle non-default ReadExpression patterns.
                 name = erase(imp.ReadExpression, "get_");
             elseif isprop(imp, "ElementIdentifier") && ~isempty(imp.ElementIdentifier)
                 name = imp.ElementIdentifier;
@@ -315,7 +319,8 @@ classdef Variable
             elseif isprop(imp, "Identifier")
                 name = imp.Identifier;
             else
-                error("Extraction of name failed")
+                error("CIGRE:Variable:NameExtractionFailed", ...
+                    "Could not extract a name from interface of type %s", class(imp));
             end
 
             name = string(name);
@@ -429,6 +434,9 @@ classdef Variable
         end
 
         function [storage, getMethod] = extractStorageSpecifier(interface)
+            arguments
+                interface (1,1)
+            end
 
             getMethod = "";
             if isa(interface, "coder.descriptor.types.AggregateElement")
@@ -457,7 +465,9 @@ classdef Variable
                 paramName (1,1) string = string(nan)
             end
 
-            failedValue = 0; % Nan may be better, but also possibly not supported. 0 is safe.
+            % NaN would be semantically clearer but is not universally
+            % accepted by downstream consumers; 0 is the safe fallback.
+            failedValue = 0;
             if ismissing(modelName) || ismissing(paramName)
                 value = failedValue;
             else
@@ -466,7 +476,9 @@ classdef Variable
                     try
                         [~, value] = util.findParam(modelName, paramName);
                     catch
-                        % Try to extract from a struct
+                        % findParam doesn't dot-into structs; retry with
+                        % the root name and resolve the trailing field
+                        % path manually.
                         p = extractBefore(paramName + ".", ".");
                         [~, value] = util.findParam(modelName, p);
                         f = strsplit(paramName, ".");
@@ -476,7 +488,7 @@ classdef Variable
                     end
                 catch
                     warning("Parameter " + paramName + " not found. Using default value: " + failedValue);
-                    value = failedValue; % Not found
+                    value = failedValue;
                 end
 
             end
@@ -488,6 +500,9 @@ classdef Variable
 end
 
 function [type, pointers] = getPointerType(type)
+arguments
+    type
+end
 
 pointers = "";
 if meta.class.fromName(class(type)) <= ?coder.types.Pointer || ...
