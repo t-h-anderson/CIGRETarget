@@ -1,8 +1,10 @@
 name: Tests
 
 on:
+  # Limit push triggers to main so feature branches with open PRs do not
+  # get two runs per commit (one from push, one from pull_request).
   push:
-    branches: [main, "claude/**"]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
