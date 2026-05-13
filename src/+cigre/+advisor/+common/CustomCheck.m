@@ -27,16 +27,20 @@ classdef CustomCheck < handle
     methods
         function obj = CustomCheck()
 
-            % Create ModelAdvisor.Check object and set properties.
-            rec = ModelAdvisor.Check(obj.ID);
-            rec.Title = obj.Title;
-            rec.TitleTips = obj.TitleTips;
-            rec.CallbackContext = obj.Compile;
-            rec.setCallbackFcn(@(system, checkObj) obj.checkCallback(system, checkObj), obj.Compile, obj.Style);
-            rec.CallbackStyle = obj.Style;
+            % The ModelAdvisor.Check API on older releases (notably
+            % R2020b) rejects MATLAB strings for these property values
+            % - the addItem/publish path internally requires character
+            % vectors. char() at the boundary keeps the class-level
+            % declarations expressive while still satisfying the API.
+            rec = ModelAdvisor.Check(char(obj.ID));
+            rec.Title = char(obj.Title);
+            rec.TitleTips = char(obj.TitleTips);
+            rec.CallbackContext = char(obj.Compile);
+            rec.setCallbackFcn(@(system, checkObj) obj.checkCallback(system, checkObj), char(obj.Compile), char(obj.Style));
+            rec.CallbackStyle = char(obj.Style);
 
             mdladvRoot = ModelAdvisor.Root;
-            mdladvRoot.publish(rec, obj.Group); % publish check into Group.
+            mdladvRoot.publish(rec, char(obj.Group));
         end
 
     end
@@ -53,21 +57,23 @@ classdef CustomCheck < handle
                 recAction
             end
 
+            % ModelAdvisor.ResultDetail's setters require char on older
+            % releases; convert at the boundary.
             ElementResults = ModelAdvisor.ResultDetail;
-            ElementResults.Description = description;
+            ElementResults.Description = char(description);
             if verLessThan("MATLAB", "23.2")
                 if ~pass
                     ElementResults.IsViolation = true;
                 end
             else
-                ElementResults.Status = status;
+                ElementResults.Status = char(status);
                 if pass
-                    ElementResults.ViolationType = "pass";
+                    ElementResults.ViolationType = 'pass';
                 else
-                    ElementResults.ViolationType = "fail";
+                    ElementResults.ViolationType = 'fail';
                 end
             end
-            ElementResults.RecAction = recAction;
+            ElementResults.RecAction = char(recAction);
             mdladvObj = Simulink.ModelAdvisor.getModelAdvisor(model); % get object
             mdladvObj.setCheckResultStatus(pass);
             checkObj.setResultDetails(ElementResults);
@@ -85,16 +91,16 @@ classdef CustomCheck < handle
                 recAction
             end
 
-            mdladvObj = Simulink.ModelAdvisor.getModelAdvisor(model); % get object
+            mdladvObj = Simulink.ModelAdvisor.getModelAdvisor(model);
             if isempty(violatingBlocks)
                 ElementResults = ModelAdvisor.ResultDetail;
                 if verLessThan("MATLAB", "23.2")
                     ElementResults.IsViolation = false;
                 else
-                    ElementResults.ViolationType = "pass";
-                    ElementResults.Status = statusPass;
+                    ElementResults.ViolationType = 'pass';
+                    ElementResults.Status = char(statusPass);
                 end
-                ElementResults.Description = description;
+                ElementResults.Description = char(description);
 
                 mdladvObj.setCheckResultStatus(true);
             else
@@ -106,43 +112,32 @@ classdef CustomCheck < handle
                     if verLessThan("MATLAB", "23.2")
                         ElementResults(idx).setData(violatingBlocks{idx});
                     else
-                        ModelAdvisor.ResultDetail.setData(ElementResults(idx), "SID", violatingBlocks{idx});
+                        ModelAdvisor.ResultDetail.setData(ElementResults(idx), 'SID', violatingBlocks{idx});
                     end
 
-                    ElementResults(idx).Description = description;
+                    ElementResults(idx).Description = char(description);
 
                     if iscell(statusFail)
-                        ElementResults(idx).Status = statusFail{idx};
+                        ElementResults(idx).Status = char(statusFail{idx});
                     else
-                        ElementResults(idx).Status = statusFail;
+                        ElementResults(idx).Status = char(statusFail);
                     end
 
                     if iscell(recAction)
-                        ElementResults(idx).RecAction =  recAction{idx};
+                        ElementResults(idx).RecAction = char(recAction{idx});
                     else
-                        ElementResults(idx).RecAction =  recAction;
+                        ElementResults(idx).RecAction = char(recAction);
                     end
 
                     if iscell(vtype)
-                        if verLessThan("MATLAB", "23.2")
-                            if strcmp(vtype{idx}, "fail")
-                                ElementResults(idx).IsViolation = true;
-                            else
-                                ElementResults(idx).IsViolation = false;
-                            end
-                        else
-                            ElementResults(idx).ViolationType = vtype{idx};
-                        end
+                        thisVtype = char(vtype{idx});
                     else
-                        if verLessThan("MATLAB", "23.2")
-                            if strcmp(vtype, "fail")
-                                ElementResults(idx).IsViolation = true;
-                            else
-                                ElementResults(idx).IsViolation = false;
-                            end
-                        else
-                            ElementResults(idx).ViolationType = vtype;
-                        end
+                        thisVtype = char(vtype);
+                    end
+                    if verLessThan("MATLAB", "23.2")
+                        ElementResults(idx).IsViolation = strcmp(thisVtype, 'fail');
+                    else
+                        ElementResults(idx).ViolationType = thisVtype;
                     end
                 end
                 mdladvObj.setCheckResultStatus(false);

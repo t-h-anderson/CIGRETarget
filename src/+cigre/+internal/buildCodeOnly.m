@@ -5,5 +5,8 @@ function buildCodeOnly(modelName)
     % Build the model generating code only, without invoking the C compiler.
     % The before_make hook still fires, so CIGRE source is generated and
     % can be compiled manually (e.g. in Visual Studio).
-    slbuild(modelName, "generateCodeOnly", true);
+    %
+    % The N-V pair name has to be a char vector: R2020b's slbuild
+    % rejects strings for the name slot with ParamMustBeChar.
+    slbuild(modelName, 'generateCodeOnly', true);
 end
