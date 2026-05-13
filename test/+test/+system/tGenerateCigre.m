@@ -792,5 +792,16 @@ if ~isa(cs, "Simulink.ConfigSet")
     cs = cs.getRefConfigSet();
 end
 set_param(cs, "Toolchain", "Automatically locate an installed toolchain");
+
+% UpdateModelReferenceTargets is being removed in a future release;
+% MATLAB warns at every build when the saved value is anything other
+% than "IfOutOfDate". Normalise it now so CI logs aren't full of the
+% deprecation warning.
+try
+    set_param(cs, "UpdateModelReferenceTargets", "IfOutOfDate");
+catch
+    % Parameter or value missing on older releases - safe to skip.
+end
+
 set_param(modelName, "Dirty", "off");
 end
