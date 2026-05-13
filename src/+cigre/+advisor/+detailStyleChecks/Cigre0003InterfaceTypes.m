@@ -42,8 +42,10 @@ classdef Cigre0003InterfaceTypes < cigre.advisor.common.CustomCheck
 
             if sourceType == "data dictionary"
                 sldd_object = Simulink.data.dictionary.open(modelVars.Source);
-                section = getSection(sldd_object, "Design Data");
-                entries = find(section, "-value", "-class", "Simulink.Bus");
+                % data-dictionary section finders take char-only flags
+                % on R2020b ("-value is not a valid option to findobj").
+                section = getSection(sldd_object, 'Design Data');
+                entries = find(section, '-value', '-class', 'Simulink.Bus');
                 sldd_object.close();
 
                 found = false;
@@ -62,7 +64,7 @@ classdef Cigre0003InterfaceTypes < cigre.advisor.common.CustomCheck
 
             elseif sourceType == "base workspace"
                 try
-                    bo = evalin("base", dt);
+                    bo = evalin('base', char(dt));
                     found = true;
                 catch me
                     disp(me);

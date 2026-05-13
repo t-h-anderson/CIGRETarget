@@ -6,7 +6,7 @@ function buildCodeOnly(modelName)
     % The before_make hook still fires, so CIGRE source is generated and
     % can be compiled manually (e.g. in Visual Studio).
     %
-    % The N-V pair name has to be a char vector: R2020b's slbuild
-    % rejects strings for the name slot with ParamMustBeChar.
-    slbuild(modelName, 'generateCodeOnly', true);
+    % Both args have to be char on R2020b: slbuild's input parser
+    % rejects strings for the model name and the N-V pair name.
+    slbuild(char(modelName), 'generateCodeOnly', true);
 end

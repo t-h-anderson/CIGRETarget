@@ -22,8 +22,11 @@ classdef Cigre0004TrigerSubsystem < cigre.advisor.common.CustomCheck
             end
 
             violatingBlocks = {};
-            blks = find_system(model, "FollowLinks", "on", ...
-                "LookUnderMasks", "on", "BlockType", "TriggerPort");
+            % R2020b's find_system rejects strings for these on/off
+            % values ("Option 'FollowLinks' must have a value of 'on',
+            % 'off' or be a logical scalar"); use char literals.
+            blks = find_system(model, 'FollowLinks', 'on', ...
+                'LookUnderMasks', 'on', 'BlockType', 'TriggerPort');
             for idx = 1:numel(blks)
                 triggerMode = string(get_param(blks{idx}, "InitialTriggerSignalState"));
                 if triggerMode == "compatibility (no trigger on first evaluation)"
