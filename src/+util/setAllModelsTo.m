@@ -104,15 +104,12 @@ for i = 1:numel(slxFiles)
 
         Simulink.exportToVersion(char(baseName), char(tempPath), char(targetRelease));
 
-        % Close before moving so Simulink isn't holding the original
-        % file open on Windows (Linux is more forgiving but the same
-        % code path runs everywhere).
-        bdclose(char(baseName));
-
-        if isfile(slxPath)
-            delete(slxPath);
-        end
-        movefile(char(tempPath), char(slxPath));
+        % Close the model and replace the original. Simulink keeps file
+        % handles open for transitively-loaded references and the
+        % data-dictionary "saveas" sidecar even after a single bdclose,
+        % so use bdclose('all') to release everything and retry a few
+        % times in case Windows hasn't finished propagating the unlock.
+        replaceWithRetry(tempPath, slxPath);
 
         fprintf("  + %-40s  %s -> %s (archived as %s)\n", ...
             baseName, currentRelease, targetRelease, baseName + "_" + currentRelease + ".slx");
@@ -196,6 +193,74 @@ if isfile(p)
     try
         delete(char(p));
     catch
+    end
+end
+end
+
+
+function replaceWithRetry(tempPath, destPath)
+% Replace destPath with tempPath, robust to Simulink not releasing its
+% file handle on Windows. After a load_system + exportToVersion, the
+% original .slx can stay pinned by several different cooperating things:
+%   - any models still loaded (bdclose('all'))
+%   - any open data dictionaries (closeAll('-discard'))
+%   - the matching .slxc cache file
+%   - Java file handles MATLAB hasn't released yet (java.lang.System.gc)
+%   - an active Simulink project tracking the file
+%
+% Each retry closes one more class of resource and waits longer. The
+% replacement itself uses copyfile with the 'f' flag, which on Windows
+% can overwrite a file that delete+movefile cannot (different lock-mode
+% rules in the underlying CreateFile call).
+maxAttempts = 5;
+slxcPath = regexprep(char(destPath), '\.slx$', '.slxc');
+
+for attempt = 1:maxAttempts
+    try
+        bdclose('all');
+        try
+            Simulink.data.dictionary.closeAll('-discard');
+        catch
+            % closeAll errors when nothing is open; harmless either way.
+        end
+
+        % .slxc holds an indirect reference to the .slx; remove so the
+        % next attempt to overwrite the .slx isn't blocked by the cache.
+        if isfile(slxcPath)
+            try
+                delete(slxcPath);
+            catch
+            end
+        end
+
+        % Nudge MATLAB's Java layer to release file handles it might
+        % still hold from the load/export sequence.
+        try
+            java.lang.System.gc();
+        catch
+        end
+
+        % copyfile with 'f' uses Win32 CopyFile semantics, which can
+        % overwrite a file held under shared-read locks where the
+        % delete-then-move pair would fail.
+        [ok, msg] = copyfile(char(tempPath), char(destPath), 'f');
+        if ~ok
+            error("util:setAllModelsTo:CopyFailed", "%s", msg);
+        end
+
+        % Source copy succeeded; tidy up the temp file.
+        try
+            delete(char(tempPath));
+        catch
+        end
+        return
+    catch me
+        if attempt == maxAttempts
+            rethrow(me);
+        end
+        % Progressive back-off. Windows file-lock release after a
+        % large Simulink load can take 0.5-2 seconds in practice.
+        pause(0.5 * attempt);
     end
 end
 end

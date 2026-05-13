@@ -45,10 +45,15 @@ classdef CigreDLL < handle
             header = fullfile(src, hfile);
             [wrapperHeader, headerDir] = ...
                 cigre.util.sanitiseLoadlibraryHeader(header);
-            [l, w] = loadlibrary(dllName, char(wrapperHeader), ...
+            [~, notfound] = loadlibrary(dllName, char(wrapperHeader), ...
                 "includepath", src, ...
                 "includepath", headerDir, ...
-                "alias", thisDLL); %#ok<ASGLU>
+                "alias", thisDLL);
+
+            % Surface a clear error if the header parse dropped the
+            % Instance struct or any Model_* prototype - loadlibrary
+            % itself does not throw in that case.
+            cigre.util.assertCigreLibraryLoaded(thisDLL, notfound);
 
             obj.IsLoaded = true;
 
