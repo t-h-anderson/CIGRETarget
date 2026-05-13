@@ -138,6 +138,20 @@ classdef tGenerateCigre < test.util.WithParallelFixture
 
         function tBuild(testCase, ModelName, Bits, Snapshot, BusAs, Toolchain)
 
+            % Pre-flight: confirm the model can be loaded on this
+            % MATLAB release. Models saved with a newer version stamp
+            % cannot be opened on older runners; report Incomplete
+            % rather than Errored so the failure is informational and
+            % surfaces in the test report instead of being hidden as a
+            % filtered-out parameter.
+            try
+                [~, cPre] = util.loadSystem(ModelName); %#ok<NASGU>
+            catch me
+                testCase.assumeFail("Cannot load '" + ModelName + "' on " ...
+                    + string(version("-release")) + ": " + me.message);
+                return
+            end
+
             testCase.loadData(ModelName);
 
             import matlab.unittest.fixtures.WorkingFolderFixture
