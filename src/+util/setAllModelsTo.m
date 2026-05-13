@@ -200,29 +200,66 @@ end
 
 function replaceWithRetry(tempPath, destPath)
 % Replace destPath with tempPath, robust to Simulink not releasing its
-% file handle promptly on Windows. Closes everything Simulink has loaded
-% between attempts and gives the file system time to settle.
+% file handle on Windows. After a load_system + exportToVersion, the
+% original .slx can stay pinned by several different cooperating things:
+%   - any models still loaded (bdclose('all'))
+%   - any open data dictionaries (closeAll('-discard'))
+%   - the matching .slxc cache file
+%   - Java file handles MATLAB hasn't released yet (java.lang.System.gc)
+%   - an active Simulink project tracking the file
+%
+% Each retry closes one more class of resource and waits longer. The
+% replacement itself uses copyfile with the 'f' flag, which on Windows
+% can overwrite a file that delete+movefile cannot (different lock-mode
+% rules in the underlying CreateFile call).
 maxAttempts = 5;
+slxcPath = regexprep(char(destPath), '\.slx$', '.slxc');
+
 for attempt = 1:maxAttempts
     try
         bdclose('all');
         try
             Simulink.data.dictionary.closeAll('-discard');
         catch
-            % Data-dictionary close is best-effort: if nothing is open
-            % it errors; nothing to do either way.
+            % closeAll errors when nothing is open; harmless either way.
         end
-        if isfile(destPath)
-            delete(char(destPath));
+
+        % .slxc holds an indirect reference to the .slx; remove so the
+        % next attempt to overwrite the .slx isn't blocked by the cache.
+        if isfile(slxcPath)
+            try
+                delete(slxcPath);
+            catch
+            end
         end
-        movefile(char(tempPath), char(destPath));
+
+        % Nudge MATLAB's Java layer to release file handles it might
+        % still hold from the load/export sequence.
+        try
+            java.lang.System.gc();
+        catch
+        end
+
+        % copyfile with 'f' uses Win32 CopyFile semantics, which can
+        % overwrite a file held under shared-read locks where the
+        % delete-then-move pair would fail.
+        [ok, msg] = copyfile(char(tempPath), char(destPath), 'f');
+        if ~ok
+            error("util:setAllModelsTo:CopyFailed", "%s", msg);
+        end
+
+        % Source copy succeeded; tidy up the temp file.
+        try
+            delete(char(tempPath));
+        catch
+        end
         return
     catch me
         if attempt == maxAttempts
             rethrow(me);
         end
-        % Each retry waits longer; Windows file-lock release after a
-        % large Simulink load can take a few hundred milliseconds.
+        % Progressive back-off. Windows file-lock release after a
+        % large Simulink load can take 0.5-2 seconds in practice.
         pause(0.5 * attempt);
     end
 end
