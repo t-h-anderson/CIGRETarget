@@ -37,3 +37,6 @@ codegen/
 *.vcxproj.*
 .vs/
 **/VSBuild_*/
+
+# Customer specific code
+customer/*

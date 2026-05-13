@@ -7,7 +7,7 @@
     <param.summary />
     <param.description>Enables developers to create CIGRE compatible DLLs from Simulink models</param.description>
     <param.screenshot>${PROJECT_ROOT}\src\resources\Logo.png</param.screenshot>
-    <param.version>2.2</param.version>
+    <param.version>2.3</param.version>
     <param.output>${PROJECT_ROOT}\Simulink to CIGRE Export Tool.mltbx</param.output>
     <param.products.name>
       <item>MATLAB</item>
@@ -69,7 +69,10 @@ gitlab-ci.yml
 % Tests
 test
 
-releases</param.exclude.filters>
+releases
+
+% Any customer specific code
+customer</param.exclude.filters>
     <param.exclude.pcodedmfiles>true</param.exclude.pcodedmfiles>
     <param.examples />
     <param.demosxml />
@@ -139,12 +142,11 @@ releases</param.exclude.filters>
     </build-deliverables>
     <workflow />
     <matlab>
-      <root>C:\Program Files\MATLAB\R2023b</root>
+      <root>C:\Program Files\MATLAB\R2024b</root>
       <toolboxes>
         <toolbox name="matlabcoder" />
         <toolbox name="embeddedcoder" />
         <toolbox name="fixedpoint" />
-        <toolbox name="neuralnetwork" />
       </toolboxes>
       <toolbox>
         <matlabcoder>
@@ -160,11 +162,6 @@ releases</param.exclude.filters>
         <fixedpoint>
           <enabled>true</enabled>
         </fixedpoint>
-      </toolbox>
-      <toolbox>
-        <neuralnetwork>
-          <enabled>true</enabled>
-        </neuralnetwork>
       </toolbox>
     </matlab>
     <platform>
