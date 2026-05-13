@@ -1,6 +1,6 @@
 function cobj = build(mdl)
 arguments
-    mdl
+    mdl (1,1) string
 end
 
 if nargout > 0

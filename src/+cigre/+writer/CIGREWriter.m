@@ -23,11 +23,11 @@ classdef CIGREWriter
             results = cigre.writer.CIGREWriter.applyFunctionSignatures(results, modelDescriptions);
 
             % Substitute model/wrapper names last so that all previously
-            % generated code fragments containing these tags are also resolved
+            % generated code fragments containing these tags are also resolved.
             results = strrep(results, "<<RTMStructName>>", modelDescriptions.RTMStructName);
-            results = strrep(results, "<<RTMType>>",       modelDescriptions.RTMVarType);
-            results = strrep(results, "<<ModelName>>",     modelDescriptions.ModelName);
-            results = strrep(results, "<<WrapperName>>",   modelDescriptions.CIGREInterfaceName);
+            results = strrep(results, "<<RTMType>>", modelDescriptions.RTMVarType);
+            results = strrep(results, "<<ModelName>>", modelDescriptions.ModelName);
+            results = strrep(results, "<<WrapperName>>", modelDescriptions.CIGREInterfaceName);
 
             filename = nvp.DLLName + ".c";
         end
@@ -146,7 +146,7 @@ classdef CIGREWriter
                     + newline + "    free(" + rtmName + "_backup);";
             end
 
-            results = strrep(results, "<<InternalStatesCache>>",           backupCode);
+            results = strrep(results, "<<InternalStatesCache>>", backupCode);
             results = strrep(results, "<<InternalStatesRestoreFromCache>>", restoreCode);
         end
 
@@ -156,27 +156,27 @@ classdef CIGREWriter
             inputType = string([desc.InputData.Type]);
             inputName = string([desc.InputData.ERTName]);
             if isempty(inputType)
-                results = strrep(results, "<<InputUnpack>>",    " // No inputs");
+                results = strrep(results, "<<InputUnpack>>", " // No inputs");
                 results = strrep(results, "<<ApplyInputData>>", " // No input data");
             else
                 results = strrep(results, "<<InputUnpack>>", ...
                     "<<InputType>>* inputs = (<<InputType>>*)instance->ExternalInputs;");
-                results = strrep(results, "<<InputType>>",      inputType);
+                results = strrep(results, "<<InputType>>", inputType);
                 results = strrep(results, "<<ApplyInputData>>", "*<<InputName>> = *inputs;");
-                results = strrep(results, "<<InputName>>",      inputName);
+                results = strrep(results, "<<InputName>>", inputName);
             end
 
             outputType = string([desc.OutputData.Type]);
             outputName = string([desc.OutputData.ERTName]);
             if isempty(outputType)
-                results = strrep(results, "<<OutputUnpack>>",    " // No outputs");
+                results = strrep(results, "<<OutputUnpack>>", " // No outputs");
                 results = strrep(results, "<<ApplyOutputData>>", " // No output data");
             else
                 results = strrep(results, "<<OutputUnpack>>", ...
                     "<<OutputType>>* outputs = (<<OutputType>>*)instance->ExternalOutputs;");
-                results = strrep(results, "<<OutputType>>",       outputType);
-                results = strrep(results, "<<ApplyOutputData>>",  "*outputs = *<<OutputName>>;");
-                results = strrep(results, "<<OutputName>>",       outputName);
+                results = strrep(results, "<<OutputType>>", outputType);
+                results = strrep(results, "<<ApplyOutputData>>", "*outputs = *<<OutputName>>;");
+                results = strrep(results, "<<OutputName>>", outputName);
             end
 
             if desc.NumCigreParameters == 0
@@ -192,12 +192,12 @@ classdef CIGREWriter
             % and their argument lists.
             initInputs = strjoin( ...
                 string({desc.InitialiseInputs.ERTName}), ", ");
-            results = strrep(results, "<<ModelInitialize>>",      desc.InitializeName);
+            results = strrep(results, "<<ModelInitialize>>", desc.InitializeName);
             results = strrep(results, "<<ModelInitialiseInputs>>", initInputs);
 
             stepInputs = strjoin( ...
                 string({desc.StepInputs.ERTName}), ", ");
-            results = strrep(results, "<<ModelStep>>",       desc.StepName);
+            results = strrep(results, "<<ModelStep>>", desc.StepName);
             results = strrep(results, "<<ModelStepInputs>>", stepInputs);
         end
 
@@ -211,20 +211,20 @@ classdef CIGREWriter
             % Substitute the model wrapper header include and the optional
             % model_reference_types.h include required by some model configurations.
             results = strrep(results, "<<WrapperHeader>>", desc.CIGREInterfaceName + ".h");
-            
+
             here = desc.CodeGenFolder;
             if isfile(fullfile(here, "/slprj/cigre/_sharedutils/model_reference_types.h"))
                 modelRefHeader = "#include ""model_reference_types.h""";
             else
                 modelRefHeader = "";
             end
-            
+
             if isfile(fullfile(here, desc.CIGREInterfaceName + "_data.c"))
                 modelRefHeader = modelRefHeader + newline + "#include """ + desc.CIGREInterfaceName + "_data.c""";
             else
                 modelRefHeader = "";
             end
-            
+
             results = strrep(results, "<<model_reference_types>>", modelRefHeader);
         end
 
@@ -232,16 +232,15 @@ classdef CIGREWriter
             % Substitute the #define count, the struct field declarations,
             % and the InputSignals array for all model inputs.
             simulinkNames = string([desc.Inputs.SimulinkName]');
-            cigreNames  = string([desc.Inputs.CIGREName]');
+            cigreNames = string([desc.Inputs.CIGREName]');
             types = util.TranslateTypes.translateType( ...
                 [desc.Inputs.Type]', "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
-            dims  = cellfun(@(x) string(prod(x)), {desc.Inputs.Dimensions})';
+            dims = cellfun(@(x) string(prod(x)), {desc.Inputs.Dimensions})';
 
-            % ERTName is already a valid C identifier (from extractExternalName).
-            % Use it directly for struct field declarations; SimulinkName (the
-            % human-readable Simulink port name) is used for the string-literal
-            % .Name / .Description fields in the InputSignals array.
-            results = strrep(results, "<<NumInputs>>",  string(numel(simulinkNames)));
+            % CIGREName is a valid C identifier (from extractExternalName) and
+            % is used for struct field declarations; the human-readable
+            % SimulinkName drives the .Name / .Description string literals.
+            results = strrep(results, "<<NumInputs>>", string(numel(simulinkNames)));
             results = strrep(results, "<<DefineInputs>>", ...
                 strjoin(types + " " + cigreNames + "[" + dims + "];", newline));
 
@@ -265,10 +264,10 @@ classdef CIGREWriter
             cigreNames = string([desc.Outputs.CIGREName]');
             types = util.TranslateTypes.translateType( ...
                 [desc.Outputs.Type]', "From", "Simulink", "To", "CIGRE", "Model", cigreInterface)';
-            dims  = cellfun(@(x) string(prod(x)), {desc.Outputs.Dimensions})';
+            dims = cellfun(@(x) string(prod(x)), {desc.Outputs.Dimensions})';
 
-            % ERTName is already a valid C identifier — see applyInputSection.
-            results = strrep(results, "<<NumOutputs>>",  string(numel(simulinkNames)));
+            % See applyInputSection for the CIGREName / SimulinkName contract.
+            results = strrep(results, "<<NumOutputs>>", string(numel(simulinkNames)));
             results = strrep(results, "<<DefineOutputs>>", ...
                 strjoin(types + " " + cigreNames + "[" + dims + "];", newline));
 
@@ -292,7 +291,7 @@ classdef CIGREWriter
             results = strrep(results, "<<NumParam>>", string(nParams));
 
             if nParams == 0
-                results = strrep(results, "<<DefineParameters>>",    "");
+                results = strrep(results, "<<DefineParameters>>", "");
                 results = strrep(results, "<<ParameterDefinitions>>", "");
                 return
             end
@@ -323,27 +322,27 @@ classdef CIGREWriter
         function results = applyModelInfoStruct(results, desc, numVisibleParams)
             % Substitute all fields of the Model_Info struct: metadata strings,
             % signal counts, sample time, and the integer state heap size.
-            results = strrep(results, "<<ModelName>>",           desc.ModelName);
-            results = strrep(results, "<<ModelVersion>>",        desc.ModelVersion);
-            results = strrep(results, "<<Description>>",         desc.Description);
-            results = strrep(results, "<<ModelCreatedDate>>",    desc.CreatedOn);
-            results = strrep(results, "<<ModelCreatedBy>>",      desc.CreatedBy);
-            results = strrep(results, "<<ModelModifiedOn>>",     desc.ModifiedOn);
-            results = strrep(results, "<<ModelModifiedBy>>",     desc.ModifiedBy);
+            results = strrep(results, "<<ModelName>>", desc.ModelName);
+            results = strrep(results, "<<ModelVersion>>", desc.ModelVersion);
+            results = strrep(results, "<<Description>>", desc.Description);
+            results = strrep(results, "<<ModelCreatedDate>>", desc.CreatedOn);
+            results = strrep(results, "<<ModelCreatedBy>>", desc.CreatedBy);
+            results = strrep(results, "<<ModelModifiedOn>>", desc.ModifiedOn);
+            results = strrep(results, "<<ModelModifiedBy>>", desc.ModifiedBy);
             results = strrep(results, "<<ModelModifiedComment>>", desc.ModelModifiedComment);
-            results = strrep(results, "<<ModelHistory>>",        desc.ModelModifiedHistory);
-            results = strrep(results, "<<SampleTime>>",          sprintf('%.17e', desc.SampleTime));
+            results = strrep(results, "<<ModelHistory>>", desc.ModelModifiedHistory);
+            results = strrep(results, "<<SampleTime>>", sprintf('%.17e', desc.SampleTime));
 
-            % <<NoX>> tags appear in the Model_Info struct; <<NumX>> tags appear
-            % in the #define macros above - they hold the same values
-            results = strrep(results, "<<NoInputs>>",  string(numel(desc.Inputs)));
+            % <<NoX>> tags appear in the Model_Info struct; <<NumX>> tags
+            % appear in the #define macros above and carry the same values.
+            results = strrep(results, "<<NoInputs>>", string(numel(desc.Inputs)));
             results = strrep(results, "<<NoOutputs>>", string(numel(desc.Outputs)));
-            results = strrep(results, "<<NoParams>>",  string(numVisibleParams));
+            results = strrep(results, "<<NoParams>>", string(numVisibleParams));
 
-            % heapSize returns an expression containing <<RTMType>>, which is
-            % resolved in the final strrep below after the expression is embedded
+            % heapSize returns an expression containing <<RTMType>>, which
+            % is resolved by the final strrep once embedded into results.
             results = strrep(results, "<<NumIntStatesNeeded>>", string(heapSize(desc)));
-            results = strrep(results, "<<RTMType>>",            desc.RTMVarType);
+            results = strrep(results, "<<RTMType>>", desc.RTMVarType);
         end
 
     end
@@ -360,7 +359,7 @@ function [results, nextIdx] = insertMemoryEntry(results, state, varName, idx)
 type = state.Type;
 ptrs = state.Pointers;
 
-mallocLine  = type + ptrs + " " + varName ...
+mallocLine = type + ptrs + " " + varName ...
     + " = heap_malloc(&instance->IntStates[0], (int32_t)sizeof(" + type + "));" ...
     + newline + "    (void)" + varName + ";" ...
     + newline + "    <<InternalStatesMalloc>>";
@@ -370,9 +369,9 @@ restoreLine = type + ptrs + " " + varName ...
     + newline + "    (void)" + varName + ";" ...
     + newline + "    <<InternalStatesRestore>>";
 
-results  = strrep(results, "<<InternalStatesMalloc>>", mallocLine);
-results  = strrep(results, "<<InternalStatesRestore>>", restoreLine);
-nextIdx  = idx + 1;
+results = strrep(results, "<<InternalStatesMalloc>>", mallocLine);
+results = strrep(results, "<<InternalStatesRestore>>", restoreLine);
+nextIdx = idx + 1;
 end
 
 
@@ -382,11 +381,11 @@ function defs = buildSignalDefinitions(cigreNames, simulinkNames, types, dims, t
 defs = strings(numel(cigreNames), 1);
 for i = 1:numel(cigreNames)
     entry = template;
-    entry = strrep(entry, "<<Num>>",         string(i-1));
-    entry = strrep(entry, "<<Name>>",        cigreNames(i));
+    entry = strrep(entry, "<<Num>>", string(i-1));
+    entry = strrep(entry, "<<Name>>", cigreNames(i));
     entry = strrep(entry, "<<Description>>", simulinkNames(i));
-    entry = strrep(entry, "<<Type>>",        types(i));
-    entry = strrep(entry, "<<Width>>",       dims(i));
+    entry = strrep(entry, "<<Type>>", types(i));
+    entry = strrep(entry, "<<Width>>", dims(i));
     defs(i) = entry;
 end
 defs = strjoin(defs, "," + newline);
@@ -417,14 +416,14 @@ for i = 1:numel(visibleParams)
     valType = replaceBetween(valType, 1, 1, upper(extractString(valType, 1)));
 
     entry = template;
-    entry = strrep(entry, "<<Num>>",         string(i-1));
-    entry = strrep(entry, "<<Name>>",        p.CIGREName);
+    entry = strrep(entry, "<<Num>>", string(i-1));
+    entry = strrep(entry, "<<Name>>", p.CIGREName);
     entry = strrep(entry, "<<Description>>", p.SimulinkName);
-    entry = strrep(entry, "<<Type>>",        cigreParamTypes(i));
-    entry = strrep(entry, "<<ValType>>",     valType);
-    entry = strrep(entry, "<<Default>>",     formatCNumericLiteral(double(p.DefaultValue)));
-    entry = strrep(entry, "<<Min>>",         formatCNumericLiteral(double(p.Min)));
-    entry = strrep(entry, "<<Max>>",         formatCNumericLiteral(double(p.Max)));
+    entry = strrep(entry, "<<Type>>", cigreParamTypes(i));
+    entry = strrep(entry, "<<ValType>>", valType);
+    entry = strrep(entry, "<<Default>>", formatCNumericLiteral(double(p.DefaultValue)));
+    entry = strrep(entry, "<<Min>>", formatCNumericLiteral(double(p.Min)));
+    entry = strrep(entry, "<<Max>>", formatCNumericLiteral(double(p.Max)));
     paramDef(i) = entry;
 end
 paramDef = strjoin(paramDef, "," + newline);
@@ -439,9 +438,9 @@ function literal = formatCNumericLiteral(value)
 % type before the unary minus is applied, causing MSVC warning C4146.
 % The safe form expresses them as (-MAX - 1).
 intMinMap = [ ...
-    double(intmin('int8')),  "(-127 - 1)"; ...
-    double(intmin('int16')), "(-32767 - 1)"; ...
-    double(intmin('int32')), "(-2147483647 - 1)"; ...
+    double(intmin("int8")), "(-127 - 1)"; ...
+    double(intmin("int16")), "(-32767 - 1)"; ...
+    double(intmin("int32")), "(-2147483647 - 1)"; ...
 ];
 
 for i = 1:size(intMinMap, 1)
@@ -460,7 +459,7 @@ function paramMaps = buildModelArgMappings(visibleParams, hiddenParams)
 % from the CIGRE parameters struct; hidden ones use hardcoded literal defaults
 % to exclude them from the DLL interface without changing model behaviour.
 modelArgVisible = visibleParams([visibleParams.IsModelArgument]);
-modelArgHidden  = hiddenParams([hiddenParams.IsModelArgument]);
+modelArgHidden = hiddenParams([hiddenParams.IsModelArgument]);
 
 paramMaps = "";
 for i = 1:numel(modelArgVisible)
@@ -490,7 +489,7 @@ function paramMaps = buildGlobalParamMappings(visibleParams, hiddenParams)
 % Global parameters are warned about because they are shared across instances,
 % creating a risk of non-determinism when the DLL is called in parallel.
 globalVisible = visibleParams(~[visibleParams.IsModelArgument]);
-globalHidden  = hiddenParams(~[hiddenParams.IsModelArgument]);
+globalHidden = hiddenParams(~[hiddenParams.IsModelArgument]);
 
 if ~isempty(globalVisible) || ~isempty(globalHidden)
     warning("CIGRE:CIGREWriter:GlobalParameters", ...
@@ -501,8 +500,8 @@ else
     paramMaps = "";
 end
 
-% Should be defined as globals. If parameter isn't found, likely a header
-% is not being included, e.g. mdl_data
+% Globals must be declared in a header that the generated DLL includes
+% (typically mdl_data); a linker error here means that header is missing.
 for i = 1:numel(globalVisible)
     p = globalVisible(i);
     paramMaps = paramMaps + p.ERTName + " = parameters->" + p.CIGREName + ";" + newline;

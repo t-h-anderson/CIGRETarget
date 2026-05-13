@@ -23,15 +23,15 @@ function [wrapperPath, headerDir] = sanitiseLoadlibraryHeader(headerPath)
 %                  resolve.
 
     headerPath = char(headerPath);
-    headerDir  = fileparts(headerPath);
+    headerDir = fileparts(headerPath);
 
     wrapperPath = fullfile(tempdir, ...
         sprintf('cigre_loadlib_wrapper_%s.h', char(cigre.util.uuid())));
 
-    fid = fopen(wrapperPath, 'w');
+    fid = fopen(wrapperPath, "w");
     if fid < 0
-        error('CIGRE:sanitiseLoadlibraryHeader:WriteFailed', ...
-            'Could not write loadlibrary wrapper header at %s', wrapperPath);
+        error("CIGRE:sanitiseLoadlibraryHeader:WriteFailed", ...
+            "Could not write loadlibrary wrapper header at %s", wrapperPath);
     end
     closeFid = onCleanup(@() fclose(fid)); %#ok<NASGU>
 

@@ -111,8 +111,8 @@ classdef ModelDescription < handle
             arguments
                 modelName (1,1) string
                 nvp.CIGREInterfaceName (1,1) string = string(missing)
-                nvp.CodeGenFolder (1,1) string = Simulink.fileGenControl('getConfig').CodeGenFolder
-                nvp.WorkFolder (1,1) string = Simulink.fileGenControl('getConfig').CacheFolder
+                nvp.CodeGenFolder (1,1) string = Simulink.fileGenControl("getConfig").CodeGenFolder
+                nvp.WorkFolder (1,1) string = Simulink.fileGenControl("getConfig").CacheFolder
             end
 
             obj.ModelName = modelName;
@@ -220,7 +220,7 @@ classdef ModelDescription < handle
                 types = string({obj.InternalData.Type});
                 idx = find(contains(types, cigre.description.ModelDescription.RtmVarTypeFallback, "IgnoreCase", true), 1);
             end
-            
+
             if isempty(idx)
                 error("CIGRE:ModelDescription:RTMStructNotFound", ...
                     "Could not identify the Real-Time Model struct in the internal data for model '%s'. " + ...
@@ -451,7 +451,7 @@ classdef ModelDescription < handle
             arguments
                 model (1,1) string
                 cigreWrapper (1,1) string = cigre.internal.cigreWrap(model)
-                nvp.CodeGenFolder (1,1) string = Simulink.fileGenControl('getConfig').CodeGenFolder
+                nvp.CodeGenFolder (1,1) string = Simulink.fileGenControl("getConfig").CodeGenFolder
             end
             % Load models before constructing the descriptor so
             % coder.getCodeDescriptor can locate them. The cleanup objects
