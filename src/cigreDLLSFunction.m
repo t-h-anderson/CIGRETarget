@@ -245,10 +245,16 @@ end
 
     [wrapperHeader, headerDir] = cigre.util.sanitiseLoadlibraryHeader(headerPath);
 
-    loadlibrary(char(dllPath), char(wrapperHeader), ...
+    [~, notfound] = loadlibrary(char(dllPath), char(wrapperHeader), ...
         "includepath", cigreSrc, ...
         "includepath", headerDir, ...
         "alias", char(alias));
+
+    % loadlibrary can return success on releases where the header parser
+    % bailed mid-file; verify the Model_* prototypes registered so the
+    % failure is reported here rather than as "Type was not found" deep
+    % inside libpointer during simulation.
+    cigre.util.assertCigreLibraryLoaded(alias, notfound);
 end
 
 function unloadIfLoaded(alias)

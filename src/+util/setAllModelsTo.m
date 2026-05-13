@@ -104,15 +104,12 @@ for i = 1:numel(slxFiles)
 
         Simulink.exportToVersion(char(baseName), char(tempPath), char(targetRelease));
 
-        % Close before moving so Simulink isn't holding the original
-        % file open on Windows (Linux is more forgiving but the same
-        % code path runs everywhere).
-        bdclose(char(baseName));
-
-        if isfile(slxPath)
-            delete(slxPath);
-        end
-        movefile(char(tempPath), char(slxPath));
+        % Close the model and replace the original. Simulink keeps file
+        % handles open for transitively-loaded references and the
+        % data-dictionary "saveas" sidecar even after a single bdclose,
+        % so use bdclose('all') to release everything and retry a few
+        % times in case Windows hasn't finished propagating the unlock.
+        replaceWithRetry(tempPath, slxPath);
 
         fprintf("  + %-40s  %s -> %s (archived as %s)\n", ...
             baseName, currentRelease, targetRelease, baseName + "_" + currentRelease + ".slx");
@@ -196,6 +193,37 @@ if isfile(p)
     try
         delete(char(p));
     catch
+    end
+end
+end
+
+
+function replaceWithRetry(tempPath, destPath)
+% Replace destPath with tempPath, robust to Simulink not releasing its
+% file handle promptly on Windows. Closes everything Simulink has loaded
+% between attempts and gives the file system time to settle.
+maxAttempts = 5;
+for attempt = 1:maxAttempts
+    try
+        bdclose('all');
+        try
+            Simulink.data.dictionary.closeAll('-discard');
+        catch
+            % Data-dictionary close is best-effort: if nothing is open
+            % it errors; nothing to do either way.
+        end
+        if isfile(destPath)
+            delete(char(destPath));
+        end
+        movefile(char(tempPath), char(destPath));
+        return
+    catch me
+        if attempt == maxAttempts
+            rethrow(me);
+        end
+        % Each retry waits longer; Windows file-lock release after a
+        % large Simulink load can take a few hundred milliseconds.
+        pause(0.5 * attempt);
     end
 end
 end
