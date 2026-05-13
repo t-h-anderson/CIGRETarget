@@ -12,8 +12,12 @@ import matlab.unittest.plugins.TAPPlugin
 import matlab.unittest.plugins.ToFile
 import matlab.unittest.plugins.CodeCoveragePlugin
 import matlab.unittest.plugins.codecoverage.CoberturaFormat
+import matlab.unittest.selectors.HasTag
 
 suite = TestSuite.fromFolder(here, "IncludeSubFolders", true);
+% Manual-tagged tests (e.g. tVSBuild) exist to be invoked from MATLAB
+% with a debugger attached; exclude them from the unattended CI run.
+suite = suite.selectIf(~HasTag("Manual"));
 
 runner = TestRunner.withTextOutput();
 resultsDir = fullfile(projectRoot, "artifacts");
