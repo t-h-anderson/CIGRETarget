@@ -781,6 +781,16 @@ function overrideToolchain(modelName)
 % wrapper's save_system isn't blocked by SaveSystemWithDirtyReferencedModels.
 % The in-memory override still takes effect; we just don't want Simulink
 % to think the file on disk needs rewriting.
-set_param(modelName, "Toolchain", "Automatically locate an installed toolchain");
+%
+% When the model's active config is a reference (Simulink.ConfigSetRef),
+% set_param on the model name fails with ConfigSetRef_SetParamNotAllowed;
+% reach through to the underlying Simulink.ConfigSet and update there
+% instead. Several models in test/models/ (NestedBus, Test_CP*) use this
+% shape because they share a referenced config set with their submodels.
+cs = getActiveConfigSet(modelName);
+if ~isa(cs, "Simulink.ConfigSet")
+    cs = cs.getRefConfigSet();
+end
+set_param(cs, "Toolchain", "Automatically locate an installed toolchain");
 set_param(modelName, "Dirty", "off");
 end
