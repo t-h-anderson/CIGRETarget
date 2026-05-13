@@ -52,6 +52,11 @@ jobs:
             Embedded_Coder
             Simulink_Check
             Parallel_Computing_Toolbox
+        env:
+          # Batch token from a MathWorks Account; authenticates the
+          # hosted runner to MathWorks licensing for the duration of
+          # the job.
+          MLM_LICENSE_TOKEN: ${{ secrets.MATLAB_Licence }}
 
       # runAllTests.m opens CIGRE.prj (which sets the path) and writes
       # JUnit + Cobertura artefacts to artifacts/. Invoking via run()
