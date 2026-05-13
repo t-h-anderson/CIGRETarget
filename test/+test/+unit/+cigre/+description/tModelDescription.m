@@ -222,7 +222,7 @@ classdef tModelDescription < matlab.mock.TestCase
                 "} RT_MODEL_T;"
                 ], newline);
             [tbc, nTasks] = cigre.description.ModelDescription.processRTMStructCode(header);
-            testCase.verifyClass(tbc, 'string');
+            testCase.verifyClass(tbc, "string");
             testCase.verifyEqual(nTasks, 1);
         end
 

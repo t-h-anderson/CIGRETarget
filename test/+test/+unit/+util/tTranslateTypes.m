@@ -26,8 +26,8 @@ classdef tTranslateTypes < matlab.unittest.TestCase
             % at least one type is silently unmapped.
             nStandard = numel(util.TranslateTypes.StandardTypes);
             nSimulink = numel(util.TranslateTypes.SimulinkTypes);
-            nCigre    = numel(util.TranslateTypes.CigreTypes);
-            nAltSL    = numel(util.TranslateTypes.AltSLTypes);
+            nCigre = numel(util.TranslateTypes.CigreTypes);
+            nAltSL = numel(util.TranslateTypes.AltSLTypes);
 
             testCase.verifyEqual(nSimulink, nStandard, ...
                 "SimulinkTypes length does not match StandardTypes");
@@ -113,7 +113,7 @@ classdef tTranslateTypes < matlab.unittest.TestCase
             % "double" maps to "real_T" in Simulink but "real64_T" in CIGRE.
             % This catches any accidental copy-paste between columns.
             doubleIdx = util.TranslateTypes.StandardTypes == "double";
-            slType    = util.TranslateTypes.SimulinkTypes(doubleIdx);
+            slType = util.TranslateTypes.SimulinkTypes(doubleIdx);
             cigreType = util.TranslateTypes.CigreTypes(doubleIdx);
             testCase.verifyNotEqual(slType, cigreType);
         end
@@ -121,7 +121,7 @@ classdef tTranslateTypes < matlab.unittest.TestCase
         function signedAndUnsignedIntegersAreDistinct(testCase)
             % int32 and uint32 must map to different Simulink types so
             % that the DLL interface preserves sign information.
-            int32Idx  = util.TranslateTypes.StandardTypes == "int32";
+            int32Idx = util.TranslateTypes.StandardTypes == "int32";
             uint32Idx = util.TranslateTypes.StandardTypes == "uint32";
             testCase.verifyNotEqual( ...
                 util.TranslateTypes.SimulinkTypes(int32Idx), ...

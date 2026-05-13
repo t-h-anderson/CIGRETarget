@@ -1,4 +1,4 @@
 function t = doVSBuild()
-t = runtests('test.system.tGenerateCigre','ProcedureName','tVSBuild');
+t = runtests("test.system.tGenerateCigre", "ProcedureName", "tVSBuild");
 end
 

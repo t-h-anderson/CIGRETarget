@@ -106,7 +106,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
 
         function tearDown(testCase) %#ok<MANU>
             bdclose("all")
-            Simulink.data.dictionary.closeAll('-discard')
+            Simulink.data.dictionary.closeAll("-discard")
         end
 
     end
@@ -142,14 +142,15 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             testCase.applyFixture(WorkingFolderFixture);
             testCase.applyCodeGenFixture(fullfile(pwd));
 
-            % Look for a parameter config file alongside the model, using which() to
-            % locate it after TestClassSetup has copied models to the working folder
-            modelPath   = which(ModelName + ".slx");
-            configPath  = fullfile(fileparts(modelPath), "ParameterConfig.xlsx");
-            buildArgs   = {};
+            % which() resolves the model after TestClassSetup copies it
+            % into the working folder; this picks up any sibling
+            % ParameterConfig.xlsx that should drive the build.
+            modelPath = which(ModelName + ".slx");
+            configPath = fullfile(fileparts(modelPath), "ParameterConfig.xlsx");
+            buildArgs = {};
             paramConfig = cigre.config.ParameterConfiguration();
             if isfile(configPath)
-                buildArgs   = {"ParameterConfigFile", configPath};
+                buildArgs = {"ParameterConfigFile", configPath};
                 paramConfig = cigre.config.ParameterConfiguration.fromFile(configPath);
             end
 
@@ -207,11 +208,11 @@ classdef tGenerateCigre < test.util.WithParallelFixture
 
             testCase.applyCodeGenFixture(fullfile(pwd));
 
-            % Look for a parameter config file alongside the model, using which() to
-            % locate it after the TestClassSetup has copied models to the working folder
-            modelPath    = which(ModelName + ".slx");
-            configPath   = fullfile(fileparts(modelPath), "ParameterConfig.xlsx");
-            buildArgs    = {};
+            % See tBuild: same mechanism for picking up a per-model
+            % parameter config from the working folder.
+            modelPath = which(ModelName + ".slx");
+            configPath = fullfile(fileparts(modelPath), "ParameterConfig.xlsx");
+            buildArgs = {};
             if isfile(configPath)
                 buildArgs = {"ParameterConfigFile", configPath};
             end
@@ -295,7 +296,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                     try
                         dt = eval(dt);
                     catch
-                        dt =  evalin('base', dt);
+                        dt = evalin("base", dt);
                     end
                 catch
                     [~, dt] = util.findParam(mdlName, dt);
@@ -340,7 +341,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                     iVals = cat(3, iVals{:});
                     iVals = permute(iVals, [3,1,2]);
 
-                    thisInput = timetable(iVals, 'RowTimes', time, 'VariableNames', "Var" + i);
+                    thisInput = timetable(iVals, "RowTimes", time, "VariableNames", "Var" + i);
 
                     input{i} = thisInput;
                 end
@@ -361,14 +362,14 @@ classdef tGenerateCigre < test.util.WithParallelFixture
 
             %% Parameters
             testCase.SimulinkParameters = struct("Name", {}, "Value", {});
-            testCase.CIGREParameters    = struct("Name", {}, "Value", {});
+            testCase.CIGREParameters = struct("Name", {}, "Value", {});
 
             % Build SimulinkParameters from the top-level parameter tree using model defaults
             simulinkParams = desc.Parameters;
             for i = 1:numel(simulinkParams)
                 simulinkParam = simulinkParams(i);
-                c             = simulinkParam.BaseType;
-                simulinkVal   = simulinkParam.DefaultValue;
+                c = simulinkParam.BaseType;
+                simulinkVal = simulinkParam.DefaultValue;
                 try
                     simulinkVal = cast(simulinkVal, c);
                 catch
@@ -393,7 +394,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             % since hidden parameters are hardcoded in the DLL and absent from its interface
             for j = 1:numel(visibleParams)
                 cigreParam = visibleParams(j);
-                cigreVal   = cigreParam.DefaultValue;
+                cigreVal = cigreParam.DefaultValue;
                 try
                     if cigreParam.BaseType == "boolean"
                         cigreVal = boolean(cigreVal);
@@ -446,7 +447,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                             vals = permute(vals, [(2:numel(size(vals))), 1]);
                         end
                         input = timeseries(vals, seconds(input.Time));
-                        input = input.setinterpmethod('nearest');
+                        input = input.setinterpmethod("nearest");
                         input = input.setuniformtime("StartTime", 0, "EndTime", seconds(max(testCase.Inputs.Time(end))));
                         input.Name = testCase.Inputs.Properties.VariableNames{i};
 
@@ -488,7 +489,10 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             end
 
             if ~isempty(ip)
-                ipNew = arrayfun(@(x) renameStructField(x, 'Path', 'FullPath'), ip);
+                % Newer MATLAB releases renamed the Path field on
+                % InstanceParameters to FullPath; rename in-place so the
+                % set works across versions.
+                ipNew = arrayfun(@(x) renameStructField(x, "Path", "FullPath"), ip);
                 simIn = simIn.setBlockParameter(simIn.ModelName + "/mdl", "InstanceParameters", ipNew);
             end
 
@@ -498,8 +502,8 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             % Get the outputs
             results = sim(simIn);
             if isempty(results.yout{1}.Values.Data)
-                % There is a potential bug in R2025a where results are not
-                % generated the first time the simulation is run
+                % R2025a occasionally returns empty yout on the first
+                % sim call for some models; re-running produces results.
                 results = sim(simIn);
             end
 
@@ -526,10 +530,13 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 testCase.assertFalse(true, me.message);
             end
 
-            % Two data sets to check they work independently
-            inputs = retime(testCase.Inputs, 'regular', 'nearest', 'TimeStep', seconds(testCase.TimeStep));
-            inputs = table2cell(timetable2table(inputs)); % Input timetable is *very* slow so convery to cell
-            inputs = inputs(:,2:end);
+            % Two parallel datasets verify that DLL instances do not
+            % share state through hidden globals.
+            inputs = retime(testCase.Inputs, "regular", "nearest", "TimeStep", seconds(testCase.TimeStep));
+            % Indexing into a timetable per timestep is much slower than
+            % into a cell, so convert once up front.
+            inputs = table2cell(timetable2table(inputs));
+            inputs = inputs(:, 2:end);
 
             outputs = testCase.Outputs;
             params = testCase.CIGREParameters;
@@ -554,7 +561,6 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 nTimeBeforeSnapshot = nTimeTotal;
             end
 
-            %% Step
             results = cell(1, nTimeTotal);
             for i = 1:nTimeBeforeSnapshot
                 instance1.updateInputs(inputs, "Row", i)
@@ -568,8 +574,9 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                     stateMemory2 = instance2.StateMemory;
                 end
 
-                % Test Snapshot Restart
-                % Reload the dll
+                % Snapshot restart: unload, reload, and reconstruct the
+                % instances from the saved int-state buffers. The result
+                % stream should be continuous across the boundary.
                 instance1.clear();
                 if nvp.TwoData
                     instance2.clear();
@@ -583,7 +590,6 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                     instance2 = cigre.dll.InterfaceInstance(inputs, outputs, params, "IntStates", stateMemory2);
                 end
 
-                %% Step
                 for i = (nTimeBeforeSnapshot + 1):nTimeTotal
                     instance1.updateInputs(inputs, "Row", i)
                     results{i} = cigreDll.step(instance1);
@@ -612,31 +618,22 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         end
 
         function applyCodeGenFixture(testCase, pth)
-            cfg = Simulink.fileGenControl('getConfig');
+            cfg = Simulink.fileGenControl("getConfig");
 
-            oldCodeGenFolder = cfg.CodeGenFolder;
-            oldCacheFolder = cfg.CacheFolder;
+            oldCodeGenFolder = cfg.CodeGenFolder; %#ok<NASGU>
+            oldCacheFolder = cfg.CacheFolder; %#ok<NASGU>
 
             cfg.CodeGenFolder = pth;
             cfg.CacheFolder = pth;
             try
-                Simulink.fileGenControl('setConfig', 'config', cfg, 'createDir',true);
+                Simulink.fileGenControl("setConfig", "config", cfg, "createDir", true);
             catch
                 warning("Set codegen and cache folder failed, likely due to interrupted previous build.")
             end
 
-            % Reset to what we hard before, rather then bruteforce using
-            % "reset"
-            testCase.addTeardown(@() resetCFG(oldCodeGenFolder, oldCacheFolder));
-
-            function resetCFG(oldCodeGenFolder, oldCacheFolder)
-                % Path is relative... so hard to restore
-                % cfgi = Simulink.fileGenControl('getConfig');
-                % cfgi.CodeGenFolder = oldCodeGenFolder;
-                % cfgi.CacheFolder = oldCacheFolder;
-                % Simulink.fileGenControl('setConfig', 'config', cfgi)
-                Simulink.fileGenControl('reset');
-            end
+            % Paths get normalised relative to the model folder, so the
+            % originals cannot be restored verbatim; fall back to reset.
+            testCase.addTeardown(@() Simulink.fileGenControl("reset"));
         end
 
     end
@@ -654,9 +651,11 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             end
 
             bracketPos = strfind(cigreSimulinkName, "[");
-            dotPos     = strfind(cigreSimulinkName, ".");
-            splitPos   = min([bracketPos, dotPos, strlength(cigreSimulinkName) + 1]);
-            rootName   = extractBefore(cigreSimulinkName + " ", splitPos); % pad to avoid empty extractBefore
+            dotPos = strfind(cigreSimulinkName, ".");
+            splitPos = min([bracketPos, dotPos, strlength(cigreSimulinkName) + 1]);
+            % Pad with a trailing space so extractBefore returns the full
+            % name when the split index points past the end.
+            rootName = extractBefore(cigreSimulinkName + " ", splitPos);
 
             entryIdx = find(string({simulinkParams.Name}) == rootName, 1);
             if isempty(entryIdx)
@@ -666,15 +665,14 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             currentValue = simulinkParams(entryIdx).Value;
 
             if ~isempty(bracketPos) && (isempty(dotPos) || bracketPos(1) < dotPos(1))
-                % Array element e.g. "p1[2]" — index is 0-based in the name
+                % Array element, e.g. "p1[2]". The bracketed index is
+                % zero-based (it came from the generated C code).
                 zeroBasedIndex = str2double(extractBetween(cigreSimulinkName, "[", "]"));
                 currentValue(zeroBasedIndex + 1) = cast(effectiveDefault, class(currentValue));
             elseif ~isempty(dotPos)
-                % Nested struct field e.g. "ps.p1" or "ps.psi.psi1"
-                fieldPath    = extractAfter(cigreSimulinkName, ".");
+                fieldPath = extractAfter(cigreSimulinkName, ".");
                 currentValue = test.system.tGenerateCigre.setNestedField(currentValue, fieldPath, effectiveDefault);
             else
-                % Simple scalar
                 currentValue = cast(effectiveDefault, class(currentValue));
             end
 
