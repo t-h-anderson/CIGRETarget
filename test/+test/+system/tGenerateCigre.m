@@ -662,8 +662,10 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             oldCodeGenFolder = cfg.CodeGenFolder; %#ok<NASGU>
             oldCacheFolder = cfg.CacheFolder; %#ok<NASGU>
 
-            cfg.CodeGenFolder = pth;
-            cfg.CacheFolder = pth;
+            % Simulink.FileGenConfig's setters reject strings and require
+            % a char vector specifically.
+            cfg.CodeGenFolder = char(pth);
+            cfg.CacheFolder = char(pth);
             try
                 Simulink.fileGenControl("setConfig", "config", cfg, "createDir", true);
             catch
