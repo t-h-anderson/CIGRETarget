@@ -165,6 +165,16 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             % of the make step and skip the baseline comparison.
             doCompile = ispc;
 
+            % The saved test models reference Windows-only CIGRE
+            % toolchains (e.g. "CIGRE DLL - Microsoft Visual C++ 2019
+            % ...") which aren't in the registry on a Linux runner.
+            % Override the toolchain on the source model (and any
+            % referenced submodels) to auto-detect; the wrapper copies
+            % this config so the override propagates into the build.
+            if ~doCompile
+                cleanups = setAutoToolchain(ModelName); %#ok<NASGU>
+            end
+
             here = pwd;
             [desc, dll, c] = cigre.buildDLL(ModelName, ...
                 "SkipBuild", ~doCompile, ...
@@ -742,3 +752,26 @@ classdef tGenerateCigre < test.util.WithParallelFixture
 
 end
 
+function cleanups = setAutoToolchain(modelName)
+% setAutoToolchain Switch the top model and every referenced submodel
+% to auto-detected toolchain. Returns an array of onCleanup objects
+% that keep the affected systems loaded for the lifetime of the test;
+% releasing them lets bdclose run unimpeded at teardown.
+arguments
+    modelName (1,1) string
+end
+
+[~, cTop] = util.loadSystem(modelName);
+set_param(modelName, "Toolchain", "Automatically locate an installed toolchain");
+
+refs = string(find_mdlrefs(modelName));
+cleanups = {cTop};
+for i = 1:numel(refs)
+    if refs(i) == modelName
+        continue
+    end
+    [~, cRef] = util.loadSystem(refs(i));
+    set_param(refs(i), "Toolchain", "Automatically locate an installed toolchain");
+    cleanups{end+1} = cRef; %#ok<AGROW>
+end
+end
