@@ -1,20 +1,14 @@
 function sl_customization(cm)
-
 % Copyright 2024 The MathWorks, Inc.
- % Adds new:      Advisor.Manager.refresh_customizations()
- % Refreshed all: Advisor.Manager.update_customizations()
+%
+% To pick up new checks: Advisor.Manager.refresh_customizations().
+% To refresh all checks: Advisor.Manager.update_customizations().
 
-% register custom checks 
 cm.addModelAdvisorCheckFcn(@defineModelAdvisorChecks);
 
 end
 
-% -----------------------------
-% defines Model Advisor Checks
-% -----------------------------
 function defineModelAdvisorChecks
-
-% Register custom checks
 cigre.advisor.detailStyleChecks.Cigre0001ConfigSet;
 cigre.advisor.detailStyleChecks.Cigre0002VirtualBus;
 cigre.advisor.detailStyleChecks.Cigre0003InterfaceTypes;

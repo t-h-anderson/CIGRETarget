@@ -62,9 +62,9 @@ classdef CustomCheck < handle
             else
                 ElementResults.Status = status;
                 if pass
-                    ElementResults.ViolationType = 'pass';
+                    ElementResults.ViolationType = "pass";
                 else
-                    ElementResults.ViolationType = 'fail';
+                    ElementResults.ViolationType = "fail";
                 end
             end
             ElementResults.RecAction = recAction;
@@ -91,7 +91,7 @@ classdef CustomCheck < handle
                 if verLessThan("MATLAB", "23.2")
                     ElementResults.IsViolation = false;
                 else
-                    ElementResults.ViolationType = 'pass';
+                    ElementResults.ViolationType = "pass";
                     ElementResults.Status = statusPass;
                 end
                 ElementResults.Description = description;
@@ -106,7 +106,7 @@ classdef CustomCheck < handle
                     if verLessThan("MATLAB", "23.2")
                         ElementResults(idx).setData(violatingBlocks{idx});
                     else
-                        ModelAdvisor.ResultDetail.setData(ElementResults(idx), 'SID', violatingBlocks{idx});
+                        ModelAdvisor.ResultDetail.setData(ElementResults(idx), "SID", violatingBlocks{idx});
                     end
 
                     ElementResults(idx).Description = description;
@@ -125,7 +125,7 @@ classdef CustomCheck < handle
 
                     if iscell(vtype)
                         if verLessThan("MATLAB", "23.2")
-                            if strcmp(vtype{idx}, 'fail')
+                            if strcmp(vtype{idx}, "fail")
                                 ElementResults(idx).IsViolation = true;
                             else
                                 ElementResults(idx).IsViolation = false;
@@ -135,7 +135,7 @@ classdef CustomCheck < handle
                         end
                     else
                         if verLessThan("MATLAB", "23.2")
-                            if strcmp(vtype, 'fail')
+                            if strcmp(vtype, "fail")
                                 ElementResults(idx).IsViolation = true;
                             else
                                 ElementResults(idx).IsViolation = false;
