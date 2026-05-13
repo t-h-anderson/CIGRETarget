@@ -762,7 +762,7 @@ arguments
 end
 
 [~, cTop] = util.loadSystem(modelName);
-set_param(modelName, "Toolchain", "Automatically locate an installed toolchain");
+overrideToolchain(modelName);
 
 refs = string(find_mdlrefs(modelName));
 cleanups = {cTop};
@@ -771,7 +771,16 @@ for i = 1:numel(refs)
         continue
     end
     [~, cRef] = util.loadSystem(refs(i));
-    set_param(refs(i), "Toolchain", "Automatically locate an installed toolchain");
+    overrideToolchain(refs(i));
     cleanups{end+1} = cRef; %#ok<AGROW>
 end
+end
+
+function overrideToolchain(modelName)
+% Apply the auto-detect override, then clear the dirty flag so the
+% wrapper's save_system isn't blocked by SaveSystemWithDirtyReferencedModels.
+% The in-memory override still takes effect; we just don't want Simulink
+% to think the file on disk needs rewriting.
+set_param(modelName, "Toolchain", "Automatically locate an installed toolchain");
+set_param(modelName, "Dirty", "off");
 end
