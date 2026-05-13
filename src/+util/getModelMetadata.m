@@ -1,19 +1,15 @@
 function modelMetadataTable = getModelMetadata(modelName)
-    % getModelMetadata Retrieves all metadata for a Simulink model and displays in a table.
-    %
-    %   modelMetadataTable = getModelMetadata(modelName) returns a table containing
-    %   the metadata of the model specified by modelName.
-    %
-    %   Inputs:
-    %       modelName - Name of the Simulink model or block to get metadata from.
-    %
-    %   Outputs:
-    %       modelMetadataTable - Table containing the metadata of the model.
+% getModelMetadata Returns a table of every readable parameter on a Simulink model.
+%
+%   Inputs:
+%       modelName - Name of the Simulink model or block to introspect.
+%
+%   Outputs:
+%       modelMetadataTable - Table with one row per (Parameter, Value) pair.
     arguments
         modelName (1,1) string
     end
 
-    % Check if the model is loaded, if not try to load it
     if ~bdIsLoaded(modelName)
         try
             load_system(modelName);
@@ -22,24 +18,22 @@ function modelMetadataTable = getModelMetadata(modelName)
                   "The model %s is not loaded and could not be loaded: %s", modelName, ME.message);
         end
     end
-    
-    % Get all the parameters of the model
+
     allParams = get_param(modelName, "ObjectParameters");
-    
-    % Retrieve the names and values of the parameters
+
     paramNames = fieldnames(allParams);
     paramValues = cell(length(paramNames), 1);
-    
+
     for i = 1:numel(paramNames)
         try
             paramValues{i} = get_param(modelName, paramNames{i});
         catch
-            % Some parameters might not be readable, so we catch the error and continue
+            % Some object parameters are write-only or context-dependent
+            % and throw on get; record as N/A rather than abort the scan.
             paramValues{i} = "N/A";
         end
     end
-    
-    % Create a table with the parameter names and values
-    modelMetadataTable = table(paramNames, paramValues, 'VariableNames', ["Parameter", "Value"]);
+
+    modelMetadataTable = table(paramNames, paramValues, "VariableNames", ["Parameter", "Value"]);
 
 end

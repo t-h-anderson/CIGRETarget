@@ -5,20 +5,16 @@ end
 
 models = test.system.tGenerateCigre.ModelName;
 
-%here = cigreRoot;
-
-%target = fullfile(here, "test", "models_" + ver);
-
-%mkdir(target);
-
 for i = 1:numel(models)
     model = models{i};
-   
+
     mdlRefs = string(find_mdlrefs(model));
 
     for j = 1:numel(mdlRefs)
         mdl = mdlRefs(j);
 
+        % Mirror the source folder layout under models_<ver> so referenced
+        % submodels keep the same relative paths.
         target = fileparts(which(mdl));
         target = strrep(target, "models", "models_" + ver);
         mkdir(target);
@@ -26,9 +22,7 @@ for i = 1:numel(models)
         [~, co] = util.loadSystem(mdl); %#ok<ASGLU>
 
         Simulink.exportToVersion(mdl, fullfile(target, mdl), ver);
-       
     end
 
     clear("co");
-
 end

@@ -1,10 +1,10 @@
 classdef TranslateTypes < handle
 
     properties (Constant)
-        StandardTypes = ["double",   "single",   "int32",   "int16",   "int8",   "uint32",   "uint16",   "uint8",   "boolean",   "int",     "uint",     "char"]
-        SimulinkTypes = ["real_T",   "real32_T", "int32_T", "int16_T", "int8_T", "uint32_T", "uint16_T", "uint8_T", "boolean_T", "int32_T", "uint32_T", "char_T"]
-        CigreTypes =    ["real64_T", "real32_T", "int32_T", "int16_T", "int8_T", "uint32_T", "uint16_T", "uint8_T", "uint8_T",   "int32_T", "uint32_T", "char_T"]
-        AltSLTypes =    ["double",   "float",    "int32_t", "int16_t", "int8_t", "uint32_t", "uint16_t", "uint8_t", "boolean_t", "int",     "unsigned int", "char"]
+        StandardTypes = ["double", "single", "int32", "int16", "int8", "uint32", "uint16", "uint8", "boolean", "int", "uint", "char"]
+        SimulinkTypes = ["real_T", "real32_T", "int32_T", "int16_T", "int8_T", "uint32_T", "uint16_T", "uint8_T", "boolean_T", "int32_T", "uint32_T", "char_T"]
+        CigreTypes = ["real64_T", "real32_T", "int32_T", "int16_T", "int8_T", "uint32_T", "uint16_T", "uint8_T", "uint8_T", "int32_T", "uint32_T", "char_T"]
+        AltSLTypes = ["double", "float", "int32_t", "int16_t", "int8_t", "uint32_t", "uint16_t", "uint8_t", "boolean_t", "int", "unsigned int", "char"]
     end
 
     methods (Static)
@@ -19,8 +19,10 @@ classdef TranslateTypes < handle
 
             nTypesIn = numel(typeIn);
 
-            % If type is too large for target hardware type gets renamed e.g. int64m_T
-            % This should be caught by a model advisor check
+            % Multi-word typedefs (suffix m_T) appear when a type is too
+            % large for the target hardware. The CIGRE DLL ABI has no
+            % representation for these so reject early; a model advisor
+            % check should also catch this upstream.
             idx = contains(typeIn, "m_T");
             if any(idx)
                 error("Cigre dll doesn't support multi-word typedefs yet, e.g. " + typeIn(find(idx, 1)));
@@ -47,11 +49,10 @@ classdef TranslateTypes < handle
             else
 
                 cigreMap = dictionary(util.TranslateTypes.StandardTypes, util.TranslateTypes.CigreTypes);
-                
+
                 model = nvp.Model;
                 co = util.loadSystem(model); %#ok<NASGU>
 
-                % Get correct replacement types
                 type = string(get_param(model, "DataTypeReplacement"));
                 switch type
                     case "CDataTypesFixedWidth"
@@ -78,13 +79,11 @@ classdef TranslateTypes < handle
                 end
             end
 
-            % Order the mappings
             if nvp.From == "Simulink"
                 from = simulinkMap;
             else
                 from = cigreMap;
             end
-
 
             if nvp.To == "Simulink"
                 to = simulinkMap;
@@ -92,10 +91,10 @@ classdef TranslateTypes < handle
                 to = cigreMap;
             end
 
-            % Search for input types in from map values
             values = from.values;
             values = reshape(values, [], 1);
-            idx = (string(values) == typeIn); % Each column indicates where the input(i) has been found
+            % Each column of idx flags where typeIn(i) appears in the "from" mapping.
+            idx = (string(values) == typeIn);
 
             missingTypes = typeIn(~any(idx, 1));
             if ~isempty(missingTypes)
@@ -104,14 +103,17 @@ classdef TranslateTypes < handle
 
             firstIdxs = zeros(nTypesIn, 1);
             for i = 1:nTypesIn
-                foundIdx = find(idx(:,i), 1);  % Take the first one if multiple are found
+                % Take the first hit when a Simulink type maps to multiple
+                % keys (e.g. boolean/uint8 collisions on the CIGRE side).
+                foundIdx = find(idx(:,i), 1);
                 firstIdxs(i) = foundIdx;
             end
 
-            % Find the corresponding "to" types based on standard type keys
             standardTypeKeys = from.keys;
             standardTypes = string(standardTypeKeys(firstIdxs));
-            typeOut = arrayfun(@(x) string(to(x)), standardTypes); % Use arrayfun to support containers.map in 2020a
+            % arrayfun rather than indexing to remain compatible with the
+            % containers.Map fallback used on MATLAB < R2022b.
+            typeOut = arrayfun(@(x) string(to(x)), standardTypes);
 
             typeOut = reshape(typeOut, [], size(typeIn, 2));
 

@@ -21,40 +21,41 @@ busCreator = add_block("built-in/BusCreator", mdl + "/" + creatorName);
 h = add_line(mdl, creatorName + "/1", toName);
 set_param(h, "Name", signalInput.SignalName)
 
-% Add the bus creator with an input for each signal
 busElements = busDef.Elements;
-set_param(busCreator,'Inputs',string(numel(busElements)));
+set_param(busCreator, "Inputs", string(numel(busElements)));
 ports = [];
 idxRange = string.empty(1,0);
 
-% output
 for j = 1:numel(busElements)
 
     me = busElements(j);
     element = busDef.Elements(j);
     portName = fromName + "_" + busElements(j).Name;
-    
+
     if ~contains(me.DataType, "Bus:")
-        % Add the in port with name in - originalName_busElementName
 
         ports(end+1) = add_block("simulink/Quick Insert/Signal Attributes/Cast", mdl + "/" + portName);
-        
+
         if contains(element.DataType, "Enum:")
-            % Need to convert input to integer before converting to enum
+            % Two-stage cast: the inbound vector slot is the wrapper's
+            % numeric type; cast first to int32, then to the enum class
+            % consumed by the model.
             ports(end) = add_block("simulink/Quick Insert/Signal Attributes/Cast", mdl + "/" + portName + "_toInt");
             set_param(ports(end), "OutDataTypeStr", "int32");
 
             add_line(mdl, portName + "_toInt/1", portName + "/" + 1);
-        
         end
 
         if all(element.Dimensions ~= 1)
+            % Matrix-valued elements need a reshape after the selector;
+            % record the contiguous vector slice they came from so the
+            % outer selector can pick them out by index.
             reshape = add_block("simulink/Math Operations/Reshape", mdl + "/" + portName + "Reshape");
             add_line(mdl, portName + "/" + 1, portName + "Reshape/1");
 
             set_param(reshape, "OutputDimensionality", "Customize");
             set_param(reshape, "OutputDimensions", "[" + strjoin(string(element.Dimensions), ", ") + "]");
-            
+
             here = portName + "Reshape";
             idxRange(end + 1) = (idx + 1) + ":" + (idx + sum(element.Dimensions));
             idx = idx + sum(element.Dimensions);
@@ -63,10 +64,9 @@ for j = 1:numel(busElements)
             here = portName;
             idxRange(end + 1) = string(idx);
         end
-        
+
         l = add_line(mdl, here + "/1", creatorName + "/" + j);
-        
-        % Name is element
+
         Name = me.Name;
         set_param(l, "Name", Name);
     else
@@ -77,10 +77,9 @@ for j = 1:numel(busElements)
         ports = [ports, p];
         idxRange = [idxRange, idxRanges];
     end
-    
+
 end
 
-% input
 set_param(busCreator, "OutDataTypeStr", "Bus: " + signalInput.BusObject);
 castTo = nvp.CastTo;
 if terminate
@@ -88,14 +87,14 @@ if terminate
     set_param(in, "OutDataTypeStr", castTo);
 
     for i = 1:numel(ports)
-        s = add_block("simulink/Signal Routing/Selector", mdl + "/" + portName + "select" , "MakeNameUnique", 'on');
-        selector =  get_param(s, "Name");
-        
-        set_param(s,  "InputPortWidth", string(idx), "IndexParamArray", cellstr(idxRange(i)));
-        
+        s = add_block("simulink/Signal Routing/Selector", mdl + "/" + portName + "select", "MakeNameUnique", "on");
+        selector = get_param(s, "Name");
+
+        set_param(s, "InputPortWidth", string(idx), "IndexParamArray", cellstr(idxRange(i)));
+
         inBlock = get_param(in, "Name");
         add_line(mdl, inBlock + "/1", selector + "/1");
-        
+
         converter = get_param(ports(i), "Name");
         add_line(mdl, selector + "/1", converter + "/1");
     end

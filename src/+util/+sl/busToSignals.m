@@ -25,8 +25,8 @@ for j = 1:numel(busElementOutput)
         nextBlock = selectorName + "/" + j;
 
         if startsWith(busElementOutput(j).DataType, "Enum: ")
-             
-            % Need to convert enums to integers
+            % The CIGRE ABI exposes enums as int32; cast before the
+            % wrapper outport so the external interface stays integral.
             c = add_block("simulink/Quick Insert/Signal Attributes/Cast", mdl + "/Convert" + portName);
             set_param(c, "OutDataTypeStr", "int32");
             add_line(mdl, selectorName + "/" + j, "Convert" + portName + "/1");
@@ -34,7 +34,7 @@ for j = 1:numel(busElementOutput)
         end
 
         add_block("built-in/Outport", mdl + "/" + portName);
-        add_line(mdl, nextBlock , portName + "/1");
+        add_line(mdl, nextBlock, portName + "/1");
     else
         util.sl.busToSignals(children, mdl, selectorName + "/" + j, portName, selectorName + "_" + j)
     end

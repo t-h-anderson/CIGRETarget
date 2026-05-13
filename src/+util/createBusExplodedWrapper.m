@@ -6,14 +6,11 @@ arguments
     nvp.VectorDataType (1,1) string = "single"
 end
 
-% Ensure the model is loaded, if not, close after we leave the explode
-% function
 [mdlh, cMdl] = util.loadSystem(model); %#ok<ASGLU>
 
-% Ensure that a fresh wrapper can be created.
 wrapperName = model + nvp.NameSuffix;
 bdclose(wrapperName);
-if exist(wrapperName, 'file')
+if exist(wrapperName, "file")
     disp("Deleting existing wrapper: " + wrapperName)
     w = which(wrapperName);
     if ~isempty(w)
@@ -21,7 +18,6 @@ if exist(wrapperName, 'file')
     end
 end
 
-% Create and load the wrapper
 new_system(wrapperName);
 if nargout > 1
     [~, cWrap] = util.loadSystem(wrapperName);
@@ -30,10 +26,10 @@ else
     cWrap = [];
 end
 
-% Copy the config set from the model to the wrapper
 config = getActiveConfigSet(model);
-if ~isa(config, 'Simulink.ConfigSet')
-    % If the config is a reference, break the link so we can customise
+if ~isa(config, "Simulink.ConfigSet")
+    % Config is a reference set; break the link so the wrapper can hold
+    % its own copy without mutating the original.
     config = config.getRefConfigSet;
 end
 newConfig = copy(config);
@@ -41,34 +37,34 @@ newConfig.Name = "CopiedConfig";
 attachConfigSet(wrapperName, newConfig);
 setActiveConfigSet(wrapperName, newConfig.Name);
 
-% Update the coder mappings
-%cm = coder.mapping.api.get(wrapperName,'EmbeddedCoderC');
 cm = coder.mapping.utils.create(wrapperName);
 if ~verLessThan("MATLAB", "9.9")
     cm.setDataDefault("ModelParameterArguments", "StorageClass", "MultiInstance");
 end
 
-% Copy the data dictionaries
 dd = get_param(model, "DataDictionary");
 set_param(wrapperName, "DataDictionary", dd);
 
-% Add a model reference back to the model
 ref = wrapperName + "/mdl";
 mdlRef = add_block("built-in/ModelReference", ref);
-set_param(mdlRef, "ModelNameDialog", model) % Link to the original model
-set_param(mdlRef, "SimulationMode", "Normal") % Ensure we are not in rapid accelerator mode
+set_param(mdlRef, "ModelNameDialog", model)
+% Normal sim mode keeps tunable parameters live; rapid accelerator would
+% freeze them at compile.
+set_param(mdlRef, "SimulationMode", "Normal")
 
-% Update the model reference to set the model parameters
 p = get_param(mdlRef, "InstanceParameters");
 for i = 1:numel(p)
+    % Simulink stores InstanceParameters.Value as char; a placeholder
+    % literal here is overwritten further down with the actual default.
     p(i).Value = '0';
     p(i).Argument = true;
 end
 set_param(mdlRef, "InstanceParameters", p);
 
 %% Input
-% Find in the inports on the top level model. Work backwards from the
-% reference to explode buses
+% Explode each top-level Inport, replacing buses with either per-signal
+% ports or a single concatenated vector port. Working from the model
+% reference outward keeps the original block ordering on the wrapper.
 inhs = find_system(mdlh, "SearchDepth", 1, "BlockType", "Inport");
 
 for i = 1:numel(inhs)
@@ -76,30 +72,25 @@ for i = 1:numel(inhs)
 
     name = get_param(inh, "Name");
 
-    % Determine if the port is a non-virtual bus
     inTypes = string(get_param(inh, "OutDataTypeStr"));
     isBus = contains(inTypes, "Bus:");
     isEnum = contains(inTypes, "Enum:");
 
-    % Port is a bus, so need to be exploded
     inOutSignals = get_param(inh, "PortHandles");
     inputSignals = get_param(inOutSignals.Outport, "SignalHierarchy");
 
     if isBus
-        
+
         if isempty(inputSignals.BusObject)
             error(inTypes + " definition not found")
         end
-        
-        % define what needs creating - a bus creator that will be linked to
-        % the first port of the reference model
+
         creatorName = "creator" + i;
         fromName = name;
         toName = "mdl/" + i;
 
         switch nvp.BusAs
             case "Ports"
-                % Add a bus creator (recursive)
                 util.sl.signalsToBus(inputSignals, wrapperName, fromName, toName, creatorName);
             otherwise
                 util.sl.vectorToBus(inputSignals, wrapperName, fromName, toName, creatorName, 0, true, "CastTo", nvp.VectorDataType);
@@ -107,8 +98,9 @@ for i = 1:numel(inhs)
     elseif isEnum
 
         name = cleanName(name);
-        
-        % Need to convert input to integer before converting to enum
+
+        % The CIGRE ABI carries enums as int32; cast on the inside of the
+        % wrapper so the outside port stays a plain integer.
         c = add_block("simulink/Quick Insert/Signal Attributes/Cast", wrapperName + "/Convert" + name);
         set_param(c, "OutDataTypeStr", inTypes);
         l = add_line(wrapperName, "Convert" + name + "/1", "mdl/" + i);
@@ -117,23 +109,22 @@ for i = 1:numel(inhs)
         set_param(in, "OutDataTypeStr", "int32");
         add_line(wrapperName, name + "/1", "Convert" + name + "/" + 1);
 
-        signalName = inputSignals.SignalName; 
+        signalName = inputSignals.SignalName;
         set_param(l, "Name", signalName);
 
     else
-        % Add the inport and connect it up
         name = cleanName(name);
         add_block("built-in/Inport", wrapperName + "/" + name);
         l = add_line(wrapperName, name + "/1", "mdl/" + i);
 
-        signalName = inputSignals.SignalName; 
+        signalName = inputSignals.SignalName;
         set_param(l, "Name", signalName);
     end
 
 end
 
 
-% Output
+%% Output
 outh = find_system(mdlh, "SearchDepth", 1, "BlockType", "Outport");
 for i = 1:numel(outh)
 
@@ -151,10 +142,9 @@ for i = 1:numel(outh)
         selectorName = "selector" + i;
         toName = name;
         fromName = "mdl/" + i;
-        
+
         switch nvp.BusAs
             case "Ports"
-                % Add a bus creator (recursive)
                 util.sl.busToSignals(bus, wrapperName, fromName, toName, selectorName);
             otherwise
                 util.sl.busToVector(bus, wrapperName, fromName, toName, selectorName, true);
@@ -163,8 +153,9 @@ for i = 1:numel(outh)
     elseif isEnum
 
         name = cleanName(name);
-        
-        % Need to convert input to integer before converting to enum
+
+        % Mirror of the input-side cast: the wrapper's port is int32, the
+        % inside of the model expects the enum class.
         c = add_block("simulink/Quick Insert/Signal Attributes/Cast", wrapperName + "/Convert" + name);
         set_param(c, "OutDataTypeStr", "int32");
         l = add_line(wrapperName, "mdl/" + i, "Convert" + name + "/1");
@@ -173,7 +164,7 @@ for i = 1:numel(outh)
         set_param(in, "OutDataTypeStr", "int32");
         add_line(wrapperName, "Convert" + name + "/" + 1, name + "/1");
 
-        signalName = inputSignals.SignalName; 
+        signalName = inputSignals.SignalName;
         set_param(l, "Name", signalName);
 
     else
@@ -185,34 +176,37 @@ for i = 1:numel(outh)
         add_block("built-in/Outport", wrapperName + "/" + name);
         l = add_line(wrapperName, "mdl/" + i, name + "/1");
 
-        signalName = outputSignals.SignalName; 
-        set_param(l, "Name", signalName);        
+        signalName = outputSignals.SignalName;
+        set_param(l, "Name", signalName);
     end
 end
 
 Simulink.BlockDiagram.arrangeSystem(wrapperName);
 
-% Set the parameters in the wrapper
 ip = get_param(mdlRef, "InstanceParameters");
 
 if ~isempty(ip)
-    
+
     mws = get_param(model, "ModelWorkspace");
     p = mws.whos;
     wws = get_param(wrapperName, "ModelWorkspace");
-    
+
     ipNames = string({ip.Name});
     for i = 1:numel(p)
         name = p(i).name;
         var = mws.getVariable(name);
         assignin(wws, name, var);
-        
+
         idx = (ipNames == name);
         if any(idx)
+            % InstanceParameters.Value is a char literal that Simulink
+            % eval's in the wrapper workspace at compile time.
             ip(idx).Value = char(util.valToString(var.Value));
         end
     end
 
+    % InstanceParameters' Path field was renamed to FullPath in newer
+    % releases; rename in-place so set_param succeeds across versions.
     ipNew = arrayfun(@(x) renameStructField(x, {"Path"}, {"FullPath"}), ip);
     set_param(mdlRef, "InstanceParameters", ipNew);
 end
@@ -224,6 +218,7 @@ arguments
     name (1,1) string
 end
 
-name = strrep(name, "/", "//"); % Allow slashes in the name
+% Slashes in Simulink block paths are escaped by doubling them.
+name = strrep(name, "/", "//");
 
 end
