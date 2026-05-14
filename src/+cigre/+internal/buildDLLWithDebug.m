@@ -1,6 +1,7 @@
 function buildDLLWithDebug(model, nvp)
 % buildDLLWithDebug Generate a CIGRE DLL ready for manual VS debugging.
 %
+%   cigre.internal.buildDLLWithDebug(model)
 %   cigre.internal.buildDLLWithDebug(model, "InputsFile", "myInputs.mat")
 %   cigre.internal.buildDLLWithDebug(model, ...
 %       "InputsFile", "myInputs.mat", "ParametersFile", "myParams.xlsx")
@@ -11,9 +12,14 @@ function buildDLLWithDebug(model, nvp)
 % pauses (via keyboard) so a super user can open the solution in Visual
 % Studio, hit Build > Build Solution, set breakpoints, and step through.
 % After the user resumes, the freshly-built DLL is loaded and stepped
-% through the inputs from InputsFile; if Compare=true (the default) the
-% DLL output is verified against a Simulink baseline run on the same
-% inputs and parameters.
+% through the supplied (or synthesised) inputs; if Compare=true (the
+% default) the DLL output is verified against a Simulink baseline run
+% on the same inputs and parameters.
+%
+% Both InputsFile and ParametersFile are optional, so the smallest
+% smoke-test invocation is just buildDLLWithDebug("MyModel") - inputs
+% default to a synthetic constant per Inport, parameters default to
+% the model's saved values.
 %
 % This is the production sibling of test.system.tGenerateCigre.tVSBuild;
 % it ships in src/ so users who don't have the test harness available
@@ -25,7 +31,12 @@ function buildDLLWithDebug(model, nvp)
 % Name-Value Arguments:
 %   InputsFile     - path to a .mat file containing a single timetable
 %                    variable (use cigre.util.captureInputsFromSimulink
-%                    to generate one). Required.
+%                    to generate one). Optional; if omitted, a synthetic
+%                    input timetable is generated via
+%                    cigre.internal.generateDefaultInputs (one constant
+%                    per Inport, distinct non-zero values) so the DLL
+%                    still gets exercised end-to-end. Good for an
+%                    initial smoke test, not for matching real data.
 %   ParametersFile - path to a ParameterConfig.xlsx (use
 %                    cigre.util.captureParametersFromSimulink). Optional;
 %                    if omitted the model's defaults are used.
@@ -45,7 +56,7 @@ function buildDLLWithDebug(model, nvp)
 %                    project (default "10.0").
 arguments
     model (1,1) string
-    nvp.InputsFile (1,1) string
+    nvp.InputsFile (1,1) string = string(missing)
     nvp.ParametersFile (1,1) string = string(missing)
     nvp.Compare (1,1) logical = true
     nvp.BusAs (1,1) string {mustBeMember(nvp.BusAs, ["Ports", "Vector"])} = "Vector"
@@ -56,7 +67,7 @@ arguments
     nvp.WindowsTargetPlatformVersion (1,1) string = "10.0"
 end
 
-if ~isfile(nvp.InputsFile)
+if ~ismissing(nvp.InputsFile) && ~isfile(nvp.InputsFile)
     error("CIGRE:buildDLLWithDebug:InputsFileMissing", ...
         "InputsFile does not exist: %s", nvp.InputsFile);
 end
@@ -84,14 +95,25 @@ desc = cigre.buildDLL(model, ...
     "BusAs", nvp.BusAs, ...
     buildArgs{:});
 
-% Load saved inputs. loadData-style: the .mat is expected to contain a
-% single timetable; we take the first variable.
-loaded = load(nvp.InputsFile);
-inputsField = string(fieldnames(loaded));
-inputs = loaded.(inputsField(1));
-if ~istimetable(inputs)
-    error("CIGRE:buildDLLWithDebug:InputsNotTimetable", ...
-        "Variable '%s' in %s is not a timetable.", inputsField(1), nvp.InputsFile);
+% Sim timing taken from the model. The inputs timetable's time vector
+% must match this for the baseline comparison to line up cleanly; when
+% we synthesise inputs below we use the same vector.
+[stopTime, timeStep] = readModelTiming(model);
+time = seconds(0:timeStep:stopTime)';
+
+if ismissing(nvp.InputsFile)
+    fprintf("No InputsFile supplied; generating synthetic defaults (input k = k * ones).\n");
+    inputs = cigre.internal.generateDefaultInputs(desc, time);
+else
+    % loadData-style: the .mat is expected to contain a single
+    % timetable; we take the first variable.
+    loaded = load(nvp.InputsFile);
+    inputsField = string(fieldnames(loaded));
+    inputs = loaded.(inputsField(1));
+    if ~istimetable(inputs)
+        error("CIGRE:buildDLLWithDebug:InputsNotTimetable", ...
+            "Variable '%s' in %s is not a timetable.", inputsField(1), nvp.InputsFile);
+    end
 end
 
 % Reconstruct a Simulink/CIGRE parameter pair from the model description
@@ -102,10 +124,6 @@ else
     paramConfig = cigre.config.ParameterConfiguration.fromFile(nvp.ParametersFile);
 end
 [simulinkParameters, cigreParameters] = resolveParameters(desc, paramConfig);
-
-% Sim timing taken from the model. The inputs timetable's time vector
-% must match this for the baseline comparison to line up cleanly.
-[stopTime, timeStep] = readModelTiming(model);
 
 % Always capture the Simulink baseline: the DLL runner needs an
 % outputs-shape allocator (cigre.dll.DataMap.create reads sizes from

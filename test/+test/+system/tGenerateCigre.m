@@ -540,38 +540,11 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             end
 
             time = testCase.Time;
-            inputs = desc.Inputs;
 
             testCase.Inputs = {};
 
             if isempty(testCase.InputData)
-                input = cell(1, numel(inputs));
-                for i = 1:numel(inputs)
-                    c = inputs(i).BaseType;
-
-                    d = inputs(i).Dimensions;
-                    if isscalar(d)
-                        d = [d, 1];
-                    end
-                    thisVal = ones(d);
-
-                    if c == "boolean"
-                        iVal = (thisVal ~= 0);
-                    else
-                        iVal = cast(i * thisVal, c);
-                    end
-
-                    % This supports matrices
-                    iVals = repelem({iVal}, numel(time), 1);
-                    iVals = cat(3, iVals{:});
-                    iVals = permute(iVals, [3,1,2]);
-
-                    % timetable/table constructors require their N-V
-                    % pair names as char vectors in legacy syntax.
-                    input{i} = timetable(iVals, 'RowTimes', time, 'VariableNames', "Var" + i);
-                end
-
-                input = [input{:}];
+                input = cigre.internal.generateDefaultInputs(desc, time);
             else
                 input = testCase.InputData;
             end
