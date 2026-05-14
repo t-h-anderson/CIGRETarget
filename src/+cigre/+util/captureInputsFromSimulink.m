@@ -71,27 +71,35 @@ if isempty(logs) || logs.numElements == 0
         "Simulation produced no logged Inport signals. Check that the model has top-level Inports and that signal logging is permitted on them.");
 end
 
-% Build a wide timetable: one variable per Inport signal, time axis taken
-% from the first logged signal. Inports are matched by block name so
-% downstream consumers can index by familiar names.
-timetables = cell(1, logs.numElements);
-for k = 1:logs.numElements
-    el = logs{k};
-    t = seconds(el.Values.Time);
-    name = string(el.Name);
-    if name == ""
-        % Some R2020b configurations leave the element name blank;
-        % fall back to a positional Var<k> so loadData-style consumers
-        % still get a usable timetable.
-        name = "Var" + k;
+% extractTimetable with 'cell-by-signal' handles bus inputs correctly:
+% each leaf of a bus becomes its own timetable instead of getting jammed
+% into a struct under el.Values. That matches the shape the CIGRE
+% wrapper expects too - the wrapper explodes buses 1:1 into per-leaf
+% Inports, so a per-leaf timetable column lines up cleanly with the
+% wrapper's input interface.
+%
+% Older releases predate extractTimetable; fall back to the manual
+% Time / Data extraction in that case (bus inputs will be unsupported
+% there, but scalar Inports still work).
+try
+    ttCells = logs.extractTimetable('OutputFormat', 'cell-by-signal');
+catch
+    ttCells = cell(1, logs.numElements);
+    for k = 1:logs.numElements
+        el = logs{k};
+        t = seconds(el.Values.Time);
+        name = string(el.Name);
+        if name == ""
+            name = "Var" + k;
+        end
+        ttCells{k} = timetable(t, el.Values.Data, 'VariableNames', name);
     end
-    timetables{k} = timetable(t, el.Values.Data, 'VariableNames', name);
 end
 
 % synchronize the per-signal timetables onto a common time vector. Use
 % nearest interpolation so we don't introduce intermediate samples beyond
-% what each Inport actually produced.
-combined = synchronize(timetables{:}, 'union', 'nearest');
+% what each leaf signal actually produced.
+combined = synchronize(ttCells{:}, 'union', 'nearest');
 
 savedVar.(nvp.Variable) = combined; %#ok<STRNU>
 save(outFile, "-struct", "savedVar");
