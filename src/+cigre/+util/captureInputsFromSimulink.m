@@ -28,21 +28,28 @@ end
 
 [~, cMdl] = util.loadSystem(model); %#ok<ASGLU>
 
+% Signal logging lives on each Inport's output PORT, not on the Inport
+% block itself - get_param(blockHandle, "DataLogging") errors with
+% "Inport block does not have a parameter named 'DataLogging'". Walk
+% PortHandles.Outport to reach the port that owns the toggle.
 inports = find_system(model, "SearchDepth", 1, "BlockType", "Inport");
-prevLogging = cell(numel(inports), 1);
+inportPorts = zeros(numel(inports), 1);
+prevLogging = strings(numel(inports), 1);
 for i = 1:numel(inports)
-    prevLogging{i} = get_param(inports{i}, "DataLogging");
-    % "DataLogging" is the Inport-block toggle for "Log signal data".
-    % set_param accepts char only on R2020b, so wrap explicitly.
+    ph = get_param(inports{i}, "PortHandles");
+    inportPorts(i) = ph.Outport(1);
+    prevLogging(i) = string(get_param(inportPorts(i), "DataLogging"));
     try
-        set_param(inports{i}, "DataLogging", 'on');
+        set_param(inportPorts(i), "DataLogging", "on");
     catch
-        % Some block configurations refuse the toggle (e.g. when an
-        % Inport sits inside a referenced model). Leave it alone; the
-        % logsout pull below will skip it.
+        % Some configurations (e.g. an Inport feeding directly into a
+        % referenced model with a fixed signal-logging policy) refuse
+        % the toggle. Leave the port alone; if the signal still isn't
+        % logged it will simply be absent from logsout and we'll error
+        % below.
     end
 end
-restore = onCleanup(@() restoreInportLogging(inports, prevLogging)); %#ok<NASGU>
+restore = onCleanup(@() restoreInportLogging(inportPorts, prevLogging)); %#ok<NASGU>
 
 simIn = Simulink.SimulationInput(model);
 if ~isnan(nvp.StopTime)
@@ -92,12 +99,16 @@ save(outFile, "-struct", "savedVar");
 end
 
 
-function restoreInportLogging(inports, prevLogging)
-for i = 1:numel(inports)
+function restoreInportLogging(inportPorts, prevLogging)
+% Best-effort restore of each port's pre-call DataLogging state. Errors
+% (e.g. the port no longer exists because the model was closed) are
+% swallowed: this is a cleanup hook on an onCleanup, so the worst case
+% is we leave one Inport with signal logging stuck on, which is
+% harmless.
+for i = 1:numel(inportPorts)
     try
-        set_param(inports{i}, "DataLogging", prevLogging{i});
+        set_param(inportPorts(i), "DataLogging", char(prevLogging(i)));
     catch
-        % best-effort restore; silently ignored
     end
 end
 end
