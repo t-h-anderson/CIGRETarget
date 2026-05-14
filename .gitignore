@@ -35,6 +35,7 @@ codegen/
 *.VC.db
 *.suo
 *.vcxproj.*
+!*.vcxproj.template
 .vs/
 **/VSBuild_*/
 

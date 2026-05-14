@@ -5,13 +5,15 @@ function buildDLLWithDebug(model, nvp)
 %   cigre.internal.buildDLLWithDebug(model, ...
 %       "InputsFile", "myInputs.mat", "ParametersFile", "myParams.xlsx")
 %
-% Sets up a working folder, emits CIGRE-target code for the wrapper, and
-% pauses (via keyboard) so a super user can open the generated sources in
-% Visual Studio, build the DLL with debug symbols, set breakpoints, and
-% step through. After the user resumes, the freshly-built DLL is loaded
-% and stepped through the inputs from InputsFile; if Compare=true (the
-% default) the DLL output is verified against a Simulink baseline run on
-% the same inputs and parameters.
+% Sets up a working folder, emits CIGRE-target code for the wrapper,
+% writes a ready-to-open .sln + .vcxproj (via writeVSProject) configured
+% for Debug | x64 | DynamicLibrary with the correct include paths, and
+% pauses (via keyboard) so a super user can open the solution in Visual
+% Studio, hit Build > Build Solution, set breakpoints, and step through.
+% After the user resumes, the freshly-built DLL is loaded and stepped
+% through the inputs from InputsFile; if Compare=true (the default) the
+% DLL output is verified against a Simulink baseline run on the same
+% inputs and parameters.
 %
 % This is the production sibling of test.system.tGenerateCigre.tVSBuild;
 % it ships in src/ so users who don't have the test harness available
@@ -107,10 +109,12 @@ end
 baseline = cigre.internal.captureSimulinkBaseline( ...
     desc.CIGREInterfaceName, inputs, simulinkParameters, stopTime, timeStep);
 
-% Hand off to the user. They open the generated <model>_wrap_cigre_rtw
-% folder + src/CIGRESource in Visual Studio, build, and resume MATLAB.
+% Hand off to the user. Generate a ready-to-open VS solution + project
+% so the only thing left to do on the Windows side is Build > Build
+% Solution, set breakpoints, and resume MATLAB.
 dllName = model + "_CIGRE";
-printVSBuildInstructions(model, dllName);
+slnPath = cigre.internal.writeVSProject(model, string(pwd));
+printVSBuildInstructions(slnPath);
 
 fprintf("\n*** Build the DLL in Visual Studio, then 'dbcont' to resume ***\n");
 keyboard %#ok<KEYBOARDFUN>
@@ -283,25 +287,17 @@ timeStep = dt;
 end
 
 
-function printVSBuildInstructions(model, dllName)
-% Mirrors test.system.tGenerateCigre.doVSBuild's clipboard / banner
-% pattern, minus the test-class plumbing.
+function printVSBuildInstructions(slnPath)
+% Tell the user where the auto-generated solution lives and clipboard
+% the path so they can paste it into Explorer / File > Open. Everything
+% else (include dirs, output name, Debug | x64, DynamicLibrary
+% configuration type) is baked into the .vcxproj by writeVSProject,
+% so there is no per-build manual setup left.
 fprintf("\n=== Visual Studio Debug Build ===\n");
-fprintf("Output DLL name (copy to VS project Output File): %s.dll\n", dllName);
-clipboard("copy", dllName + ".dll");
-
-src = fullfile(cigreRoot, "src", "CIGRESource");
-fprintf("CIGRE source folder: %s\n", src);
-
-fld = string(src) + ";";
-fld = fld + genpath(fullfile(pwd, "slprj", "cigre"));
-fld = fld + fullfile(pwd, "slprj", "ert", "_sharedutils") + ";";
-fld = fld + fullfile(matlabroot, "extern", "include") + ";";
-fld = fld + fullfile(matlabroot, "simulink", "include") + ";";
-fld = fld + fullfile(matlabroot, "rtw", "c", "src") + ";";
-fld = fld + fullfile(pwd, model + "_wrap_cigre_rtw");
-
-fprintf("Include / source search paths (copy to VS project Additional Include Directories):\n  %s\n", fld);
+fprintf("Open this solution in Visual Studio (path copied to clipboard):\n  %s\n", slnPath);
+fprintf("Then Build > Build Solution. The DLL lands at:\n  %s\n", ...
+    fullfile(fileparts(slnPath), "x64", "Debug"));
+clipboard("copy", slnPath);
 end
 
 
