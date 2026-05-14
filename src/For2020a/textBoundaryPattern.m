@@ -1,8 +1,8 @@
-function out = textBoundaryPattern(varargin)
-arguments (Repeating)
-    varargin
+function out = textBoundaryPattern(opts)
+arguments
+    opts.LegacyMatlab (1,1) logical = compat.legacyMatlab()
 end
-if verLessThan("MATLAB", "9.9")
+if opts.LegacyMatlab
     out = "";
 else
     out = textBoundary;

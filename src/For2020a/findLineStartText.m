@@ -1,10 +1,11 @@
-function [idxs, idx] = findLineStartText(txt, toMatch)
+function [idxs, idx] = findLineStartText(txt, toMatch, opts)
 arguments
     txt (:,1) string
     toMatch (1,1) string
+    opts.LegacyMatlab (1,1) logical = compat.legacyMatlab()
 end
 
-if verLessThan("MATLAB", "9.9")
+if opts.LegacyMatlab
     idx = cellfun(@(x) sum(x) > 0, regexp(txt, "^" + toMatch));
 else
     idx = contains(txt, lineBoundary + toMatch);

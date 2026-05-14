@@ -1,9 +1,10 @@
-function lines = readFromFile(file)
+function lines = readFromFile(file, opts)
 arguments
     file (1,1) string
+    opts.LegacyMatlab (1,1) logical = compat.legacyMatlab()
 end
 
-if verLessThan("MATLAB", "9.9")
+if opts.LegacyMatlab
     fid = fopen(file, "r");
     if fid == -1
         % Return an empty string so callers can detect a missing file
