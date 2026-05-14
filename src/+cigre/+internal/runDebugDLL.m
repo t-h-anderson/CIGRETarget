@@ -85,15 +85,15 @@ wait(fPid, "finished", 30);
 workerPid = fPid.fetchOutputs();
 
 fprintf("\n");
-fprintf("########################################################\n");
-fprintf("#  Worker PID:  %-8d                                  #\n", workerPid);
-fprintf("#  Steps to run: %-6d                                  #\n", nSteps);
-fprintf("#                                                      #\n");
-fprintf("#  In Visual Studio:                                   #\n");
-fprintf("#    Debug > Attach to Process                         #\n");
-fprintf("#    select MATLAB.exe with PID %-8d                #\n", workerPid);
-fprintf("#    set breakpoints in the C source                   #\n");
-fprintf("########################################################\n");
+fprintf("========================================================\n");
+fprintf("  Worker PID for VS Attach: %d\n", workerPid);
+fprintf("  Steps to run: %d\n", nSteps);
+fprintf("\n");
+fprintf("  In Visual Studio:\n");
+fprintf("    Debug > Attach to Process\n");
+fprintf("    select MATLAB.exe with PID %d\n", workerPid);
+fprintf("    set breakpoints in the C source\n");
+fprintf("========================================================\n");
 
 if nvp.PauseBeforeRun
     fprintf("\n*** Attach VS, set breakpoints, then 'dbcont' to step into the DLL ***\n");
