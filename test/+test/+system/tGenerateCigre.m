@@ -336,135 +336,10 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 nvp.ParameterConfig (1,1) cigre.config.ParameterConfiguration = cigre.config.ParameterConfiguration()
             end
 
-            mdlName = desc.ModelName;
-            testCase.tempLoad(mdlName);
-
-            %% Create an input object to match the input and parameter test data
-            if ismissing(nvp.TestTime)
-                stopTime = double(string(eval(get_param(mdlName, "StopTime"))));
-            else
-                stopTime = nvp.TestTime;
-            end
-
-            dt = get_param(mdlName, "FixedStep");
-            if ~isnumeric(dt)
-                try
-                    try
-                        dt = eval(dt);
-                    catch
-                        dt = evalin("base", dt);
-                    end
-                catch
-                    [~, dt] = util.findParam(mdlName, dt);
-                    if dt == 0
-                        dt = 0.1;
-                    end
-                end
-            end
-
-            timeStep = dt;
-
-            time = seconds(0:timeStep:stopTime)';
-
-            testCase.SimTime = stopTime;
-            testCase.TimeStep = timeStep;
-            testCase.Time = time;
-
-            %% Inputs
-            testCase.Inputs = {};
-
-            inputs = desc.Inputs;
-
-            if isempty(testCase.InputData)
-
-                for i = 1:numel(inputs)
-                    c = inputs(i).BaseType;
-
-                    d = inputs(i).Dimensions;
-                    if isscalar(d)
-                        d = [d, 1]; %#ok<AGROW>
-                    end
-                    thisVal = ones(d);
-
-                    if c == "boolean"
-                        iVal = (thisVal ~= 0);
-                    else
-                        iVal = cast(i * thisVal, c);
-                    end
-
-                    % This supports matrices
-                    iVals = repelem({iVal}, numel(time), 1);
-                    iVals = cat(3, iVals{:});
-                    iVals = permute(iVals, [3,1,2]);
-
-                    % timetable/table constructors require their N-V
-                    % pair names as char vectors in legacy syntax.
-                    thisInput = timetable(iVals, 'RowTimes', time, 'VariableNames', "Var" + i);
-
-                    input{i} = thisInput;
-                end
-
-                input = [input{:}];
-
-            else
-                input = testCase.InputData;
-            end
-
-            warning("Custom input")
-
-            input.Var1(:) = 0;
-            input.Var1(thisInput.Time > seconds(50)) = 100;
-            input.Var2(:) = 0;
-            testCase.Inputs = input;
-            
-
-            %% Parameters
-            testCase.SimulinkParameters = struct("Name", {}, "Value", {});
-            testCase.CIGREParameters = struct("Name", {}, "Value", {});
-
-            % Build SimulinkParameters from the top-level parameter tree using model defaults
-            simulinkParams = desc.Parameters;
-            for i = 1:numel(simulinkParams)
-                simulinkParam = simulinkParams(i);
-                c = simulinkParam.BaseType;
-                simulinkVal = simulinkParam.DefaultValue;
-                try
-                    simulinkVal = cast(simulinkVal, c);
-                catch
-                    % Not castable, e.g. a struct — leave as-is
-                end
-                testCase.SimulinkParameters(i) = struct("Name", simulinkParam.SimulinkName, "Value", simulinkVal);
-            end
-
-            % Apply effective defaults from the config to SimulinkParameters so the
-            % Simulink baseline uses the same values as the DLL — including values
-            % that are hardcoded for hidden parameters
-            allCigreParams = desc.CIGREParameters;
-            [visibleParams, hiddenParams] = nvp.ParameterConfig.partitionParameters(allCigreParams);
-
-            allEffectiveParams = [visibleParams, hiddenParams];
-            for i = 1:numel(allEffectiveParams)
-                p = allEffectiveParams(i);
-                testCase.SimulinkParameters = testCase.applyEffectiveDefault(testCase.SimulinkParameters, p.SimulinkName, p.DefaultValue);
-            end
-
-            % CIGREParameters contains only visible parameters with effective defaults,
-            % since hidden parameters are hardcoded in the DLL and absent from its interface
-            for j = 1:numel(visibleParams)
-                cigreParam = visibleParams(j);
-                cigreVal = cigreParam.DefaultValue;
-                try
-                    if cigreParam.BaseType == "boolean"
-                        cigreVal = boolean(cigreVal);
-                    else
-                        cigreVal = cast(cigreVal, cigreParam.BaseType);
-                    end
-                catch
-                    warning("Could not cast CIGRE parameter " + cigreParam.CIGREName + " to type " + cigreParam.BaseType);
-                end
-                testCase.CIGREParameters(end+1) = struct("Name", cigreParam.CIGREName, "Value", cigreVal);
-            end
-
+            testCase.tempLoad(desc.ModelName);
+            testCase.computeSimulationTiming(desc, nvp.TestTime);
+            testCase.generateTestInputs(desc);
+            testCase.gatherParameters(desc, nvp.ParameterConfig);
         end
 
         function baseline = captureBaseline(testCase, mdlName)
@@ -473,105 +348,16 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 mdlName (1,1) string
             end
 
-            %% Create an input object to match the input and parameter test data
             testCase.tempLoad(mdlName);
             simIn = Simulink.SimulationInput(mdlName);
 
-            % Inputs
-            try
-                if verLessThan("MATLAB", "25.1") %#ok<VERLESSMATLAB>
-                    inDS = createInputDataset(mdlName);
-                else
-                    inDS = createInputDataset(mdlName, "UpdateDiagram", false);
-                end
-                nInputs = numel(inDS.getElementNames());
-            catch me
-                % errors if no inputs
-                if me.identifier == "sl_sta:editor:modelNoExternalInterface"
-                    nInputs = 0;
-                else
-                    rethrow(me)
-                end
-            end
+            simIn = testCase.configureInputs(simIn, mdlName);
+            simIn = testCase.configureParameters(simIn, mdlName);
 
-            testCase.assertTrue(size(testCase.Inputs, 2) == nInputs, "Number of test inputs does not match model");
+            simIn = setModelParameter(simIn, "StopTime", string(testCase.SimTime), ...
+                "FixedStep", string(testCase.TimeStep));
 
-            if nInputs > 0
-
-                for i = 1:nInputs
-                    input = testCase.Inputs(:, i);
-
-                    if istimetable(input)
-                        vals = input.Variables;
-                        if numel(size(vals)) > 2
-                            % With e.g. t times points, an input of t x m x n
-                            % needs permuting to m x n x t
-                            vals = permute(vals, [(2:numel(size(vals))), 1]);
-                        end
-                        input = timeseries(vals, seconds(input.Time));
-                        input = input.setinterpmethod("nearest");
-                        input = input.setuniformtime("StartTime", 0, "EndTime", seconds(max(testCase.Inputs.Time(end))));
-                        input.Name = testCase.Inputs.Properties.VariableNames{i};
-
-                    end
-                    inDS{i} = input;
-                end
-
-                simIn = simIn.setExternalInput(inDS);
-            end
-
-            % Parameters
-            params = testCase.SimulinkParameters;
-
-            % Model arguments
-            ip = get_param(simIn.ModelName + "/mdl", "InstanceParameters");
-            for i = 1:numel(params)
-                name = testCase.SimulinkParameters(i).Name;
-                val = testCase.SimulinkParameters(i).Value;
-                val = char(util.valToString(val)); % Parameter value needs to be a char on the input object
-                idx = (string({ip.Name}) == name);
-                if any(idx)
-                    ip(idx).Value = val;
-                else
-                    % In model workspace
-                    mdl = erase(mdlName, "_wrap");
-                    param = util.findParam(mdl, name);
-                    if isa(param, "Simulink.data.dictionary.Entry")
-                        simIn = simIn.setVariable(name, eval(val));
-                    elseif isfield(param, "Value") || isprop(param, "Value")
-                        param.Value = eval(val);
-                        simIn = simIn.setVariable(name, param, "Workspace", mdl);
-                    else
-                        param = eval(value);
-                        simIn = simIn.setVariable(name, param, "Workspace", mdl);
-                    end
-
-                end
-
-            end
-
-            if ~isempty(ip)
-                % Newer MATLAB releases renamed the Path field on
-                % InstanceParameters to FullPath; rename in-place so the
-                % set works across versions.
-                ipNew = arrayfun(@(x) renameStructField(x, "Path", "FullPath"), ip);
-                simIn = simIn.setBlockParameter(simIn.ModelName + "/mdl", "InstanceParameters", ipNew);
-            end
-
-            % Simulation time
-            simIn = setModelParameter(simIn, "StopTime", string(testCase.SimTime), "FixedStep", string(testCase.TimeStep));
-
-            % Get the outputs
-            results = sim(simIn);
-            if isempty(results.yout{1}.Values.Data)
-                % R2025a occasionally returns empty yout on the first
-                % sim call for some models; re-running produces results.
-                results = sim(simIn);
-            end
-
-            baseline = extractData(results);
-
-            testCase.Outputs = baseline;
+            baseline = testCase.runSimulationAndCapture(simIn);
 
         end
 
@@ -708,6 +494,263 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             % Paths get normalised relative to the model folder, so the
             % originals cannot be restored verbatim; fall back to reset.
             testCase.addTeardown(@() Simulink.fileGenControl("reset"));
+        end
+
+    end
+
+    methods (Access = private)
+
+        function computeSimulationTiming(testCase, desc, testTime)
+            arguments
+                testCase
+                desc
+                testTime (1,1) double = NaN
+            end
+
+            mdlName = desc.ModelName;
+
+            if ismissing(testTime)
+                stopTime = double(string(eval(get_param(mdlName, "StopTime"))));
+            else
+                stopTime = testTime;
+            end
+
+            dt = get_param(mdlName, "FixedStep");
+            if ~isnumeric(dt)
+                try
+                    try
+                        dt = eval(dt);
+                    catch
+                        dt = evalin("base", dt);
+                    end
+                catch
+                    [~, dt] = util.findParam(mdlName, dt);
+                    if dt == 0
+                        dt = 0.1;
+                    end
+                end
+            end
+
+            timeStep = dt;
+            time = seconds(0:timeStep:stopTime)';
+
+            testCase.SimTime = stopTime;
+            testCase.TimeStep = timeStep;
+            testCase.Time = time;
+        end
+
+        function generateTestInputs(testCase, desc)
+            arguments
+                testCase
+                desc
+            end
+
+            time = testCase.Time;
+            inputs = desc.Inputs;
+
+            testCase.Inputs = {};
+
+            if isempty(testCase.InputData)
+                input = cell(1, numel(inputs));
+                for i = 1:numel(inputs)
+                    c = inputs(i).BaseType;
+
+                    d = inputs(i).Dimensions;
+                    if isscalar(d)
+                        d = [d, 1];
+                    end
+                    thisVal = ones(d);
+
+                    if c == "boolean"
+                        iVal = (thisVal ~= 0);
+                    else
+                        iVal = cast(i * thisVal, c);
+                    end
+
+                    % This supports matrices
+                    iVals = repelem({iVal}, numel(time), 1);
+                    iVals = cat(3, iVals{:});
+                    iVals = permute(iVals, [3,1,2]);
+
+                    % timetable/table constructors require their N-V
+                    % pair names as char vectors in legacy syntax.
+                    input{i} = timetable(iVals, 'RowTimes', time, 'VariableNames', "Var" + i);
+                end
+
+                input = [input{:}];
+            else
+                input = testCase.InputData;
+            end
+
+            warning("Custom input")
+
+            input.Var1(:) = 0;
+            input.Var1(time > seconds(50)) = 100;
+            input.Var2(:) = 0;
+            testCase.Inputs = input;
+        end
+
+        function gatherParameters(testCase, desc, parameterConfig)
+            arguments
+                testCase
+                desc
+                parameterConfig (1,1) cigre.config.ParameterConfiguration
+            end
+
+            testCase.SimulinkParameters = struct("Name", {}, "Value", {});
+            testCase.CIGREParameters = struct("Name", {}, "Value", {});
+
+            % Build SimulinkParameters from the top-level parameter tree using model defaults
+            simulinkParams = desc.Parameters;
+            for i = 1:numel(simulinkParams)
+                simulinkParam = simulinkParams(i);
+                c = simulinkParam.BaseType;
+                simulinkVal = simulinkParam.DefaultValue;
+                try
+                    simulinkVal = cast(simulinkVal, c);
+                catch
+                    % Not castable, e.g. a struct — leave as-is
+                end
+                testCase.SimulinkParameters(i) = struct("Name", simulinkParam.SimulinkName, "Value", simulinkVal);
+            end
+
+            % Apply effective defaults from the config to SimulinkParameters so the
+            % Simulink baseline uses the same values as the DLL — including values
+            % that are hardcoded for hidden parameters
+            allCigreParams = desc.CIGREParameters;
+            [visibleParams, hiddenParams] = parameterConfig.partitionParameters(allCigreParams);
+
+            allEffectiveParams = [visibleParams, hiddenParams];
+            for i = 1:numel(allEffectiveParams)
+                p = allEffectiveParams(i);
+                testCase.SimulinkParameters = testCase.applyEffectiveDefault(testCase.SimulinkParameters, p.SimulinkName, p.DefaultValue);
+            end
+
+            % CIGREParameters contains only visible parameters with effective defaults,
+            % since hidden parameters are hardcoded in the DLL and absent from its interface
+            for j = 1:numel(visibleParams)
+                cigreParam = visibleParams(j);
+                cigreVal = cigreParam.DefaultValue;
+                try
+                    if cigreParam.BaseType == "boolean"
+                        cigreVal = boolean(cigreVal);
+                    else
+                        cigreVal = cast(cigreVal, cigreParam.BaseType);
+                    end
+                catch
+                    warning("Could not cast CIGRE parameter " + cigreParam.CIGREName + " to type " + cigreParam.BaseType);
+                end
+                testCase.CIGREParameters(end+1) = struct("Name", cigreParam.CIGREName, "Value", cigreVal);
+            end
+        end
+
+        function simIn = configureInputs(testCase, simIn, mdlName)
+            arguments
+                testCase
+                simIn
+                mdlName (1,1) string
+            end
+
+            try
+                if verLessThan("MATLAB", "25.1") %#ok<VERLESSMATLAB>
+                    inDS = createInputDataset(mdlName);
+                else
+                    inDS = createInputDataset(mdlName, "UpdateDiagram", false);
+                end
+                nInputs = numel(inDS.getElementNames());
+            catch me
+                % errors if no inputs
+                if me.identifier == "sl_sta:editor:modelNoExternalInterface"
+                    nInputs = 0;
+                else
+                    rethrow(me)
+                end
+            end
+
+            testCase.assertTrue(size(testCase.Inputs, 2) == nInputs, "Number of test inputs does not match model");
+
+            if nInputs == 0
+                return
+            end
+
+            for i = 1:nInputs
+                input = testCase.Inputs(:, i);
+
+                if istimetable(input)
+                    vals = input.Variables;
+                    if numel(size(vals)) > 2
+                        % With e.g. t times points, an input of t x m x n
+                        % needs permuting to m x n x t
+                        vals = permute(vals, [(2:numel(size(vals))), 1]);
+                    end
+                    input = timeseries(vals, seconds(input.Time));
+                    input = input.setinterpmethod("nearest");
+                    input = input.setuniformtime("StartTime", 0, "EndTime", seconds(max(testCase.Inputs.Time(end))));
+                    input.Name = testCase.Inputs.Properties.VariableNames{i};
+                end
+                inDS{i} = input;
+            end
+
+            simIn = simIn.setExternalInput(inDS);
+        end
+
+        function simIn = configureParameters(testCase, simIn, mdlName)
+            arguments
+                testCase
+                simIn
+                mdlName (1,1) string
+            end
+
+            params = testCase.SimulinkParameters;
+
+            ip = get_param(simIn.ModelName + "/mdl", "InstanceParameters");
+            for i = 1:numel(params)
+                name = testCase.SimulinkParameters(i).Name;
+                val = testCase.SimulinkParameters(i).Value;
+                val = char(util.valToString(val)); % Parameter value needs to be a char on the input object
+                idx = (string({ip.Name}) == name);
+                if any(idx)
+                    ip(idx).Value = val;
+                else
+                    % In model workspace
+                    mdl = erase(mdlName, "_wrap");
+                    param = util.findParam(mdl, name);
+                    if isa(param, "Simulink.data.dictionary.Entry")
+                        simIn = simIn.setVariable(name, eval(val));
+                    elseif isfield(param, "Value") || isprop(param, "Value")
+                        param.Value = eval(val);
+                        simIn = simIn.setVariable(name, param, "Workspace", mdl);
+                    else
+                        param = eval(value);
+                        simIn = simIn.setVariable(name, param, "Workspace", mdl);
+                    end
+                end
+            end
+
+            if ~isempty(ip)
+                % Newer MATLAB releases renamed the Path field on
+                % InstanceParameters to FullPath; rename in-place so the
+                % set works across versions.
+                ipNew = arrayfun(@(x) renameStructField(x, "Path", "FullPath"), ip);
+                simIn = simIn.setBlockParameter(simIn.ModelName + "/mdl", "InstanceParameters", ipNew);
+            end
+        end
+
+        function baseline = runSimulationAndCapture(testCase, simIn)
+            arguments
+                testCase
+                simIn
+            end
+
+            results = sim(simIn);
+            if isempty(results.yout{1}.Values.Data)
+                % R2025a occasionally returns empty yout on the first
+                % sim call for some models; re-running produces results.
+                results = sim(simIn);
+            end
+
+            baseline = extractData(results);
+            testCase.Outputs = baseline;
         end
 
     end
