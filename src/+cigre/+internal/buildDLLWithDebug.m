@@ -1,0 +1,345 @@
+function buildDLLWithDebug(model, opts)
+% buildDLLWithDebug Generate a CIGRE DLL ready for manual VS debugging.
+%
+%   cigre.internal.buildDLLWithDebug(model, "InputsFile", "myInputs.mat")
+%   cigre.internal.buildDLLWithDebug(model, ...
+%       "InputsFile", "myInputs.mat", "ParametersFile", "myParams.xlsx")
+%
+% Sets up a working folder, emits CIGRE-target code for the wrapper, and
+% pauses (via keyboard) so a super user can open the generated sources in
+% Visual Studio, build the DLL with debug symbols, set breakpoints, and
+% step through. After the user resumes, the freshly-built DLL is loaded
+% and stepped through the inputs from InputsFile; if Compare=true (the
+% default) the DLL output is verified against a Simulink baseline run on
+% the same inputs and parameters.
+%
+% This is the production sibling of test.system.tGenerateCigre.tVSBuild;
+% it ships in src/ so users who don't have the test harness available
+% (e.g. installed toolbox users) can still drive the workflow.
+%
+% Inputs:
+%   model - top-level model name. The wrapper "<model>_wrap" is built.
+%
+% Name-Value Arguments:
+%   InputsFile     - path to a .mat file containing a single timetable
+%                    variable (use cigre.util.captureInputsFromSimulink
+%                    to generate one). Required.
+%   ParametersFile - path to a ParameterConfig.xlsx (use
+%                    cigre.util.captureParametersFromSimulink). Optional;
+%                    if omitted the model's defaults are used.
+%   Compare        - if true (default), capture a Simulink baseline and
+%                    diff the DLL output against it after the user
+%                    finishes the VS build. Set false to skip the
+%                    baseline and just run the DLL once the user has
+%                    finished.
+%   BusAs          - wrapper bus-handling mode (default "Vector").
+%   WorkFolder     - working directory the build is staged in (default
+%                    tempdir/<model>_dbg_<pid>).
+%   RelTol         - relative tolerance for the baseline comparison
+%                    (default 1e-10).
+arguments
+    model (1,1) string
+    opts.InputsFile (1,1) string
+    opts.ParametersFile (1,1) string = string(missing)
+    opts.Compare (1,1) logical = true
+    opts.BusAs (1,1) string {mustBeMember(opts.BusAs, ["Ports", "Vector"])} = "Vector"
+    opts.WorkFolder (1,1) string = ...
+        string(fullfile(tempdir, model + "_dbg_" + string(feature("getpid"))))
+    opts.RelTol (1,1) double = 1e-10
+end
+
+if ~isfile(opts.InputsFile)
+    error("cigre:buildDLLWithDebug:InputsFileMissing", ...
+        "InputsFile does not exist: %s", opts.InputsFile);
+end
+
+if ~isfolder(opts.WorkFolder)
+    mkdir(opts.WorkFolder);
+end
+here = pwd;
+cd(opts.WorkFolder);
+cCwd = onCleanup(@() cd(here)); %#ok<NASGU>
+
+% Generate code (no make), with the optional parameter override file.
+buildArgs = {};
+if ~ismissing(opts.ParametersFile)
+    if ~isfile(opts.ParametersFile)
+        error("cigre:buildDLLWithDebug:ParametersFileMissing", ...
+            "ParametersFile does not exist: %s", opts.ParametersFile);
+    end
+    buildArgs = {"ParameterConfigFile", opts.ParametersFile};
+end
+
+desc = cigre.buildDLL(model, ...
+    "SkipBuild", true, ...
+    "CodeGenFolder", string(pwd), ...
+    "BusAs", opts.BusAs, ...
+    buildArgs{:});
+
+% Load saved inputs. loadData-style: the .mat is expected to contain a
+% single timetable; we take the first variable.
+loaded = load(opts.InputsFile);
+inputsField = string(fieldnames(loaded));
+inputs = loaded.(inputsField(1));
+if ~istimetable(inputs)
+    error("cigre:buildDLLWithDebug:InputsNotTimetable", ...
+        "Variable '%s' in %s is not a timetable.", inputsField(1), opts.InputsFile);
+end
+
+% Reconstruct a Simulink/CIGRE parameter pair from the model description
+% and the supplied ParameterConfig (defaults are used if none was given).
+if ismissing(opts.ParametersFile)
+    paramConfig = cigre.config.ParameterConfiguration();
+else
+    paramConfig = cigre.config.ParameterConfiguration.fromFile(opts.ParametersFile);
+end
+[simulinkParameters, cigreParameters] = resolveParameters(desc, paramConfig);
+
+% Sim timing taken from the model. The inputs timetable's time vector
+% must match this for the baseline comparison to line up cleanly.
+[stopTime, timeStep] = readModelTiming(model);
+
+% Always capture the Simulink baseline: the DLL runner needs an
+% outputs-shape allocator (cigre.dll.DataMap.create reads sizes from
+% the supplied container), and the baseline timetable is the natural
+% candidate. The Compare flag only governs whether the post-run diff is
+% reported as pass/fail.
+baseline = cigre.internal.captureSimulinkBaseline( ...
+    desc.CIGREInterfaceName, inputs, simulinkParameters, stopTime, timeStep);
+
+% Hand off to the user. They open the generated <model>_wrap_cigre_rtw
+% folder + src/CIGRESource in Visual Studio, build, and resume MATLAB.
+dllName = model + "_CIGRE";
+printVSBuildInstructions(model, dllName);
+
+fprintf("\n*** Build the DLL in Visual Studio, then 'dbcont' to resume ***\n");
+keyboard %#ok<KEYBOARDFUN>
+
+% Resume: the DLL should now be on the file system. Pull it from the
+% standard x64\Debug folder VS writes to.
+addpath(fullfile(pwd, "x64", "Debug"));
+addpath(fullfile(pwd, "slprj"));
+
+result = runDLL(dllName, inputs, cigreParameters, baseline, timeStep);
+
+if ~opts.Compare
+    fprintf("\nDLL run complete (%d rows). Compare disabled; result is in cigre_debug_result.\n", height(result));
+    assignin("base", "cigre_debug_result", result);
+    return
+end
+
+% Diff against the Simulink baseline.
+baselineTable = timetable2table(baseline, 'ConvertRowTimes', false);
+baselineTable.Properties.VariableNames = result.Properties.VariableNames;
+baselineTable.Properties.VariableContinuity = [];
+
+passed = isequaln(result, baselineTable);
+if ~passed
+    try
+        % Numerical-tolerance comparison via the unittest constraint.
+        import matlab.unittest.constraints.IsEqualTo
+        import matlab.unittest.constraints.RelativeTolerance
+        passed = IsEqualTo(baselineTable, "Within", RelativeTolerance(opts.RelTol)) ...
+            .satisfiedBy(result);
+    catch
+        passed = false;
+    end
+end
+
+assignin("base", "cigre_debug_result", result);
+assignin("base", "cigre_debug_baseline", baselineTable);
+if passed
+    fprintf("\nDLL output matches Simulink baseline within RelTol=%g.\n", opts.RelTol);
+else
+    fprintf("\nDLL output DIFFERS from Simulink baseline. Compare cigre_debug_result vs cigre_debug_baseline in the base workspace.\n");
+end
+
+end
+
+
+function [simulinkParameters, cigreParameters] = resolveParameters(desc, paramConfig)
+% Build the SimulinkParameters / CIGREParameters structs the same way
+% tGenerateCigre's gatherParameters does, but parameterised purely on
+% the descriptor and config (no testCase state).
+simulinkParameters = struct("Name", {}, "Value", {});
+cigreParameters = struct("Name", {}, "Value", {});
+
+simulinkParams = desc.Parameters;
+for i = 1:numel(simulinkParams)
+    p = simulinkParams(i);
+    val = p.DefaultValue;
+    try
+        val = cast(val, p.BaseType);
+    catch
+        % Not castable (e.g. a struct default) - leave as-is.
+    end
+    simulinkParameters(i) = struct("Name", p.SimulinkName, "Value", val);
+end
+
+allCigreParams = desc.CIGREParameters;
+[visibleParams, hiddenParams] = paramConfig.partitionParameters(allCigreParams);
+
+% Visible + hidden defaults flow into SimulinkParameters; only visible
+% are exposed as CIGREParameters (hidden are baked into the DLL).
+for i = 1:numel([visibleParams, hiddenParams])
+    all = [visibleParams, hiddenParams];
+    p = all(i);
+    simulinkParameters = applyEffectiveDefault(simulinkParameters, ...
+        p.SimulinkName, p.DefaultValue);
+end
+
+for j = 1:numel(visibleParams)
+    p = visibleParams(j);
+    val = p.DefaultValue;
+    try
+        if p.BaseType == "boolean"
+            val = boolean(val);
+        else
+            val = cast(val, p.BaseType);
+        end
+    catch
+        warning("Could not cast CIGRE parameter %s to %s", p.CIGREName, p.BaseType);
+    end
+    cigreParameters(end+1) = struct("Name", p.CIGREName, "Value", val); %#ok<AGROW>
+end
+end
+
+
+function simulinkParams = applyEffectiveDefault(simulinkParams, cigreSimulinkName, effectiveDefault)
+% Mirror of test.system.tGenerateCigre.applyEffectiveDefault. The CIGRE
+% SimulinkName may include array indexing or nested struct field paths;
+% the root identifier matches an existing entry in simulinkParams.
+arguments
+    simulinkParams  (1,:) struct
+    cigreSimulinkName (1,1) string
+    effectiveDefault (1,1) double
+end
+
+bracketPos = strfind(cigreSimulinkName, "[");
+dotPos = strfind(cigreSimulinkName, ".");
+splitPos = min([bracketPos, dotPos, strlength(cigreSimulinkName) + 1]);
+rootName = extractBefore(cigreSimulinkName + " ", splitPos);
+
+entryIdx = find(string({simulinkParams.Name}) == rootName, 1);
+if isempty(entryIdx)
+    return
+end
+
+currentValue = simulinkParams(entryIdx).Value;
+
+if ~isempty(bracketPos) && (isempty(dotPos) || bracketPos(1) < dotPos(1))
+    zeroBasedIndex = str2double(extractBetween(cigreSimulinkName, "[", "]"));
+    currentValue(zeroBasedIndex + 1) = cast(effectiveDefault, class(currentValue));
+elseif ~isempty(dotPos)
+    fieldPath = extractAfter(cigreSimulinkName, ".");
+    currentValue = setNestedField(currentValue, fieldPath, effectiveDefault);
+else
+    currentValue = cast(effectiveDefault, class(currentValue));
+end
+
+simulinkParams(entryIdx).Value = currentValue;
+end
+
+
+function s = setNestedField(s, fieldPath, value)
+arguments
+    s
+    fieldPath (1,1) string
+    value     (1,1) double
+end
+dotPos = strfind(fieldPath, ".");
+if isempty(dotPos)
+    s.(fieldPath) = cast(value, class(s.(fieldPath)));
+else
+    head = extractBefore(fieldPath, dotPos(1));
+    tail = extractAfter(fieldPath, dotPos(1));
+    s.(head) = setNestedField(s.(head), tail, value);
+end
+end
+
+
+function [stopTime, timeStep] = readModelTiming(mdlName)
+arguments
+    mdlName (1,1) string
+end
+[~, c] = util.loadSystem(mdlName); %#ok<ASGLU>
+stopTime = double(string(eval(get_param(mdlName, "StopTime"))));
+dt = get_param(mdlName, "FixedStep");
+if ~isnumeric(dt)
+    try
+        try
+            dt = eval(dt);
+        catch
+            dt = evalin("base", dt);
+        end
+    catch
+        [~, dt] = util.findParam(mdlName, dt);
+        if dt == 0
+            dt = 0.1;
+        end
+    end
+end
+timeStep = dt;
+end
+
+
+function printVSBuildInstructions(model, dllName)
+% Mirrors test.system.tGenerateCigre.doVSBuild's clipboard / banner
+% pattern, minus the test-class plumbing.
+fprintf("\n=== Visual Studio Debug Build ===\n");
+fprintf("Output DLL name (copy to VS project Output File): %s.dll\n", dllName);
+clipboard("copy", dllName + ".dll");
+
+src = fullfile(cigreRoot, "src", "CIGRESource");
+fprintf("CIGRE source folder: %s\n", src);
+
+fld = string(src) + ";";
+fld = fld + genpath(fullfile(pwd, "slprj", "cigre"));
+fld = fld + fullfile(pwd, "slprj", "ert", "_sharedutils") + ";";
+fld = fld + fullfile(matlabroot, "extern", "include") + ";";
+fld = fld + fullfile(matlabroot, "simulink", "include") + ";";
+fld = fld + fullfile(matlabroot, "rtw", "c", "src") + ";";
+fld = fld + fullfile(pwd, model + "_wrap_cigre_rtw");
+
+fprintf("Include / source search paths (copy to VS project Additional Include Directories):\n  %s\n", fld);
+end
+
+
+function result = runDLL(dllName, inputs, cigreParameters, outputs, timeStep)
+% Simplified DLL runner: load, init, step row-by-row, unload.
+%
+% Mirror of test.system.tGenerateCigre.runDLL minus the snapshot/parallel
+% logic, which is test-specific and not useful in a debug session. The
+% outputs argument is used purely as a shape descriptor for
+% cigre.dll.DataMap.create; pass the captured Simulink baseline
+% timetable so the allocator sees the right per-port types.
+arguments
+    dllName (1,1) string
+    inputs timetable
+    cigreParameters (1,:) struct
+    outputs
+    timeStep (1,1) double
+end
+
+cigreDll = cigre.dll.CigreDLL(dllName);
+cObj = cigreDll.load(); %#ok<NASGU>
+
+inputs = retime(inputs, 'regular', 'nearest', 'TimeStep', seconds(timeStep));
+inputsCell = table2cell(timetable2table(inputs));
+inputsCell = inputsCell(:, 2:end);  % drop the time column
+
+instance = cigre.dll.InterfaceInstance(inputsCell, outputs, cigreParameters);
+cigreDll.initialise(instance);
+
+nSteps = size(outputs, 1);
+results = cell(1, nSteps);
+for i = 1:nSteps
+    instance.updateInputs(inputsCell, "Row", i);
+    results{i} = cigreDll.step(instance);
+end
+
+results = vertcat(results{:});
+result = cell2table(results);
+
+instance.clear();
+end
