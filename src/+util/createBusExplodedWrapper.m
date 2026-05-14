@@ -6,7 +6,23 @@ arguments
     nvp.VectorDataType (1,1) string = "single"
 end
 
-[mdlh, cMdl] = util.loadSystem(model); %#ok<ASGLU>
+[wrapperName, mdlh, mdlRef, cMdl, cWrap] = setupWrapper(model, nvp, nargout > 1); %#ok<ASGLU>
+processInputPorts(mdlh, wrapperName, nvp);
+processOutputPorts(mdlh, wrapperName, model, nvp);
+Simulink.BlockDiagram.arrangeSystem(wrapperName);
+copyInstanceParameters(mdlRef, model, wrapperName);
+
+end
+
+
+function [wrapperName, mdlh, mdlRef, cMdl, cWrap] = setupWrapper(model, nvp, wantWrapperHandle)
+arguments
+    model (1,1) string
+    nvp struct
+    wantWrapperHandle (1,1) logical
+end
+
+[mdlh, cMdl] = util.loadSystem(model);
 
 wrapperName = model + nvp.NameSuffix;
 bdclose(wrapperName);
@@ -19,7 +35,7 @@ if exist(wrapperName, "file")
 end
 
 new_system(wrapperName);
-if nargout > 1
+if wantWrapperHandle
     [~, cWrap] = util.loadSystem(wrapperName);
 else
     util.loadSystem(wrapperName);
@@ -69,7 +85,10 @@ for i = 1:numel(p)
 end
 set_param(mdlRef, "InstanceParameters", p);
 
-%% Input
+end
+
+
+function processInputPorts(mdlh, wrapperName, nvp)
 % Explode each top-level Inport, replacing buses with either per-signal
 % ports or a single concatenated vector port. Working from the model
 % reference outward keeps the original block ordering on the wrapper.
@@ -131,8 +150,10 @@ for i = 1:numel(inhs)
 
 end
 
+end
 
-%% Output
+
+function processOutputPorts(mdlh, wrapperName, model, nvp)
 outh = find_system(mdlh, "SearchDepth", 1, "BlockType", "Outport");
 for i = 1:numel(outh)
 
@@ -142,6 +163,9 @@ for i = 1:numel(outh)
     isEnum = contains(outTypes, "Enum:");
 
     name = get_param(outh(i), "Name");
+
+    outInputSignals = get_param(outh(i), "PortHandles");
+    outputSignals = get_param(outInputSignals.Inport, "SignalHierarchy");
 
     if isBus
 
@@ -172,13 +196,10 @@ for i = 1:numel(outh)
         set_param(in, "OutDataTypeStr", "int32");
         add_line(wrapperName, "Convert" + name + "/" + 1, name + "/1");
 
-        signalName = inputSignals.SignalName;
+        signalName = outputSignals.SignalName;
         set_param(l, "Name", signalName);
 
     else
-
-        outInputSignals = get_param(outh(i), "PortHandles");
-        outputSignals = get_param(outInputSignals.Inport, "SignalHierarchy");
 
         name = cleanName(name);
         add_block("built-in/Outport", wrapperName + "/" + name);
@@ -189,37 +210,41 @@ for i = 1:numel(outh)
     end
 end
 
-Simulink.BlockDiagram.arrangeSystem(wrapperName);
+end
 
+
+function copyInstanceParameters(mdlRef, model, wrapperName)
 ip = get_param(mdlRef, "InstanceParameters");
 
-if ~isempty(ip)
+if isempty(ip)
+    return;
+end
 
-    mws = get_param(model, "ModelWorkspace");
-    p = mws.whos;
-    wws = get_param(wrapperName, "ModelWorkspace");
+mws = get_param(model, "ModelWorkspace");
+p = mws.whos;
+wws = get_param(wrapperName, "ModelWorkspace");
 
-    ipNames = string({ip.Name});
-    for i = 1:numel(p)
-        name = p(i).name;
-        var = mws.getVariable(name);
-        assignin(wws, name, var);
+ipNames = string({ip.Name});
+for i = 1:numel(p)
+    name = p(i).name;
+    var = mws.getVariable(name);
+    assignin(wws, name, var);
 
-        idx = (ipNames == name);
-        if any(idx)
-            % InstanceParameters.Value is a char literal that Simulink
-            % eval's in the wrapper workspace at compile time.
-            ip(idx).Value = char(util.valToString(var.Value));
-        end
+    idx = (ipNames == name);
+    if any(idx)
+        % InstanceParameters.Value is a char literal that Simulink
+        % eval's in the wrapper workspace at compile time.
+        ip(idx).Value = char(util.valToString(var.Value));
     end
-
-    % InstanceParameters' Path field was renamed to FullPath in newer
-    % releases; rename in-place so set_param succeeds across versions.
-    ipNew = arrayfun(@(x) renameStructField(x, {"Path"}, {"FullPath"}), ip);
-    set_param(mdlRef, "InstanceParameters", ipNew);
 end
 
+% InstanceParameters' Path field was renamed to FullPath in newer
+% releases; rename in-place so set_param succeeds across versions.
+ipNew = arrayfun(@(x) renameStructField(x, {"Path"}, {"FullPath"}), ip);
+set_param(mdlRef, "InstanceParameters", ipNew);
+
 end
+
 
 function name = cleanName(name)
 arguments
