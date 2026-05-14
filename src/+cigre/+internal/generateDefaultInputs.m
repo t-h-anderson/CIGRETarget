@@ -10,7 +10,7 @@ function inputs = generateDefaultInputs(desc, time)
 % get the correct (t, m, n) shape so configureSimInputs and DataMap
 % accept the result unchanged.
 %
-% Used as the no-input fallback for cigre.internal.buildDLLWithDebug,
+% Used as the no-input fallback for cigre.buildDLL(Debug=true),
 % and as the test-class fallback inside
 % test.system.tGenerateCigre.generateTestInputs when no InputData is
 % saved on disk. The signal is intentionally simple - it doesn't

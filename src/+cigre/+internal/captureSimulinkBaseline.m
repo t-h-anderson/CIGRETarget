@@ -5,7 +5,7 @@ function baseline = captureSimulinkBaseline(mdlName, inputs, simulinkParameters,
 %       mdlName, inputs, simulinkParameters, stopTime, timeStep)
 %
 % Used both by the test suite (to produce a reference baseline that DLL
-% output is compared against) and by cigre.internal.buildDLLWithDebug to
+% output is compared against) and by cigre.buildDLL(Debug=true) to
 % give super users a Simulink-derived reference when debugging the DLL
 % in Visual Studio.
 %
@@ -21,8 +21,9 @@ function baseline = captureSimulinkBaseline(mdlName, inputs, simulinkParameters,
 %   timeStep           - fixed sample step (seconds, double).
 %
 % Returns:
-%   baseline - the extractData() timetable that runDLL / buildDLLWithDebug
-%              uses as the reference signal stream.
+%   baseline - the extractData() timetable that the test class and
+%              cigre.buildDLL(Debug=true) callers can use as a
+%              reference signal stream.
 arguments
     mdlName (1,1) string
     inputs timetable

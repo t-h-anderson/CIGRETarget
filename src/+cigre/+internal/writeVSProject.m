@@ -12,14 +12,14 @@ function slnPath = writeVSProject(model, workFolder, nvp)
 %
 % The .vcxproj is rebuilt from CIGREDebug.vcxproj.template on every run,
 % so manual edits in VS to the .vcxproj will not survive a re-run of
-% cigre.internal.buildDLLWithDebug; tweak the template in source control
+% cigre.buildDLL(Debug=true); tweak the template in source control
 % if a permanent change is needed.
 %
 % Inputs:
 %   model      - top-level model name (without the wrapper suffix).
 %   workFolder - directory containing the CIGRE-target code generated
-%                by cigre.buildDLL (i.e. the cwd after buildDLLWithDebug
-%                runs codegen).
+%                by cigre.buildDLL (i.e. CodeGenFolder after the
+%                Debug=true codegen pass).
 %
 % Name-Value Arguments:
 %   PlatformToolset - VS PlatformToolset value, e.g. "v141" (VS 2017),
@@ -45,7 +45,7 @@ projectName = model + "_CIGRE";
 templateDir = fileparts(mfilename("fullpath"));
 
 % Enumerate every .c file the toolchain would compile. The same folders
-% feed cigre.internal.buildDLLWithDebug's AdditionalIncludeDirectories
+% feed cigre.buildDLL(Debug=true)'s AdditionalIncludeDirectories
 % string, so the lists stay in sync.
 sourceDirs = collectSourceDirs(model, workFolder);
 sources = collectSources(sourceDirs);

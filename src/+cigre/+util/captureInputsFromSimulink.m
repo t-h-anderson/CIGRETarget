@@ -6,7 +6,7 @@ function captureInputsFromSimulink(model, outFile, nvp)
 % Runs the model with its currently-configured external inputs and writes
 % the time-stamped top-level Inport signals to outFile as a .mat file
 % containing a single timetable variable named "input". The shape matches
-% what loadData / cigre.internal.buildDLLWithDebug expects.
+% what loadData / cigre.buildDLL(Debug=true) expects.
 %
 % The util enables signal logging on every top-level Inport for the
 % duration of the sim and restores the prior LogSignals state afterwards

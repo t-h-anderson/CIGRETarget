@@ -1,30 +1,38 @@
-function result = runDebugDLL(sessionZip, nvp)
+function result = runDebugDLL(dllPath, inputs, cigreParameters, outputs, timeStep, nvp)
 % runDebugDLL Run a CIGRE DLL on a parallel worker for VS debugging.
 %
-%   result = cigre.internal.runDebugDLL("MyModel_session.zip")
-%   [result, ~] = cigre.internal.runDebugDLL(bundle, "Compare", true)
+%   result = cigre.internal.runDebugDLL( ...
+%       dllPath, inputs, cigreParameters, outputs, timeStep)
 %
-% Unpacks a session bundle written by cigre.internal.buildDLLWithDebug,
-% spawns a fresh parallel worker, prints the worker's OS PID so the user
-% can attach Visual Studio (Debug > Attach to Process > MATLAB.exe with
-% that PID), pauses for breakpoints, then parfeval's the DLL step loop.
-% The worker isolation means a DLL crash kills only the worker, not the
-% host MATLAB; the fresh parpool per call means a rebuilt DLL gets
-% loaded from scratch each time so the "edit C, rebuild in VS, rerun"
-% iteration loop works without re-running codegen.
+% Spawns a fresh parallel worker, prints the worker's OS PID so the
+% user can attach Visual Studio (Debug > Attach to Process >
+% MATLAB.exe with that PID), pauses for breakpoints, then parfeval's
+% cigre.internal.runCigreDLL. Worker isolation means a DLL crash
+% kills only the worker, not the host MATLAB; the fresh parpool per
+% call means a rebuilt DLL is loaded from scratch each time so the
+% "edit C, MSBuild again, rerun" iteration loop works without any
+% MATLAB-side state to clean up.
+%
+% This is the debug-loop side of the pivot away from a single
+% orchestrator: cigre.buildDLL(..., "Debug", true) produces the DLL
+% (and is composable with cigre.importDLL for Simulink); this
+% function runs it for the MATLAB harness case.
 %
 % Inputs:
-%   sessionZip - path to a .zip produced by buildDLLWithDebug.
-%
-% Returns:
-%   result - timetable of DLL outputs, one row per simulation step.
+%   dllPath          - absolute path to the debug DLL produced by
+%                      cigre.buildDLL(..., "Debug", true).
+%   inputs           - timetable of Inport values; cigre.dll.DataMap
+%                      reads the per-column type and dimensions from it.
+%   cigreParameters  - (1,:) struct array (.Name, .Value) of visible
+%                      CIGRE parameter values.
+%   outputs          - timetable used as a shape allocator for
+%                      cigre.dll.DataMap.create. Pass either a captured
+%                      Simulink baseline (if you want a reference to
+%                      diff against later) or
+%                      cigre.internal.generateOutputsShape(desc, time).
+%   timeStep         - sample step, seconds.
 %
 % Name-Value Arguments:
-%   Compare         - if true, diff the DLL output against the saved
-%                     Simulink baseline (only meaningful when the bundle
-%                     was built with Compare=true so a baseline exists).
-%                     Default false: the debug workflow is about
-%                     stepping through, not validating.
 %   PauseBeforeRun  - if true (default), pause via keyboard after the
 %                     worker is up so the user can attach VS. Set false
 %                     for non-interactive reruns.
@@ -32,39 +40,32 @@ function result = runDebugDLL(sessionZip, nvp)
 %                     (one day) so the user can step through at human
 %                     speed without parfeval declaring the worker stuck.
 arguments
-    sessionZip (1,1) string
-    nvp.Compare (1,1) logical = false
+    dllPath (1,1) string
+    inputs timetable
+    cigreParameters (1,:) struct
+    outputs
+    timeStep (1,1) double
     nvp.PauseBeforeRun (1,1) logical = true
     nvp.WaitTimeout (1,1) double = 86400
 end
 
-if ~isfile(sessionZip)
-    error("CIGRE:runDebugDLL:SessionZipMissing", ...
-        "Session bundle not found at %s", sessionZip);
+if ~isfile(dllPath)
+    error("CIGRE:runDebugDLL:DLLMissing", ...
+        "DLL not found at %s", dllPath);
 end
 
-% Extract into a fresh per-call temp folder. Each rerun gets its own
-% copy of the DLL so a previously-loaded library on a dying worker
-% doesn't leave file locks blocking the next rebuild.
-extractDir = string(tempname);
-mkdir(extractDir);
-unzip(sessionZip, extractDir);
+[dllDir, dllBase, ~] = fileparts(dllPath);
+dllDir = string(dllDir);
+dllName = string(dllBase);
 
-sessionMat = fullfile(extractDir, "debug_session.mat");
-if ~isfile(sessionMat)
-    error("CIGRE:runDebugDLL:SessionMatMissing", ...
-        "debug_session.mat is missing from %s", sessionZip);
-end
-session = load(sessionMat);
-
-% Sanity check the step count up front. A zero-row Outputs container
-% would silently produce an empty result after parfeval (the DLL would
-% be loaded and initialised but the step loop would not iterate),
-% which is impossible to diagnose from the outside.
-nSteps = size(session.Outputs, 1);
+% Sanity-check the step count before any parallel-pool work; a zero-row
+% outputs container would silently make the parfeval body load and
+% initialise the DLL but never call Model_Outputs, which is impossible
+% to diagnose from the outside.
+nSteps = size(outputs, 1);
 if nSteps == 0
     error("CIGRE:runDebugDLL:NoSteps", ...
-        "Session bundle's Outputs timetable has 0 rows - the DLL would be loaded and initialised but no step would execute. Likely cause: the model's StopTime / FixedStep combination produced an empty time vector, or desc.Outputs was empty at bundle time.");
+        "outputs timetable has 0 rows - the DLL would be loaded and initialised but no step would execute. Check that the time vector / outputs shape were populated correctly upstream.");
 end
 
 % Tear down any existing pool so the worker reloads the (possibly
@@ -101,8 +102,7 @@ if nvp.PauseBeforeRun
 end
 
 f = parfeval(p, @cigre.internal.runCigreDLL, 1, ...
-    extractDir, session.DllName, session.Inputs, ...
-    session.CIGREParameters, session.Outputs, session.TimeStep);
+    dllDir, dllName, inputs, cigreParameters, outputs, timeStep);
 wait(f, "finished", nvp.WaitTimeout);
 
 if p.NumWorkers == 0
@@ -112,33 +112,4 @@ end
 
 result = f.fetchOutputs();
 fprintf("DLL run complete (%d rows).\n", height(result));
-
-if nvp.Compare
-    if ~isfield(session, "Baseline") || isempty(session.Baseline)
-        warning("CIGRE:runDebugDLL:NoBaseline", ...
-            "Compare=true but the session bundle has no Baseline (rebuild with Compare=true on buildDLLWithDebug to populate it).");
-        return
-    end
-    baselineTable = timetable2table(session.Baseline, 'ConvertRowTimes', false);
-    baselineTable.Properties.VariableNames = result.Properties.VariableNames;
-    baselineTable.Properties.VariableContinuity = [];
-
-    passed = isequaln(result, baselineTable);
-    if ~passed
-        try
-            import matlab.unittest.constraints.IsEqualTo
-            import matlab.unittest.constraints.RelativeTolerance
-            passed = IsEqualTo(baselineTable, "Within", RelativeTolerance(session.RelTol)) ...
-                .satisfiedBy(result);
-        catch
-            passed = false;
-        end
-    end
-    if passed
-        fprintf("DLL output matches Simulink baseline within RelTol=%g.\n", session.RelTol);
-    else
-        fprintf("DLL output DIFFERS from Simulink baseline.\n");
-        fprintf("  Load session.Baseline from %s to inspect.\n", sessionZip);
-    end
-end
 end

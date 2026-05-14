@@ -9,6 +9,24 @@ arguments
     nvp.WrapSuffix (1,1) string = "_wrap"
     nvp.VectorDataType (1,1) string = "single"
     nvp.ParameterConfigFile (1,1) string = string(NaN)
+    % Debug: when true, the standard nmake build step is replaced by an
+    % MSBuild invocation against an auto-generated .sln/.vcxproj
+    % (Debug | x64 | DynamicLibrary). Returns the resolved DLL path -
+    % suitable for handing to cigre.importDLL or
+    % cigre.internal.runDebugDLL - instead of the bare base name the
+    % release path emits. Windows-only.
+    nvp.Debug (1,1) logical = false
+end
+
+if nvp.Debug
+    if ~ispc
+        error("CIGRE:buildDLL:DebugOnlyOnWindows", ...
+            "Debug=true uses MSBuild on the generated .vcxproj/.sln and is only supported on Windows.");
+    end
+    if nvp.SkipBuild
+        error("CIGRE:buildDLL:DebugAndSkipBuild", ...
+            "Debug=true and SkipBuild=true are mutually exclusive: Debug needs codegen output to compile, SkipBuild stops at codegen.");
+    end
 end
 
 model = modelIn;
@@ -59,11 +77,22 @@ contextPath = fullfile(codeGenFolder, "cigre_build_context.mat");
 save(contextPath, "-struct", "buildContext");
 cleanupContext = onCleanup(@() deleteIfExists(contextPath));
 
-if ~nvp.SkipBuild
+if nvp.Debug
+    % Debug path: codegen only, then drive a VS .sln/.vcxproj through
+    % MSBuild for a Debug | x64 DLL with PDB symbols. The auto-detected
+    % PlatformToolset matches whichever VS is installed (vswhere).
+    buildModel(wrapper);
+    [~, toolset] = cigre.internal.findVSInstallation();
+    slnPath = cigre.internal.writeVSProject(model, codeGenFolder, ...
+        "PlatformToolset", toolset);
+    dll = cigre.internal.invokeMSBuild(slnPath, model + "_CIGRE");
+elseif ~nvp.SkipBuild
     cigre.internal.build(wrapper);
+    dll = model + "_CIGRE";
 else
     % SkipBuild: emit code via the hook without invoking the make step.
     buildModel(wrapper);
+    dll = model + "_CIGRE";
 end
 
 % analyseModel already ran inside the build hook, but ModelDescription is
@@ -72,7 +101,6 @@ end
 desc = cigre.description.ModelDescription.analyseModel(model, wrapper, ...
     "CodeGenFolder", codeGenFolder);
 
-dll = model + "_CIGRE";
 c = [];
 
 if nvp.Verbose

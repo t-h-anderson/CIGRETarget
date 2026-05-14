@@ -13,7 +13,8 @@ function captureParametersFromSimulink(model, outFile, nvp)
 %
 % The file is the same shape cigre.buildDLL's ParameterConfigFile NV-pair
 % expects, so callers can edit a few rows by hand and feed it straight
-% back into cigre.buildDLL or cigre.internal.buildDLLWithDebug.
+% back into cigre.buildDLL (including the cigre.buildDLL Debug=true
+% path that produces a VS-debuggable DLL).
 %
 % Name-Value Arguments:
 %   CodeGenFolder - working directory for the throwaway codegen pass
