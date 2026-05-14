@@ -128,13 +128,7 @@ for i = 1:numel(inhs)
 
         % The CIGRE ABI carries enums as int32; cast on the inside of the
         % wrapper so the outside port stays a plain integer.
-        c = add_block("simulink/Quick Insert/Signal Attributes/Cast", wrapperName + "/Convert" + name);
-        set_param(c, "OutDataTypeStr", inTypes);
-        l = add_line(wrapperName, "Convert" + name + "/1", "mdl/" + i);
-
-        in = add_block("built-in/Inport", wrapperName + "/" + name);
-        set_param(in, "OutDataTypeStr", "int32");
-        add_line(wrapperName, name + "/1", "Convert" + name + "/" + 1);
+        l = addEnumCastAdapter(wrapperName, name, "input", i, "int32", inTypes);
 
         signalName = inputSignals.SignalName;
         set_param(l, "Name", signalName);
@@ -188,13 +182,7 @@ for i = 1:numel(outh)
 
         % Mirror of the input-side cast: the wrapper's port is int32, the
         % inside of the model expects the enum class.
-        c = add_block("simulink/Quick Insert/Signal Attributes/Cast", wrapperName + "/Convert" + name);
-        set_param(c, "OutDataTypeStr", "int32");
-        l = add_line(wrapperName, "mdl/" + i, "Convert" + name + "/1");
-
-        in = add_block("built-in/Outport", wrapperName + "/" + name);
-        set_param(in, "OutDataTypeStr", "int32");
-        add_line(wrapperName, "Convert" + name + "/" + 1, name + "/1");
+        l = addEnumCastAdapter(wrapperName, name, "output", i, "int32", outTypes);
 
         signalName = outputSignals.SignalName;
         set_param(l, "Name", signalName);
@@ -253,5 +241,53 @@ end
 
 % Slashes in Simulink block paths are escaped by doubling them.
 name = strrep(name, "/", "//");
+
+end
+
+
+function lineHandle = addEnumCastAdapter(wrapperName, name, direction, mdlPortIdx, externalType, internalType)
+% Wire an enum-typed top-level port through a Cast block so the
+% wrapper's external interface uses externalType while the inside of
+% the model sees internalType. The CIGRE ABI carries enums as int32,
+% so callers pass externalType="int32" and internalType set to the
+% enum class string (e.g. "Enum: MyKind") for input direction.
+%
+% direction:
+%   "input"  - external port is an Inport; data flows
+%              external -> cast -> mdl. Cast outputs internalType.
+%   "output" - external port is an Outport; data flows
+%              mdl -> cast -> external port. Cast outputs externalType.
+%
+% Returns the handle of the line into/out of the model reference
+% (cast->mdl for inputs, mdl->cast for outputs) so the caller can
+% set its Name to the signal name reported by the source port.
+arguments
+    wrapperName (1,1) string
+    name (1,1) string
+    direction (1,1) string {mustBeMember(direction, ["input", "output"])}
+    mdlPortIdx (1,1) double
+    externalType (1,1) string
+    internalType (1,1) string
+end
+
+castName = "Convert" + name;
+castBlock = add_block("simulink/Quick Insert/Signal Attributes/Cast", ...
+    wrapperName + "/" + castName);
+
+if direction == "input"
+    set_param(castBlock, "OutDataTypeStr", internalType);
+    lineHandle = add_line(wrapperName, castName + "/1", "mdl/" + mdlPortIdx);
+
+    portBlock = add_block("built-in/Inport", wrapperName + "/" + name);
+    set_param(portBlock, "OutDataTypeStr", externalType);
+    add_line(wrapperName, name + "/1", castName + "/1");
+else
+    set_param(castBlock, "OutDataTypeStr", externalType);
+    lineHandle = add_line(wrapperName, "mdl/" + mdlPortIdx, castName + "/1");
+
+    portBlock = add_block("built-in/Outport", wrapperName + "/" + name);
+    set_param(portBlock, "OutDataTypeStr", externalType);
+    add_line(wrapperName, castName + "/1", name + "/1");
+end
 
 end
