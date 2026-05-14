@@ -349,16 +349,10 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             end
 
             testCase.tempLoad(mdlName);
-            simIn = Simulink.SimulationInput(mdlName);
-
-            simIn = testCase.configureInputs(simIn, mdlName);
-            simIn = testCase.configureParameters(simIn, mdlName);
-
-            simIn = setModelParameter(simIn, "StopTime", string(testCase.SimTime), ...
-                "FixedStep", string(testCase.TimeStep));
-
-            baseline = testCase.runSimulationAndCapture(simIn);
-
+            baseline = cigre.internal.captureSimulinkBaseline(mdlName, ...
+                testCase.Inputs, testCase.SimulinkParameters, ...
+                testCase.SimTime, testCase.TimeStep);
+            testCase.Outputs = baseline;
         end
 
         function result = runDLL(testCase, dllName, snapshot, nvp)
@@ -642,115 +636,6 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 end
                 testCase.CIGREParameters(end+1) = struct("Name", cigreParam.CIGREName, "Value", cigreVal);
             end
-        end
-
-        function simIn = configureInputs(testCase, simIn, mdlName)
-            arguments
-                testCase
-                simIn
-                mdlName (1,1) string
-            end
-
-            try
-                if verLessThan("MATLAB", "25.1") %#ok<VERLESSMATLAB>
-                    inDS = createInputDataset(mdlName);
-                else
-                    inDS = createInputDataset(mdlName, "UpdateDiagram", false);
-                end
-                nInputs = numel(inDS.getElementNames());
-            catch me
-                % errors if no inputs
-                if me.identifier == "sl_sta:editor:modelNoExternalInterface"
-                    nInputs = 0;
-                else
-                    rethrow(me)
-                end
-            end
-
-            testCase.assertTrue(size(testCase.Inputs, 2) == nInputs, "Number of test inputs does not match model");
-
-            if nInputs == 0
-                return
-            end
-
-            for i = 1:nInputs
-                input = testCase.Inputs(:, i);
-
-                if istimetable(input)
-                    vals = input.Variables;
-                    if numel(size(vals)) > 2
-                        % With e.g. t times points, an input of t x m x n
-                        % needs permuting to m x n x t
-                        vals = permute(vals, [(2:numel(size(vals))), 1]);
-                    end
-                    input = timeseries(vals, seconds(input.Time));
-                    input = input.setinterpmethod("nearest");
-                    input = input.setuniformtime("StartTime", 0, "EndTime", seconds(max(testCase.Inputs.Time(end))));
-                    input.Name = testCase.Inputs.Properties.VariableNames{i};
-                end
-                inDS{i} = input;
-            end
-
-            simIn = simIn.setExternalInput(inDS);
-        end
-
-        function simIn = configureParameters(testCase, simIn, mdlName)
-            arguments
-                testCase
-                simIn
-                mdlName (1,1) string
-            end
-
-            params = testCase.SimulinkParameters;
-
-            ip = get_param(simIn.ModelName + "/mdl", "InstanceParameters");
-            for i = 1:numel(params)
-                name = testCase.SimulinkParameters(i).Name;
-                val = testCase.SimulinkParameters(i).Value;
-                val = char(util.valToString(val)); % Parameter value needs to be a char on the input object
-                idx = (string({ip.Name}) == name);
-                if any(idx)
-                    ip(idx).Value = val;
-                else
-                    % In model workspace
-                    mdl = erase(mdlName, "_wrap");
-                    param = util.findParam(mdl, name);
-                    if isa(param, "Simulink.data.dictionary.Entry")
-                        simIn = simIn.setVariable(name, eval(val));
-                    elseif isfield(param, "Value") || isprop(param, "Value")
-                        param.Value = eval(val);
-                        simIn = simIn.setVariable(name, param, "Workspace", mdl);
-                    else
-                        param = eval(value);
-                        simIn = simIn.setVariable(name, param, "Workspace", mdl);
-                    end
-                end
-            end
-
-            if ~isempty(ip)
-                % Newer MATLAB releases renamed the Path field on
-                % InstanceParameters to FullPath; rename in-place so the
-                % set works across versions.
-                ipNew = arrayfun(@(x) renameStructField(x, "Path", "FullPath"), ip);
-                simIn = simIn.setBlockParameter(simIn.ModelName + "/mdl", "InstanceParameters", ipNew);
-            end
-        end
-
-        function baseline = runSimulationAndCapture(testCase, simIn)
-            arguments
-                testCase
-                simIn
-            end
-
-            results = sim(simIn);
-            if isempty(results.yout{1}.Values.Data)
-                % R2025a occasionally returns empty yout on the first
-                % sim call for some models; re-running produces results.
-                results = sim(simIn);
-            end
-
-            baseline = extractData(results);
-            testCase.Outputs = baseline;
         end
 
     end
