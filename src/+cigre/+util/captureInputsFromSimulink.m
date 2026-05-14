@@ -1,4 +1,4 @@
-function captureInputsFromSimulink(model, outFile, opts)
+function captureInputsFromSimulink(model, outFile, nvp)
 % captureInputsFromSimulink Sim a model and dump its Inport signals.
 %
 %   cigre.util.captureInputsFromSimulink(model, outFile)
@@ -21,9 +21,9 @@ function captureInputsFromSimulink(model, outFile, opts)
 arguments
     model (1,1) string
     outFile (1,1) string
-    opts.StopTime (1,1) double = NaN
-    opts.TimeStep (1,1) double = NaN
-    opts.Variable (1,1) string = "input"
+    nvp.StopTime (1,1) double = NaN
+    nvp.TimeStep (1,1) double = NaN
+    nvp.Variable (1,1) string = "input"
 end
 
 [~, cMdl] = util.loadSystem(model); %#ok<ASGLU>
@@ -45,11 +45,11 @@ end
 restore = onCleanup(@() restoreInportLogging(inports, prevLogging)); %#ok<NASGU>
 
 simIn = Simulink.SimulationInput(model);
-if ~isnan(opts.StopTime)
-    simIn = setModelParameter(simIn, "StopTime", string(opts.StopTime));
+if ~isnan(nvp.StopTime)
+    simIn = setModelParameter(simIn, "StopTime", string(nvp.StopTime));
 end
-if ~isnan(opts.TimeStep)
-    simIn = setModelParameter(simIn, "FixedStep", string(opts.TimeStep));
+if ~isnan(nvp.TimeStep)
+    simIn = setModelParameter(simIn, "FixedStep", string(nvp.TimeStep));
 end
 
 % Make sure logsout is enabled for the run regardless of how the model
@@ -60,7 +60,7 @@ results = sim(simIn);
 
 logs = results.logsout;
 if isempty(logs) || logs.numElements == 0
-    error("cigre:captureInputsFromSimulink:NoLogs", ...
+    error("CIGRE:captureInputsFromSimulink:NoLogs", ...
         "Simulation produced no logged Inport signals. Check that the model has top-level Inports and that signal logging is permitted on them.");
 end
 
@@ -86,7 +86,7 @@ end
 % what each Inport actually produced.
 combined = synchronize(timetables{:}, 'union', 'nearest');
 
-savedVar.(opts.Variable) = combined; %#ok<STRNU>
+savedVar.(nvp.Variable) = combined; %#ok<STRNU>
 save(outFile, "-struct", "savedVar");
 
 end

@@ -1,4 +1,4 @@
-function buildDLLWithDebug(model, opts)
+function buildDLLWithDebug(model, nvp)
 % buildDLLWithDebug Generate a CIGRE DLL ready for manual VS debugging.
 %
 %   cigre.internal.buildDLLWithDebug(model, "InputsFile", "myInputs.mat")
@@ -39,59 +39,59 @@ function buildDLLWithDebug(model, opts)
 %                    (default 1e-10).
 arguments
     model (1,1) string
-    opts.InputsFile (1,1) string
-    opts.ParametersFile (1,1) string = string(missing)
-    opts.Compare (1,1) logical = true
-    opts.BusAs (1,1) string {mustBeMember(opts.BusAs, ["Ports", "Vector"])} = "Vector"
-    opts.WorkFolder (1,1) string = ...
+    nvp.InputsFile (1,1) string
+    nvp.ParametersFile (1,1) string = string(missing)
+    nvp.Compare (1,1) logical = true
+    nvp.BusAs (1,1) string {mustBeMember(nvp.BusAs, ["Ports", "Vector"])} = "Vector"
+    nvp.WorkFolder (1,1) string = ...
         string(fullfile(tempdir, model + "_dbg_" + string(feature("getpid"))))
-    opts.RelTol (1,1) double = 1e-10
+    nvp.RelTol (1,1) double = 1e-10
 end
 
-if ~isfile(opts.InputsFile)
-    error("cigre:buildDLLWithDebug:InputsFileMissing", ...
-        "InputsFile does not exist: %s", opts.InputsFile);
+if ~isfile(nvp.InputsFile)
+    error("CIGRE:buildDLLWithDebug:InputsFileMissing", ...
+        "InputsFile does not exist: %s", nvp.InputsFile);
 end
 
-if ~isfolder(opts.WorkFolder)
-    mkdir(opts.WorkFolder);
+if ~isfolder(nvp.WorkFolder)
+    mkdir(nvp.WorkFolder);
 end
 here = pwd;
-cd(opts.WorkFolder);
+cd(nvp.WorkFolder);
 cCwd = onCleanup(@() cd(here)); %#ok<NASGU>
 
 % Generate code (no make), with the optional parameter override file.
 buildArgs = {};
-if ~ismissing(opts.ParametersFile)
-    if ~isfile(opts.ParametersFile)
-        error("cigre:buildDLLWithDebug:ParametersFileMissing", ...
-            "ParametersFile does not exist: %s", opts.ParametersFile);
+if ~ismissing(nvp.ParametersFile)
+    if ~isfile(nvp.ParametersFile)
+        error("CIGRE:buildDLLWithDebug:ParametersFileMissing", ...
+            "ParametersFile does not exist: %s", nvp.ParametersFile);
     end
-    buildArgs = {"ParameterConfigFile", opts.ParametersFile};
+    buildArgs = {"ParameterConfigFile", nvp.ParametersFile};
 end
 
 desc = cigre.buildDLL(model, ...
     "SkipBuild", true, ...
     "CodeGenFolder", string(pwd), ...
-    "BusAs", opts.BusAs, ...
+    "BusAs", nvp.BusAs, ...
     buildArgs{:});
 
 % Load saved inputs. loadData-style: the .mat is expected to contain a
 % single timetable; we take the first variable.
-loaded = load(opts.InputsFile);
+loaded = load(nvp.InputsFile);
 inputsField = string(fieldnames(loaded));
 inputs = loaded.(inputsField(1));
 if ~istimetable(inputs)
-    error("cigre:buildDLLWithDebug:InputsNotTimetable", ...
-        "Variable '%s' in %s is not a timetable.", inputsField(1), opts.InputsFile);
+    error("CIGRE:buildDLLWithDebug:InputsNotTimetable", ...
+        "Variable '%s' in %s is not a timetable.", inputsField(1), nvp.InputsFile);
 end
 
 % Reconstruct a Simulink/CIGRE parameter pair from the model description
 % and the supplied ParameterConfig (defaults are used if none was given).
-if ismissing(opts.ParametersFile)
+if ismissing(nvp.ParametersFile)
     paramConfig = cigre.config.ParameterConfiguration();
 else
-    paramConfig = cigre.config.ParameterConfiguration.fromFile(opts.ParametersFile);
+    paramConfig = cigre.config.ParameterConfiguration.fromFile(nvp.ParametersFile);
 end
 [simulinkParameters, cigreParameters] = resolveParameters(desc, paramConfig);
 
@@ -122,7 +122,7 @@ addpath(fullfile(pwd, "slprj"));
 
 result = runDLL(dllName, inputs, cigreParameters, baseline, timeStep);
 
-if ~opts.Compare
+if ~nvp.Compare
     fprintf("\nDLL run complete (%d rows). Compare disabled; result is in cigre_debug_result.\n", height(result));
     assignin("base", "cigre_debug_result", result);
     return
@@ -139,7 +139,7 @@ if ~passed
         % Numerical-tolerance comparison via the unittest constraint.
         import matlab.unittest.constraints.IsEqualTo
         import matlab.unittest.constraints.RelativeTolerance
-        passed = IsEqualTo(baselineTable, "Within", RelativeTolerance(opts.RelTol)) ...
+        passed = IsEqualTo(baselineTable, "Within", RelativeTolerance(nvp.RelTol)) ...
             .satisfiedBy(result);
     catch
         passed = false;
@@ -149,7 +149,7 @@ end
 assignin("base", "cigre_debug_result", result);
 assignin("base", "cigre_debug_baseline", baselineTable);
 if passed
-    fprintf("\nDLL output matches Simulink baseline within RelTol=%g.\n", opts.RelTol);
+    fprintf("\nDLL output matches Simulink baseline within RelTol=%g.\n", nvp.RelTol);
 else
     fprintf("\nDLL output DIFFERS from Simulink baseline. Compare cigre_debug_result vs cigre_debug_baseline in the base workspace.\n");
 end

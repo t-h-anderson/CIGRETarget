@@ -1,4 +1,4 @@
-function captureParametersFromSimulink(model, outFile, opts)
+function captureParametersFromSimulink(model, outFile, nvp)
 % captureParametersFromSimulink Write a ParameterConfig.xlsx for a model.
 %
 %   cigre.util.captureParametersFromSimulink(model, outFile)
@@ -25,21 +25,21 @@ function captureParametersFromSimulink(model, outFile, opts)
 arguments
     model (1,1) string
     outFile (1,1) string
-    opts.CodeGenFolder (1,1) string = ...
+    nvp.CodeGenFolder (1,1) string = ...
         string(fullfile(tempdir, "cigre_captureParams_" + model + "_" + string(feature("getpid"))))
-    opts.BusAs (1,1) string {mustBeMember(opts.BusAs, ["Ports", "Vector"])} = "Vector"
-    opts.Verbose (1,1) logical = false
+    nvp.BusAs (1,1) string {mustBeMember(nvp.BusAs, ["Ports", "Vector"])} = "Vector"
+    nvp.Verbose (1,1) logical = false
 end
 
-if ~isfolder(opts.CodeGenFolder)
-    mkdir(opts.CodeGenFolder);
+if ~isfolder(nvp.CodeGenFolder)
+    mkdir(nvp.CodeGenFolder);
 end
 
 desc = cigre.buildDLL(model, ...
     "SkipBuild", true, ...
-    "CodeGenFolder", opts.CodeGenFolder, ...
-    "BusAs", opts.BusAs, ...
-    "Verbose", opts.Verbose);
+    "CodeGenFolder", nvp.CodeGenFolder, ...
+    "BusAs", nvp.BusAs, ...
+    "Verbose", nvp.Verbose);
 
 params = desc.Parameters;
 n = numel(params);
