@@ -50,6 +50,11 @@ templateDir = fileparts(mfilename("fullpath"));
 sourceDirs = collectSourceDirs(model, workFolder);
 sources = collectSources(sourceDirs);
 
+% Headers are cosmetic for the build (the compiler finds them via
+% AdditionalIncludeDirectories), but listing them in the .vcxproj gives
+% F12 / Solution-Explorer navigation across the generated tree.
+headers = collectHeaders(sourceDirs);
+
 % Include set mirrors test.system.tGenerateCigre.doVSBuild plus the
 % generated wrapper folder, joined with semicolons per MSBuild
 % convention.
@@ -68,20 +73,15 @@ includes = strjoin(string(includeDirs), ";");
 % what the templates expect.
 guid = upper(string(cigre.util.uuid()));
 
-% Each source file becomes a <ClCompile Include="..." /> entry. Indent
-% to match the existing line containing the @@SOURCES@@ placeholder so
-% the resulting XML stays readable in VS's editor.
-clItems = strings(numel(sources), 1);
-for i = 1:numel(sources)
-    clItems(i) = "    <ClCompile Include=""" + sources(i) + """ />";
-end
-sourcesBlock = strjoin(clItems, newline);
+sourcesBlock = formatItemEntries(sources, "ClCompile");
+headersBlock = formatItemEntries(headers, "ClInclude");
 
 vcxproj = readFile(fullfile(templateDir, "CIGREDebug.vcxproj.template"));
 vcxproj = replace(vcxproj, "@@MODEL@@", model);
 vcxproj = replace(vcxproj, "@@GUID@@", guid);
 vcxproj = replace(vcxproj, "@@INCLUDES@@", includes);
 vcxproj = replace(vcxproj, "@@SOURCES@@", sourcesBlock);
+vcxproj = replace(vcxproj, "@@HEADERS@@", headersBlock);
 vcxproj = replace(vcxproj, "@@TOOLSET@@", nvp.PlatformToolset);
 vcxproj = replace(vcxproj, "@@WINSDK@@", nvp.WindowsTargetPlatformVersion);
 
@@ -122,30 +122,61 @@ end
 
 
 function files = collectSources(sourceDirs)
-% Glob *.c (and *.cpp, just in case) under each source dir, non-recursive.
-% Each dir in sourceDirs is already a leaf, so we don't recurse.
-buckets = cell(numel(sourceDirs), 1);
-for i = 1:numel(sourceDirs)
-    cFiles = dir(fullfile(sourceDirs(i), "*.c"));
-    cppFiles = dir(fullfile(sourceDirs(i), "*.cpp"));
-    entries = [cFiles; cppFiles];
-    if isempty(entries)
-        buckets{i} = strings(0, 1);
-        continue
-    end
-    buckets{i} = string(fullfile({entries.folder}, {entries.name}))';
-end
-files = vertcat(buckets{:});
-
+% Glob *.c / *.cpp under each source dir, non-recursive.
+files = globExtensions(sourceDirs, ["*.c", "*.cpp"]);
 if isempty(files)
     error("CIGRE:writeVSProject:NoSources", ...
         "No .c sources found under any of the expected build folders. Did cigre.buildDLL emit code into the work folder?");
 end
+end
 
+
+function files = collectHeaders(sourceDirs)
+% Glob *.h / *.hpp under each source dir. Absent headers are not an
+% error - some folders (e.g. shared utilities) contain only sources.
+files = globExtensions(sourceDirs, ["*.h", "*.hpp"]);
+end
+
+
+function files = globExtensions(sourceDirs, exts)
+% Non-recursive glob across multiple extensions and dirs. Each dir in
+% sourceDirs is already a leaf (collectSourceDirs expanded slprj/cigre
+% via genpath), so we don't recurse here.
+buckets = cell(numel(sourceDirs) * numel(exts), 1);
+k = 0;
+for i = 1:numel(sourceDirs)
+    for j = 1:numel(exts)
+        entries = dir(fullfile(sourceDirs(i), exts(j)));
+        k = k + 1;
+        if isempty(entries)
+            buckets{k} = strings(0, 1);
+        else
+            buckets{k} = string(fullfile({entries.folder}, {entries.name}))';
+        end
+    end
+end
+files = vertcat(buckets{:});
 % Deduplicate by absolute path so a file that appears under two parents
-% (rare, but possible if the user reuses an output dir) only compiles
-% once.
+% (rare, but possible if the user reuses an output dir) only appears
+% once in the .vcxproj.
 files = unique(files, "stable");
+end
+
+
+function block = formatItemEntries(files, tag)
+% Build a block of <Tag Include="..." /> entries indented to slot into
+% the template alongside the surrounding ItemGroup. An empty list
+% collapses to a single blank line so the resulting XML still parses.
+arguments
+    files (:,1) string
+    tag (1,1) string
+end
+if isempty(files)
+    block = "";
+    return
+end
+entries = "    <" + tag + " Include=""" + files + """ />";
+block = strjoin(entries, newline);
 end
 
 
