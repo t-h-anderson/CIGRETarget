@@ -12,10 +12,11 @@ function bundlePath = buildDLLWithDebug(model, nvp)
 % pauses (via keyboard) so the user can open the solution in Visual
 % Studio and hit Build > Build Solution. On resume, the DLL plus a
 % debug_session.mat capturing the inputs, parameters, and (optionally)
-% Simulink baseline are zipped into <model>_CIGRE_session.zip, and
-% cigre.internal.runDebugDLL is called on the zip. The function returns
-% the bundle path, so repeated runs after rebuilds in VS are just
-% cigre.internal.runDebugDLL(bundle) - no need to re-run codegen.
+% Simulink baseline are zipped into <model>_CIGRE_session.zip. The
+% function returns the bundle path; the user then calls
+% cigre.internal.runDebugDLL on it to actually exercise the DLL on a
+% parallel worker (the call is separated so reruns after a VS rebuild
+% are just another runDebugDLL invocation - no need to re-run codegen).
 %
 % Both InputsFile and ParametersFile are optional, so the smallest
 % smoke-test invocation is just buildDLLWithDebug("MyModel") - inputs
@@ -168,11 +169,7 @@ save(sessionMat, "DllName", "Inputs", "CIGREParameters", "Outputs", ...
 
 bundlePath = bundleDebugSession(nvp.WorkFolder, dllName);
 fprintf("\nSession bundle: %s\n", bundlePath);
-fprintf("Rerun without rebuilding: cigre.internal.runDebugDLL(bundle)\n");
-
-% First run uses the same bundle path; subsequent reruns can just call
-% runDebugDLL again.
-cigre.internal.runDebugDLL(bundlePath, "Compare", nvp.Compare);
+fprintf("Run / rerun the DLL: result = cigre.internal.runDebugDLL(bundle);\n");
 
 end
 

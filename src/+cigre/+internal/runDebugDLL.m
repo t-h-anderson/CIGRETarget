@@ -2,6 +2,7 @@ function result = runDebugDLL(sessionZip, nvp)
 % runDebugDLL Run a CIGRE DLL on a parallel worker for VS debugging.
 %
 %   result = cigre.internal.runDebugDLL("MyModel_session.zip")
+%   [result, ~] = cigre.internal.runDebugDLL(bundle, "Compare", true)
 %
 % Unpacks a session bundle written by cigre.internal.buildDLLWithDebug,
 % spawns a fresh parallel worker, prints the worker's OS PID so the user
@@ -14,6 +15,9 @@ function result = runDebugDLL(sessionZip, nvp)
 %
 % Inputs:
 %   sessionZip - path to a .zip produced by buildDLLWithDebug.
+%
+% Returns:
+%   result - timetable of DLL outputs, one row per simulation step.
 %
 % Name-Value Arguments:
 %   Compare         - if true, diff the DLL output against the saved
@@ -53,6 +57,16 @@ if ~isfile(sessionMat)
 end
 session = load(sessionMat);
 
+% Sanity check the step count up front. A zero-row Outputs container
+% would silently produce an empty result after parfeval (the DLL would
+% be loaded and initialised but the step loop would not iterate),
+% which is impossible to diagnose from the outside.
+nSteps = size(session.Outputs, 1);
+if nSteps == 0
+    error("CIGRE:runDebugDLL:NoSteps", ...
+        "Session bundle's Outputs timetable has 0 rows - the DLL would be loaded and initialised but no step would execute. Likely cause: the model's StopTime / FixedStep combination produced an empty time vector, or desc.Outputs was empty at bundle time.");
+end
+
 % Tear down any existing pool so the worker reloads the (possibly
 % rebuilt) DLL from scratch on each call. backgroundPool runs
 % in-process and cannot host a loaded DLL safely, so we force a
@@ -64,13 +78,22 @@ warning("off", "parallel:cluster:LocalWorkerCrash");
 cleanWarn = onCleanup(@() warning(state, "parallel:cluster:LocalWorkerCrash")); %#ok<NASGU>
 
 % Surface the worker's OS PID so the user can attach VS to it before
-% the DLL is loaded.
+% the DLL is loaded. parfeval(@()feature("getpid")) on the worker
+% returns the worker's PID, not the host's.
 fPid = parfeval(p, @() feature("getpid"), 1);
 wait(fPid, "finished", 30);
 workerPid = fPid.fetchOutputs();
-fprintf("\n=== Parallel worker spawned (PID %d) ===\n", workerPid);
-fprintf("In Visual Studio: Debug > Attach to Process > MATLAB.exe with PID %d.\n", workerPid);
-fprintf("Set breakpoints in the C source, then resume MATLAB.\n");
+
+fprintf("\n");
+fprintf("########################################################\n");
+fprintf("#  Worker PID:  %-8d                                  #\n", workerPid);
+fprintf("#  Steps to run: %-6d                                  #\n", nSteps);
+fprintf("#                                                      #\n");
+fprintf("#  In Visual Studio:                                   #\n");
+fprintf("#    Debug > Attach to Process                         #\n");
+fprintf("#    select MATLAB.exe with PID %-8d                #\n", workerPid);
+fprintf("#    set breakpoints in the C source                   #\n");
+fprintf("########################################################\n");
 
 if nvp.PauseBeforeRun
     fprintf("\n*** Attach VS, set breakpoints, then 'dbcont' to step into the DLL ***\n");
@@ -88,8 +111,7 @@ if p.NumWorkers == 0
 end
 
 result = f.fetchOutputs();
-assignin("base", "cigre_debug_result", result);
-fprintf("DLL run complete (%d rows). Result in cigre_debug_result.\n", height(result));
+fprintf("DLL run complete (%d rows).\n", height(result));
 
 if nvp.Compare
     if ~isfield(session, "Baseline") || isempty(session.Baseline)
@@ -100,7 +122,6 @@ if nvp.Compare
     baselineTable = timetable2table(session.Baseline, 'ConvertRowTimes', false);
     baselineTable.Properties.VariableNames = result.Properties.VariableNames;
     baselineTable.Properties.VariableContinuity = [];
-    assignin("base", "cigre_debug_baseline", baselineTable);
 
     passed = isequaln(result, baselineTable);
     if ~passed
@@ -116,7 +137,8 @@ if nvp.Compare
     if passed
         fprintf("DLL output matches Simulink baseline within RelTol=%g.\n", session.RelTol);
     else
-        fprintf("DLL output DIFFERS from Simulink baseline. Compare cigre_debug_result vs cigre_debug_baseline.\n");
+        fprintf("DLL output DIFFERS from Simulink baseline.\n");
+        fprintf("  Load session.Baseline from %s to inspect.\n", sessionZip);
     end
 end
 end

@@ -47,6 +47,16 @@ instance = cigre.dll.InterfaceInstance(inputsCell, outputs, cigreParameters);
 cigreDll.initialise(instance);
 
 nSteps = size(outputs, 1);
+if nSteps == 0
+    % Without an explicit guard here, the DLL would be loaded and
+    % initialised, the for loop below would simply not iterate, and
+    % the caller would receive an empty result with no hint of why.
+    % Surface the cause loudly so a misconfigured time vector /
+    % outputs shape is obvious from the worker's stack trace.
+    error("CIGRE:runCigreDLL:NoSteps", ...
+        "outputs container has 0 rows - DLL was loaded and initialised but no step would execute. Check that the time vector / outputs shape were populated correctly at bundle time.");
+end
+fprintf("Stepping DLL for %d steps...\n", nSteps);
 results = cell(1, nSteps);
 for i = 1:nSteps
     instance.updateInputs(inputsCell, "Row", i);
