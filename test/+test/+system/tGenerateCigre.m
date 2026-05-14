@@ -242,26 +242,24 @@ classdef tGenerateCigre < test.util.WithParallelFixture
 
     methods (Test, TestTags = "Manual")
 
-        function tVSBuild(testCase, ModelName, Snapshot, BusAs)
+        function tVSBuild(testCase, ModelName, BusAs)
+            % End-to-end Visual Studio debug build. Tagged Manual because
+            % MSBuild is Windows-only and CI runs on Linux; on a Windows
+            % box this test runs unattended (cigre.buildDLL(Debug=true)
+            % drives MSBuild; cigre.internal.runDebugDLL with
+            % PauseBeforeRun=false skips the VS Attach pause). For an
+            % interactive debug session, call those two entry points by
+            % hand with PauseBeforeRun=true.
 
             testCase.loadData(ModelName);
 
-            import matlab.unittest.fixtures.WorkingFolderFixture
-
-            fixture.Folder = fullfile(cigreRoot, "test", "VS_Build", "VSBuild_" + ModelName);
-            if ~isfolder(fixture.Folder)
-                mkdir(fixture.Folder);
+            workFolder = fullfile(cigreRoot, "test", "VS_Build", "VSBuild_" + ModelName);
+            if ~isfolder(workFolder)
+                mkdir(workFolder);
             end
+            testCase.applyCodeGenFixture(workFolder);
 
-            % Resulting files go in build folder
-            here = pwd;
-            cd(fixture.Folder);
-            testCase.addTeardown(@() cd(here));
-
-            testCase.applyCodeGenFixture(fullfile(pwd));
-
-            % See tBuild: same mechanism for picking up a per-model
-            % parameter config from the working folder.
+            % Same per-model ParameterConfig.xlsx lookup as tBuild.
             modelPath = which(ModelName + ".slx");
             configPath = fullfile(fileparts(modelPath), "ParameterConfig.xlsx");
             buildArgs = {};
@@ -269,64 +267,31 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 buildArgs = {"ParameterConfigFile", configPath};
             end
 
-            % Generate the code only
-            desc = cigre.buildDLL(ModelName, "SkipBuild", true, "BusAs", BusAs, buildArgs{:});
-
+            [desc, dll] = cigre.buildDLL(ModelName, ...
+                "Debug", true, ...
+                "BusAs", BusAs, ...
+                "CodeGenFolder", string(workFolder), ...
+                buildArgs{:});
             testCase.ModelDescription = desc;
 
             testCase.defineInputsAndParameters(desc);
-
-            % Wrapper IO and baseline should match Simulink
             baseline = testCase.captureBaseline(desc.CIGREInterfaceName);
 
-            % Build manually in Visual Studio following the instruction herein
-            dll = testCase.doVSBuild(ModelName);
-
-            % Extract the dll and header
-            addpath(fullfile(pwd, "x64", "Debug"));
-            addpath(fullfile(pwd, "slprj"));
-
-            doRun = @() runDLL(testCase, dll, Snapshot, "VSBuild", true, "TwoData", false);
-
-            result = testCase.runParallel(doRun, "PauseBeforeRun", true);
+            result = cigre.internal.runDebugDLL(dll, ...
+                testCase.Inputs, testCase.CIGREParameters, ...
+                testCase.Outputs, testCase.TimeStep, ...
+                "PauseBeforeRun", false);
 
             baseline = timetable2table(baseline, 'ConvertRowTimes', false);
             baseline.Properties.VariableNames = result.Properties.VariableNames;
             baseline.Properties.VariableContinuity = [];
 
             testCase.verifyEqual(result, baseline, "RelTol", 1e-10)
-
         end
 
     end
 
     methods
-
-        function dll = doVSBuild(testCase, modelName)
-            arguments
-                testCase
-                modelName (1,1) string
-            end
-
-            dll = modelName + "_CIGRE.dll";
-            clipboard("copy", dll);
-
-            src = fullfile(cigreRoot, "src\CIGRESource");
-            clipboard("copy", src);
-
-            % manually create in VS
-            fld =  fullfile(cigreRoot(), "\src\CIGRESource;");
-            fld = fld + genpath(pwd + "\slprj\cigre\");
-            fld = fld + fullfile(pwd + "\slprj\ert\_sharedutils") + ";";
-            fld = fld + fullfile(matlabroot, "extern", "include")+";";
-            fld = fld + fullfile(matlabroot, "simulink", "include") + ";";
-            fld = fld + fullfile(matlabroot, "rtw\c\src") + ";";
-            fld = fld + fullfile(pwd, modelName + "_wrap_cigre_rtw");
-            %clipboard("copy", fld);
-
-            keyboard %#ok<KEYBOARDFUN>
-
-        end
 
         function defineInputsAndParameters(testCase, desc, nvp)
             arguments
@@ -360,7 +325,6 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 testCase
                 dllName (1,1) string
                 snapshot (1,1) logical = true
-                nvp.VSBuild (1,1) logical = false
                 nvp.TwoData (1,1) logical = true
             end
 
