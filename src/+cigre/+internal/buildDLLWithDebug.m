@@ -39,6 +39,10 @@ function buildDLLWithDebug(model, nvp)
 %                    tempdir/<model>_dbg_<pid>).
 %   RelTol         - relative tolerance for the baseline comparison
 %                    (default 1e-10).
+%   PlatformToolset - VS toolset for the generated project (default
+%                    "v142"; see cigre.internal.writeVSProject).
+%   WindowsTargetPlatformVersion - SDK version for the generated
+%                    project (default "10.0").
 arguments
     model (1,1) string
     nvp.InputsFile (1,1) string
@@ -48,6 +52,8 @@ arguments
     nvp.WorkFolder (1,1) string = ...
         string(fullfile(tempdir, model + "_dbg_" + string(feature("getpid"))))
     nvp.RelTol (1,1) double = 1e-10
+    nvp.PlatformToolset (1,1) string = "v142"
+    nvp.WindowsTargetPlatformVersion (1,1) string = "10.0"
 end
 
 if ~isfile(nvp.InputsFile)
@@ -113,7 +119,9 @@ baseline = cigre.internal.captureSimulinkBaseline( ...
 % so the only thing left to do on the Windows side is Build > Build
 % Solution, set breakpoints, and resume MATLAB.
 dllName = model + "_CIGRE";
-slnPath = cigre.internal.writeVSProject(model, string(pwd));
+slnPath = cigre.internal.writeVSProject(model, string(pwd), ...
+    "PlatformToolset", nvp.PlatformToolset, ...
+    "WindowsTargetPlatformVersion", nvp.WindowsTargetPlatformVersion);
 printVSBuildInstructions(slnPath);
 
 fprintf("\n*** Build the DLL in Visual Studio, then 'dbcont' to resume ***\n");

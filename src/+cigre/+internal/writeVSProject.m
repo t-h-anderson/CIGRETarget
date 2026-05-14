@@ -1,4 +1,4 @@
-function slnPath = writeVSProject(model, workFolder)
+function slnPath = writeVSProject(model, workFolder, nvp)
 % writeVSProject Emit a VS solution + project for a CIGRE DLL debug build.
 %
 %   slnPath = cigre.internal.writeVSProject(model, workFolder)
@@ -21,11 +21,24 @@ function slnPath = writeVSProject(model, workFolder)
 %                by cigre.buildDLL (i.e. the cwd after buildDLLWithDebug
 %                runs codegen).
 %
+% Name-Value Arguments:
+%   PlatformToolset - VS PlatformToolset value, e.g. "v141" (VS 2017),
+%                     "v142" (VS 2019), "v143" (VS 2022). Default
+%                     "v142", which is the toolset shipped by both
+%                     VS 2019 and VS 2022 - install it via the VS
+%                     installer if you only have v143 on disk.
+%   WindowsTargetPlatformVersion - Windows SDK version. Default "10.0"
+%                     auto-resolves to the latest installed Windows 10
+%                     SDK on the user's box; pin to e.g. "10.0.19041.0"
+%                     if you need reproducibility.
+%
 % Returns:
 %   slnPath - absolute path to the emitted .sln file.
 arguments
     model (1,1) string
     workFolder (1,1) string
+    nvp.PlatformToolset (1,1) string = "v142"
+    nvp.WindowsTargetPlatformVersion (1,1) string = "10.0"
 end
 
 projectName = model + "_CIGRE";
@@ -69,6 +82,8 @@ vcxproj = replace(vcxproj, "@@MODEL@@", model);
 vcxproj = replace(vcxproj, "@@GUID@@", guid);
 vcxproj = replace(vcxproj, "@@INCLUDES@@", includes);
 vcxproj = replace(vcxproj, "@@SOURCES@@", sourcesBlock);
+vcxproj = replace(vcxproj, "@@TOOLSET@@", nvp.PlatformToolset);
+vcxproj = replace(vcxproj, "@@WINSDK@@", nvp.WindowsTargetPlatformVersion);
 
 sln = readFile(fullfile(templateDir, "CIGREDebug.sln.template"));
 sln = replace(sln, "@@MODEL@@", model);
