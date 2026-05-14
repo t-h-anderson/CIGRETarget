@@ -31,6 +31,17 @@ arguments
     nvp.Verbose (1,1) logical = false
 end
 
+% Validate the output extension up front - writetable's "spreadsheet"
+% FileType only accepts an Excel-family extension, and codegen below is
+% ~30s wasted if the user typo'd .mat. Error here before we do any work.
+[~, ~, ext] = fileparts(outFile);
+allowedExts = [".xlsx", ".xls", ".xlsm", ".xlsb", ".xltx", ".xltm", ".ods"];
+if ~ismember(lower(ext), allowedExts)
+    error("CIGRE:captureParametersFromSimulink:UnsupportedExtension", ...
+        "outFile must use one of the spreadsheet extensions %s (got '%s').", ...
+        strjoin(allowedExts, ", "), ext);
+end
+
 if ~isfolder(nvp.CodeGenFolder)
     mkdir(nvp.CodeGenFolder);
 end
