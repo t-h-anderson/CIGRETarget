@@ -277,11 +277,12 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             testCase.defineInputsAndParameters(desc);
             baseline = testCase.captureBaseline(desc.CIGREInterfaceName);
 
-            % Outputs shape defaults from desc inside runDebugDLL; the
-            % baseline here is purely the verifyEqual reference.
-            result = cigre.internal.runDebugDLL(dll, desc, ...
-                testCase.Inputs, testCase.CIGREParameters, ...
-                testCase.TimeStep, "PauseBeforeRun", false);
+            % runDebugDLL introspects the DLL header for sample time and
+            % port layout; it only needs the inputs and parameters here.
+            result = cigre.internal.runDebugDLL(dll, ...
+                "Inputs", testCase.Inputs, ...
+                "Parameters", testCase.CIGREParameters, ...
+                "PauseBeforeRun", false);
 
             baseline = timetable2table(baseline, 'ConvertRowTimes', false);
             baseline.Properties.VariableNames = result.Properties.VariableNames;

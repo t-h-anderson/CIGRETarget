@@ -1,8 +1,9 @@
-function result = runDebugDLL(dllPath, desc, inputs, cigreParameters, timeStep, nvp)
+function result = runDebugDLL(dllPath, nvp)
 % runDebugDLL Run a CIGRE DLL on a parallel worker for VS debugging.
 %
-%   result = cigre.internal.runDebugDLL( ...
-%       dllPath, desc, inputs, cigreParameters, timeStep)
+%   result = cigre.internal.runDebugDLL(dllPath)
+%   result = cigre.internal.runDebugDLL(dllPath, ...
+%       "Inputs", inputsTimetable, "Parameters", cigreParams)
 %
 % Spawns a fresh parallel worker, prints the worker's OS PID so the
 % user can attach Visual Studio (Debug > Attach to Process >
@@ -13,46 +14,37 @@ function result = runDebugDLL(dllPath, desc, inputs, cigreParameters, timeStep, 
 % "edit C, MSBuild again, rerun" iteration loop works without any
 % MATLAB-side state to clean up.
 %
-% This is the debug-loop side of the pivot away from a single
-% orchestrator: cigre.buildDLL(..., "Debug", true) produces the DLL
-% (and is composable with cigre.importDLL for Simulink); this
-% function runs it for the MATLAB harness case.
+% Everything other than the DLL is optional: the function introspects
+% the DLL header (Model_GetInfo, via cigre.importer.ModelInfo) for the
+% sample time and the input / output / parameter port layout, so it
+% does not need the ModelDescription that produced the DLL. The DLL
+% path alone is enough for a smoke run; supply Inputs / Parameters to
+% drive specific data through.
 %
 % Inputs:
-%   dllPath          - absolute path to the debug DLL produced by
-%                      cigre.buildDLL(..., "Debug", true).
-%   desc             - cigre.description.ModelDescription for the
-%                      model (the second output of cigre.buildDLL).
-%                      Used to size the outputs container - see the
-%                      Outputs name-value below.
-%   inputs           - timetable of Inport values; cigre.dll.DataMap
-%                      reads the per-column type and dimensions from it.
-%   cigreParameters  - (1,:) struct array (.Name, .Value) of visible
-%                      CIGRE parameter values.
-%   timeStep         - sample step, seconds.
+%   dllPath - absolute path to a CIGRE DLL (e.g. the second output of
+%             cigre.buildDLL(..., "Debug", true)).
 %
 % Name-Value Arguments:
-%   Outputs         - timetable used as the shape allocator for
-%                     cigre.dll.DataMap.create. Defaults to
-%                     cigre.internal.generateOutputsShape(desc, ...)
-%                     over the retimed input grid (one output row per
-%                     step). Pass a captured Simulink baseline here to
-%                     reuse it instead - the two are interchangeable as
-%                     shape allocators since the DLL overwrites the
-%                     values regardless.
-%   PauseBeforeRun  - if true (default), pause via keyboard after the
-%                     worker is up so the user can attach VS. Set false
-%                     for non-interactive reruns.
-%   WaitTimeout     - parfeval wait timeout in seconds. Default 86400
-%                     (one day) so the user can step through at human
-%                     speed without parfeval declaring the worker stuck.
+%   Inputs         - timetable of Inport values, retimed onto the
+%                    DLL's sample grid. Default: a synthetic
+%                    constant-per-port stand-in NumSteps rows long.
+%   Parameters     - (1,:) struct array (.Name, .Value) of CIGRE
+%                    parameter values. Default: each DLL parameter at
+%                    its declared DefaultValue.
+%   NumSteps       - step count for the synthetic default Inputs
+%                    (ignored when Inputs is supplied). Default 100.
+%   PauseBeforeRun - if true (default), pause via keyboard after the
+%                    worker is up so the user can attach VS. Set false
+%                    for non-interactive reruns.
+%   WaitTimeout    - parfeval wait timeout in seconds. Default 86400
+%                    (one day) so the user can step through at human
+%                    speed without parfeval declaring the worker stuck.
 arguments
     dllPath (1,1) string
-    desc
-    inputs timetable
-    cigreParameters (1,:) struct
-    timeStep (1,1) double
-    nvp.Outputs = []
+    nvp.Inputs timetable = timetable.empty
+    nvp.Parameters struct = struct("Name", {}, "Value", {})
+    nvp.NumSteps (1,1) double {mustBePositive} = 100
     nvp.PauseBeforeRun (1,1) logical = true
     nvp.WaitTimeout (1,1) double = 86400
 end
@@ -66,26 +58,41 @@ end
 dllDir = string(dllDir);
 dllName = string(dllBase);
 
-% The DLL runner needs an outputs container purely as a shape
-% allocator for cigre.dll.DataMap.create. Default it from the model
-% description over the retimed input grid so the row count matches the
-% step count exactly; a caller with a captured Simulink baseline can
-% override via Outputs.
-if isempty(nvp.Outputs)
-    retimed = retime(inputs, 'regular', 'nearest', 'TimeStep', seconds(timeStep));
-    outputs = cigre.internal.generateOutputsShape(desc, retimed.Properties.RowTimes);
-else
-    outputs = nvp.Outputs;
+% Read the DLL header for the sample time and port layout. This is
+% what lets runDebugDLL stay light - the DLL describes itself.
+info = cigre.importer.ModelInfo.fromDLL(dllPath);
+timeStep = info.SampleTime;
+if timeStep <= 0
+    error("CIGRE:runDebugDLL:BadSampleTime", ...
+        "DLL reports a non-positive FixedStepBaseSampleTime (%g).", timeStep);
 end
 
-% Sanity-check the step count before any parallel-pool work; a zero-row
-% outputs container would silently make the parfeval body load and
-% initialise the DLL but never call Model_Outputs, which is impossible
-% to diagnose from the outside.
-nSteps = size(outputs, 1);
+% Resolve inputs: the supplied timetable retimed onto the DLL's sample
+% grid, or a synthetic constant-per-port stand-in NumSteps rows long.
+if isempty(nvp.Inputs)
+    nSteps = nvp.NumSteps;
+    inputs = dllSignalTimetable(info.Inputs, stepTimes(nSteps, timeStep), "index");
+else
+    inputs = retime(nvp.Inputs, 'regular', 'nearest', 'TimeStep', seconds(timeStep));
+    nSteps = height(inputs);
+end
 if nSteps == 0
     error("CIGRE:runDebugDLL:NoSteps", ...
-        "outputs timetable has 0 rows - the DLL would be loaded and initialised but no step would execute. Check that the inputs / timeStep produced a non-empty grid.");
+        "Resolved a zero-length input - nothing to step.");
+end
+
+% The outputs container is purely a shape allocator for
+% cigre.dll.DataMap.create; a zeros timetable from the DLL's declared
+% output ports gives it the right per-port type and width, and the
+% row count drives the step loop in runCigreDLL.
+outputs = dllSignalTimetable(info.Outputs, stepTimes(nSteps, timeStep), "zeros");
+
+% Resolve parameters: the supplied override, or each DLL parameter at
+% its declared DefaultValue.
+if isempty(nvp.Parameters)
+    cigreParameters = defaultParameters(info.Parameters);
+else
+    cigreParameters = nvp.Parameters;
 end
 
 % Tear down any existing pool so the worker reloads the (possibly
@@ -132,4 +139,63 @@ end
 
 result = f.fetchOutputs();
 fprintf("DLL run complete (%d rows).\n", height(result));
+end
+
+
+function t = stepTimes(nSteps, timeStep)
+% Column duration vector for an nSteps run on the DLL's sample grid.
+t = seconds((0:nSteps-1)' * timeStep);
+end
+
+
+function tt = dllSignalTimetable(signals, time, fill)
+% Build a timetable matching a ModelInfo signal-port array. Each port
+% becomes one variable, width signals(k).Width, type
+% cigreTypeToSimulink(signals(k).DataType). The CIGRE ABI carries
+% every port as a flat vector, so there are no matrix dimensions to
+% reconstruct. fill "index" gives port k the constant k (a distinct
+% non-zero value per wire); "zeros" gives an all-zero output-shape
+% allocator the DLL overwrites.
+arguments
+    signals struct
+    time (:,1) duration
+    fill (1,1) string {mustBeMember(fill, ["index", "zeros"])}
+end
+
+n = numel(signals);
+if n == 0
+    tt = timetable.empty;
+    return
+end
+
+nSteps = numel(time);
+cols = cell(1, n);
+for k = 1:n
+    matlabType = cigre.importer.ModelInfo.cigreTypeToSimulink(signals(k).DataType);
+    width = double(signals(k).Width);
+    if fill == "index"
+        vals = cast(k, matlabType) * ones(nSteps, width, matlabType);
+    else
+        vals = zeros(nSteps, width, matlabType);
+    end
+    cols{k} = timetable(vals, 'RowTimes', time, 'VariableNames', "Var" + k);
+end
+tt = [cols{:}];
+end
+
+
+function params = defaultParameters(infoParams)
+% Each DLL parameter at its declared DefaultValue, cast to the
+% parameter's CIGRE data type.
+arguments
+    infoParams struct
+end
+
+params = struct("Name", {}, "Value", {});
+for k = 1:numel(infoParams)
+    pk = infoParams(k);
+    matlabType = cigre.importer.ModelInfo.cigreTypeToSimulink(pk.DataType);
+    params(k) = struct("Name", string(pk.Name), ...
+        "Value", cast(pk.DefaultValue, matlabType)); %#ok<AGROW>
+end
 end
