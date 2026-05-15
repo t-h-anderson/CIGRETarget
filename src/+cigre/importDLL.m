@@ -38,6 +38,11 @@ function [modelPath, info] = importDLL(dllPath, nvp)
 %                driving 0 into each input, and one Outport per DLL
 %                output. Default: true.
 %
+%   Overwrite    (logical) Permit overwriting an existing .slx at the
+%                target path. Default: false - importDLL errors rather
+%                than clobber a file, so it can never destroy a model
+%                that happens to share the generated name.
+%
 % Example
 % -------
 %   modelPath = cigre.importDLL('C:\dlls\MyController.dll');
@@ -53,6 +58,7 @@ function [modelPath, info] = importDLL(dllPath, nvp)
         nvp.BlockName (1,1) string = string(missing)
         nvp.OpenModel (1,1) logical = true
         nvp.Harness (1,1) logical = true
+        nvp.Overwrite (1,1) logical = false
     end
 
     dllPath = resolvePath(dllPath);
@@ -96,7 +102,19 @@ function [modelPath, info] = importDLL(dllPath, nvp)
     % Suffix the model so it can sit alongside the actual CIGRE block of
     % the same base name without colliding in the same folder.
     modelName = blockName + "_ImportedCIGREDLL";
-    modelPath = fullfile(outputFolder, modelName + ".slx");
+    modelPath = string(fullfile(outputFolder, modelName + ".slx"));
+
+    % Never silently overwrite an existing model file. The generated
+    % name is derived from the DLL's own ModelName, so in principle it
+    % could collide with a user's model; refuse rather than risk
+    % destroying it. Overwrite=true opts back in (e.g. for a re-import).
+    if isfile(modelPath) && ~nvp.Overwrite
+        error("CIGRE:importDLL:ModelExists", ...
+            "A file already exists at:\n  %s\n" + ...
+            "importDLL will not overwrite it. Move or delete that file, " + ...
+            "pass a different BlockName / OutputFolder, or call importDLL " + ...
+            "with Overwrite=true to replace it deliberately.", modelPath);
+    end
 
     if bdIsLoaded(modelName)
         close_system(modelName, 0);
