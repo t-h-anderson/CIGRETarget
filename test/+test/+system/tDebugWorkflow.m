@@ -57,7 +57,7 @@ classdef tDebugWorkflow < matlab.unittest.TestCase
         function tCaptureInputsFromSimulink(testCase)
             % captureInputsFromSimulink sims a model and writes the
             % logged Inport signals to a .mat as a single timetable.
-            testCase.applyFixture(matlab.unittest.fixtures.WorkingFolderFixture);
+            testCase.useTempWorkFolder();
             outFile = fullfile(pwd, "siso_inputs.mat");
 
             cigre.util.captureInputsFromSimulink("Test_SISO", outFile);
@@ -80,7 +80,7 @@ classdef tDebugWorkflow < matlab.unittest.TestCase
             % captureParametersFromSimulink runs codegen to enumerate the
             % model's parameters and writes a ParameterConfig.xlsx that
             % round-trips through ParameterConfiguration.fromFile.
-            testCase.applyFixture(matlab.unittest.fixtures.WorkingFolderFixture);
+            testCase.useTempWorkFolder();
             cleanups = test.util.setAutoToolchain("Test_CP"); %#ok<NASGU>
             outFile = fullfile(pwd, "cp_params.xlsx");
 
@@ -113,7 +113,7 @@ classdef tDebugWorkflow < matlab.unittest.TestCase
             % captureSimulinkBaseline, fed inputs and parameters built by
             % generateDefaultInputs and resolveParameters, runs the
             % wrapper model and returns a populated output timetable.
-            testCase.applyFixture(matlab.unittest.fixtures.WorkingFolderFixture);
+            testCase.useTempWorkFolder();
             cleanups = test.util.setAutoToolchain("Test_SISO"); %#ok<NASGU>
 
             desc = testCase.codegenOnly("Test_SISO");
@@ -138,7 +138,7 @@ classdef tDebugWorkflow < matlab.unittest.TestCase
         function tWriteVSProject(testCase)
             % writeVSProject emits a Debug | x64 .sln + .vcxproj that
             % lists the generated sources.
-            testCase.applyFixture(matlab.unittest.fixtures.WorkingFolderFixture);
+            testCase.useTempWorkFolder();
             cleanups = test.util.setAutoToolchain("Test_SISO"); %#ok<NASGU>
 
             testCase.codegenOnly("Test_SISO");
@@ -171,6 +171,20 @@ classdef tDebugWorkflow < matlab.unittest.TestCase
     end
 
     methods (Access = private)
+
+        function useTempWorkFolder(testCase)
+            % Fresh per-test working folder, plus a teardown that resets
+            % Simulink's fileGenControl. cigre.buildDLL points the
+            % code-gen / cache folders at the working directory; the
+            % reset teardown is registered AFTER the WorkingFolderFixture
+            % so it runs BEFORE the fixture deletes that directory.
+            % Without it, fileGenControl would keep pointing at a
+            % now-deleted temp path and every subsequent test (here or
+            % in tGenerateCigre) would fail its Simulink.fileGenControl
+            % call with RTW:buildProcess:RootFolderDoesNotExist.
+            testCase.applyFixture(matlab.unittest.fixtures.WorkingFolderFixture);
+            testCase.addTeardown(@() Simulink.fileGenControl("reset"));
+        end
 
         function desc = codegenOnly(testCase, modelName)
             % Run cigre.buildDLL up to code generation (no make step),
