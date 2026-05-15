@@ -213,6 +213,16 @@ end
         % throws but there is nothing useful to do.
     end
 
+    % Release the instance's libpointers before unloading. unloadlibrary
+    % refuses ("Cannot unload a library that has outstanding objects")
+    % while any libpointer into the library is still alive - here the
+    % s_IEEE_Cigre_DLLInterface_Instance libstruct held by the instance.
+    try
+        instance.clear();
+    catch
+        % Best-effort: a clear failure must not abort Terminate.
+    end
+
     dll.unload();
     set_param(block.BlockHandle, "UserData", userData);
 end
