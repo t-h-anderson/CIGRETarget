@@ -1,8 +1,8 @@
-function result = runDebugDLL(dllPath, inputs, cigreParameters, outputs, timeStep, nvp)
+function result = runDebugDLL(dllPath, desc, inputs, cigreParameters, timeStep, nvp)
 % runDebugDLL Run a CIGRE DLL on a parallel worker for VS debugging.
 %
 %   result = cigre.internal.runDebugDLL( ...
-%       dllPath, inputs, cigreParameters, outputs, timeStep)
+%       dllPath, desc, inputs, cigreParameters, timeStep)
 %
 % Spawns a fresh parallel worker, prints the worker's OS PID so the
 % user can attach Visual Studio (Debug > Attach to Process >
@@ -21,18 +21,25 @@ function result = runDebugDLL(dllPath, inputs, cigreParameters, outputs, timeSte
 % Inputs:
 %   dllPath          - absolute path to the debug DLL produced by
 %                      cigre.buildDLL(..., "Debug", true).
+%   desc             - cigre.description.ModelDescription for the
+%                      model (the second output of cigre.buildDLL).
+%                      Used to size the outputs container - see the
+%                      Outputs name-value below.
 %   inputs           - timetable of Inport values; cigre.dll.DataMap
 %                      reads the per-column type and dimensions from it.
 %   cigreParameters  - (1,:) struct array (.Name, .Value) of visible
 %                      CIGRE parameter values.
-%   outputs          - timetable used as a shape allocator for
-%                      cigre.dll.DataMap.create. Pass either a captured
-%                      Simulink baseline (if you want a reference to
-%                      diff against later) or
-%                      cigre.internal.generateOutputsShape(desc, time).
 %   timeStep         - sample step, seconds.
 %
 % Name-Value Arguments:
+%   Outputs         - timetable used as the shape allocator for
+%                     cigre.dll.DataMap.create. Defaults to
+%                     cigre.internal.generateOutputsShape(desc, ...)
+%                     over the retimed input grid (one output row per
+%                     step). Pass a captured Simulink baseline here to
+%                     reuse it instead - the two are interchangeable as
+%                     shape allocators since the DLL overwrites the
+%                     values regardless.
 %   PauseBeforeRun  - if true (default), pause via keyboard after the
 %                     worker is up so the user can attach VS. Set false
 %                     for non-interactive reruns.
@@ -41,10 +48,11 @@ function result = runDebugDLL(dllPath, inputs, cigreParameters, outputs, timeSte
 %                     speed without parfeval declaring the worker stuck.
 arguments
     dllPath (1,1) string
+    desc
     inputs timetable
     cigreParameters (1,:) struct
-    outputs
     timeStep (1,1) double
+    nvp.Outputs = []
     nvp.PauseBeforeRun (1,1) logical = true
     nvp.WaitTimeout (1,1) double = 86400
 end
@@ -58,6 +66,18 @@ end
 dllDir = string(dllDir);
 dllName = string(dllBase);
 
+% The DLL runner needs an outputs container purely as a shape
+% allocator for cigre.dll.DataMap.create. Default it from the model
+% description over the retimed input grid so the row count matches the
+% step count exactly; a caller with a captured Simulink baseline can
+% override via Outputs.
+if isempty(nvp.Outputs)
+    retimed = retime(inputs, 'regular', 'nearest', 'TimeStep', seconds(timeStep));
+    outputs = cigre.internal.generateOutputsShape(desc, retimed.Properties.RowTimes);
+else
+    outputs = nvp.Outputs;
+end
+
 % Sanity-check the step count before any parallel-pool work; a zero-row
 % outputs container would silently make the parfeval body load and
 % initialise the DLL but never call Model_Outputs, which is impossible
@@ -65,7 +85,7 @@ dllName = string(dllBase);
 nSteps = size(outputs, 1);
 if nSteps == 0
     error("CIGRE:runDebugDLL:NoSteps", ...
-        "outputs timetable has 0 rows - the DLL would be loaded and initialised but no step would execute. Check that the time vector / outputs shape were populated correctly upstream.");
+        "outputs timetable has 0 rows - the DLL would be loaded and initialised but no step would execute. Check that the inputs / timeStep produced a non-empty grid.");
 end
 
 % Tear down any existing pool so the worker reloads the (possibly
