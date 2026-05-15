@@ -37,7 +37,13 @@ end
 addpath(dllDir);
 
 cigreDll = cigre.dll.CigreDLL(dllName);
-cObj = cigreDll.load(); %#ok<NASGU>
+
+% CigreDLL.load returns an unload handle. Wrap it in onCleanup so the
+% library is unloaded when this function exits - on the normal path
+% and on error. Without the unload the parfeval worker keeps the DLL
+% mapped, locking the file so it cannot be rebuilt without killing
+% the worker (or restarting MATLAB).
+unloadDll = onCleanup(cigreDll.load()); %#ok<NASGU>
 
 inputs = retime(inputs, 'regular', 'nearest', 'TimeStep', seconds(timeStep));
 inputsCell = table2cell(timetable2table(inputs));
