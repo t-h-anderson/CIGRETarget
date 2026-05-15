@@ -1,13 +1,14 @@
 function baseline = captureSimulinkBaseline(mdlName, inputs, simulinkParameters, stopTime, timeStep)
 % captureSimulinkBaseline Run a Simulink model and return the output timetable.
 %
-%   baseline = cigre.internal.captureSimulinkBaseline( ...
+%   baseline = cigre.util.captureSimulinkBaseline( ...
 %       mdlName, inputs, simulinkParameters, stopTime, timeStep)
 %
-% Used both by the test suite (to produce a reference baseline that DLL
-% output is compared against) and by cigre.buildDLL(Debug=true) to
-% give super users a Simulink-derived reference when debugging the DLL
-% in Visual Studio.
+% Runs the wrapper model with the supplied Inport data and
+% InstanceParameters, and returns the extractData() output timetable.
+% Used by the test suite to produce a reference baseline that DLL
+% output is compared against, and available generally as a way to get
+% a Simulink-derived reference for a model run.
 %
 % Inputs:
 %   mdlName            - the wrapper model name (e.g. "<Model>_wrap").

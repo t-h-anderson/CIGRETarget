@@ -314,7 +314,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             end
 
             testCase.tempLoad(mdlName);
-            baseline = cigre.internal.captureSimulinkBaseline(mdlName, ...
+            baseline = cigre.util.captureSimulinkBaseline(mdlName, ...
                 testCase.Inputs, testCase.SimulinkParameters, ...
                 testCase.SimTime, testCase.TimeStep);
             testCase.Outputs = baseline;
@@ -528,112 +528,8 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 parameterConfig (1,1) cigre.config.ParameterConfiguration
             end
 
-            testCase.SimulinkParameters = struct("Name", {}, "Value", {});
-            testCase.CIGREParameters = struct("Name", {}, "Value", {});
-
-            % Build SimulinkParameters from the top-level parameter tree using model defaults
-            simulinkParams = desc.Parameters;
-            for i = 1:numel(simulinkParams)
-                simulinkParam = simulinkParams(i);
-                c = simulinkParam.BaseType;
-                simulinkVal = simulinkParam.DefaultValue;
-                try
-                    simulinkVal = cast(simulinkVal, c);
-                catch
-                    % Not castable, e.g. a struct — leave as-is
-                end
-                testCase.SimulinkParameters(i) = struct("Name", simulinkParam.SimulinkName, "Value", simulinkVal);
-            end
-
-            % Apply effective defaults from the config to SimulinkParameters so the
-            % Simulink baseline uses the same values as the DLL — including values
-            % that are hardcoded for hidden parameters
-            allCigreParams = desc.CIGREParameters;
-            [visibleParams, hiddenParams] = parameterConfig.partitionParameters(allCigreParams);
-
-            allEffectiveParams = [visibleParams, hiddenParams];
-            for i = 1:numel(allEffectiveParams)
-                p = allEffectiveParams(i);
-                testCase.SimulinkParameters = testCase.applyEffectiveDefault(testCase.SimulinkParameters, p.SimulinkName, p.DefaultValue);
-            end
-
-            % CIGREParameters contains only visible parameters with effective defaults,
-            % since hidden parameters are hardcoded in the DLL and absent from its interface
-            for j = 1:numel(visibleParams)
-                cigreParam = visibleParams(j);
-                cigreVal = cigreParam.DefaultValue;
-                try
-                    if cigreParam.BaseType == "boolean"
-                        cigreVal = boolean(cigreVal);
-                    else
-                        cigreVal = cast(cigreVal, cigreParam.BaseType);
-                    end
-                catch
-                    warning("Could not cast CIGRE parameter " + cigreParam.CIGREName + " to type " + cigreParam.BaseType);
-                end
-                testCase.CIGREParameters(end+1) = struct("Name", cigreParam.CIGREName, "Value", cigreVal);
-            end
-        end
-
-    end
-
-    methods (Access = private, Static)
-
-        function simulinkParams = applyEffectiveDefault(simulinkParams, cigreSimulinkName, effectiveDefault)
-            % Update the SimulinkParameters entry that corresponds to a flat CIGRE
-            % SimulinkName. The root variable name (before the first '.' or '[')
-            % identifies the entry; the remainder identifies the element to update.
-            arguments
-                simulinkParams  (1,:) struct
-                cigreSimulinkName (1,1) string
-                effectiveDefault (1,1) double
-            end
-
-            bracketPos = strfind(cigreSimulinkName, "[");
-            dotPos = strfind(cigreSimulinkName, ".");
-            splitPos = min([bracketPos, dotPos, strlength(cigreSimulinkName) + 1]);
-            % Pad with a trailing space so extractBefore returns the full
-            % name when the split index points past the end.
-            rootName = extractBefore(cigreSimulinkName + " ", splitPos);
-
-            entryIdx = find(string({simulinkParams.Name}) == rootName, 1);
-            if isempty(entryIdx)
-                return
-            end
-
-            currentValue = simulinkParams(entryIdx).Value;
-
-            if ~isempty(bracketPos) && (isempty(dotPos) || bracketPos(1) < dotPos(1))
-                % Array element, e.g. "p1[2]". The bracketed index is
-                % zero-based (it came from the generated C code).
-                zeroBasedIndex = str2double(extractBetween(cigreSimulinkName, "[", "]"));
-                currentValue(zeroBasedIndex + 1) = cast(effectiveDefault, class(currentValue));
-            elseif ~isempty(dotPos)
-                fieldPath = extractAfter(cigreSimulinkName, ".");
-                currentValue = test.system.tGenerateCigre.setNestedField(currentValue, fieldPath, effectiveDefault);
-            else
-                currentValue = cast(effectiveDefault, class(currentValue));
-            end
-
-            simulinkParams(entryIdx).Value = currentValue;
-        end
-
-        function s = setNestedField(s, fieldPath, value)
-            % Recursively set a value in a nested struct given a dot-separated field path
-            arguments
-                s
-                fieldPath (1,1) string
-                value     (1,1) double
-            end
-
-            dotPos = strfind(fieldPath, ".");
-            if isempty(dotPos)
-                s.(fieldPath) = cast(value, class(s.(fieldPath)));
-            else
-                head = extractBefore(fieldPath, dotPos(1));
-                tail = extractAfter(fieldPath, dotPos(1));
-                s.(head) = test.system.tGenerateCigre.setNestedField(s.(head), tail, value);
-            end
+            [testCase.SimulinkParameters, testCase.CIGREParameters] = ...
+                cigre.internal.resolveParameters(desc, parameterConfig);
         end
 
     end

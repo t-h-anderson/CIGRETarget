@@ -4,10 +4,10 @@ function [simulinkParameters, cigreParameters] = resolveParameters(desc, paramCo
 %   [simulinkParameters, cigreParameters] = ...
 %       cigre.internal.resolveParameters(desc, paramConfig)
 %
-% Parallel of test.system.tGenerateCigre.gatherParameters but
-% parameterised purely on the model description and a
-% cigre.config.ParameterConfiguration (no testCase state). Both
-% structs are arrays of (.Name, .Value).
+% Derives both parameter struct arrays purely from the model
+% description and a cigre.config.ParameterConfiguration; the test
+% suite's gatherParameters delegates here. Both returns are arrays of
+% (.Name, .Value).
 %
 %   simulinkParameters - every Simulink parameter the wrapper exposes,
 %                        each carrying the effective default after
