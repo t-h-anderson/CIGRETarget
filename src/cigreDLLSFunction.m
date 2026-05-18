@@ -132,30 +132,40 @@ end
 
     info = cigre.importer.ModelInfo.fromDLL(dllPath);
 
-    alias = loadDLLForSim(dllPath, headerPath);
+    alias = loadDLLForSim(block, dllPath, headerPath);
 
-    inputs = buildZeroSignals(info.Inputs);
-    outputs = buildZeroSignals(info.Outputs);
+    % Everything below runs with the DLL loaded. If any of it throws,
+    % Start never reaches the set_param("UserData", ...) call, so
+    % Terminate - which bails early on empty UserData - would leave the
+    % library loaded and the .dll file locked. Unwind the load on
+    % failure so the file can still be rebuilt.
+    try
+        inputs = buildZeroSignals(info.Inputs);
+        outputs = buildZeroSignals(info.Outputs);
 
-    parameters = buildParameters(block, info.Parameters);
+        parameters = buildParameters(block, info.Parameters);
 
-    instance = cigre.dll.InterfaceInstance(inputs, outputs, parameters);
+        instance = cigre.dll.InterfaceInstance(inputs, outputs, parameters);
 
-    % CigreDLL would normally call loadlibrary itself; here the library
-    % is already loaded under a unique alias so the handle is plugged in
-    % directly to avoid a second load.
-    dll = cigre.dll.CigreDLL(dllPath, "Header", headerPath);
-    dll.Name_ = alias;
-    dll.IsLoaded = true;
+        % CigreDLL would normally call loadlibrary itself; here the library
+        % is already loaded under a unique alias so the handle is plugged in
+        % directly to avoid a second load.
+        dll = cigre.dll.CigreDLL(dllPath, "Header", headerPath);
+        dll.Name_ = alias;
+        dll.IsLoaded = true;
 
-    dll.firstCall(instance);
-    calllib(char(alias), "Model_CheckParameters", instance.Instance);
-    dll.initialise(instance);
+        dll.firstCall(instance);
+        calllib(char(alias), "Model_CheckParameters", instance.Instance);
+        dll.initialise(instance);
 
-    userData.dll = dll;
-    userData.instance = instance;
-    userData.info = info;
-    set_param(block.BlockHandle, "UserData", userData)
+        userData.dll = dll;
+        userData.instance = instance;
+        userData.info = info;
+        set_param(block.BlockHandle, "UserData", userData)
+    catch startErr
+        unloadIfLoaded(alias);
+        rethrow(startErr);
+    end
 end
 
 function Outputs(block)
@@ -203,6 +213,16 @@ end
         % throws but there is nothing useful to do.
     end
 
+    % Release the instance's libpointers before unloading. unloadlibrary
+    % refuses ("Cannot unload a library that has outstanding objects")
+    % while any libpointer into the library is still alive - here the
+    % s_IEEE_Cigre_DLLInterface_Instance libstruct held by the instance.
+    try
+        instance.clear();
+    catch
+        % Best-effort: a clear failure must not abort Terminate.
+    end
+
     dll.unload();
     set_param(block.BlockHandle, "UserData", userData);
 end
@@ -227,8 +247,9 @@ end
     end
 end
 
-function alias = loadDLLForSim(dllPath, headerPath)
+function alias = loadDLLForSim(block, dllPath, headerPath)
 arguments
+    block (1,1)
     dllPath (1,1) string
     headerPath (1,1) string
 end
@@ -239,8 +260,14 @@ end
 % to nothing before including the real header.
     cigreSrc = fullfile(cigreRoot(), "src", "CIGRESource");
     [~, base] = fileparts(dllPath);
+    % The alias is deterministic per block (keyed on the block handle)
+    % rather than random. That keeps two blocks referencing the same
+    % DLL from colliding, while also letting the unloadIfLoaded below
+    % clear a load this same block leaked on an earlier run - e.g. a
+    % sim that errored before Terminate could unload it - so the file
+    % does not stay locked across runs.
     alias = "cigredll_" + matlab.lang.makeValidName(base) ...
-            + "_" + cigre.util.uuid();
+            + "_" + matlab.lang.makeValidName(num2str(block.BlockHandle));
     unloadIfLoaded(alias);
 
     [wrapperHeader, headerDir] = cigre.util.sanitiseLoadlibraryHeader(headerPath);

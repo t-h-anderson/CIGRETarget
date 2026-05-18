@@ -45,7 +45,17 @@ classdef CigreDLL < handle
             header = fullfile(src, hfile);
             [wrapperHeader, headerDir] = ...
                 cigre.util.sanitiseLoadlibraryHeader(header);
-            [~, notfound] = loadlibrary(dllName, char(wrapperHeader), ...
+            % loadlibrary's documented signature is
+            %   [notfound, warnings] = loadlibrary(...)
+            % - notfound: cell array of header-declared functions that
+            %   loadlibrary could not bind in the library.
+            % - warnings: char/string with parser warnings.
+            % Capture notfound (the meaningful output) and discard
+            % warnings; the inverse order was a long-standing bug that
+            % only surfaced when the validator inside
+            % assertCigreLibraryLoaded started rejecting the (string)
+            % warnings value.
+            [notfound, ~] = loadlibrary(dllName, char(wrapperHeader), ...
                 "includepath", src, ...
                 "includepath", headerDir, ...
                 "alias", thisDLL);

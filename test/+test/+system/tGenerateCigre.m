@@ -186,7 +186,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             % referenced submodels) to auto-detect; the wrapper copies
             % this config so the override propagates into the build.
             if ~doCompile
-                cleanups = setAutoToolchain(ModelName); %#ok<NASGU>
+                cleanups = test.util.setAutoToolchain(ModelName); %#ok<NASGU>
             end
 
             here = pwd;
@@ -197,7 +197,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                     "BusAs", BusAs, ...
                     buildArgs{:}); %#ok<ASGLU>
             catch me
-                if isKnownReleaseLimitation(me)
+                if test.util.isKnownReleaseLimitation(me)
                     testCase.assumeFail("Skipping '" + ModelName + "' on " ...
                         + string(version("-release")) + ": " + me.message);
                     return
@@ -242,26 +242,24 @@ classdef tGenerateCigre < test.util.WithParallelFixture
 
     methods (Test, TestTags = "Manual")
 
-        function tVSBuild(testCase, ModelName, Snapshot, BusAs)
+        function tVSBuild(testCase, ModelName, BusAs)
+            % End-to-end Visual Studio debug build. Tagged Manual because
+            % MSBuild is Windows-only and CI runs on Linux; on a Windows
+            % box this test runs unattended (cigre.buildDLL(Debug=true)
+            % drives MSBuild; cigre.internal.runDebugDLL with
+            % PauseBeforeRun=false skips the VS Attach pause). For an
+            % interactive debug session, call those two entry points by
+            % hand with PauseBeforeRun=true.
 
             testCase.loadData(ModelName);
 
-            import matlab.unittest.fixtures.WorkingFolderFixture
-
-            fixture.Folder = fullfile(cigreRoot, "test", "VS_Build", "VSBuild_" + ModelName);
-            if ~isfolder(fixture.Folder)
-                mkdir(fixture.Folder);
+            workFolder = fullfile(cigreRoot, "test", "VS_Build", "VSBuild_" + ModelName);
+            if ~isfolder(workFolder)
+                mkdir(workFolder);
             end
+            testCase.applyCodeGenFixture(workFolder);
 
-            % Resulting files go in build folder
-            here = pwd;
-            cd(fixture.Folder);
-            testCase.addTeardown(@() cd(here));
-
-            testCase.applyCodeGenFixture(fullfile(pwd));
-
-            % See tBuild: same mechanism for picking up a per-model
-            % parameter config from the working folder.
+            % Same per-model ParameterConfig.xlsx lookup as tBuild.
             modelPath = which(ModelName + ".slx");
             configPath = fullfile(fileparts(modelPath), "ParameterConfig.xlsx");
             buildArgs = {};
@@ -269,64 +267,33 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 buildArgs = {"ParameterConfigFile", configPath};
             end
 
-            % Generate the code only
-            desc = cigre.buildDLL(ModelName, "SkipBuild", true, "BusAs", BusAs, buildArgs{:});
-
+            [desc, dll] = cigre.buildDLL(ModelName, ...
+                "Debug", true, ...
+                "BusAs", BusAs, ...
+                "CodeGenFolder", string(workFolder), ...
+                buildArgs{:});
             testCase.ModelDescription = desc;
 
             testCase.defineInputsAndParameters(desc);
-
-            % Wrapper IO and baseline should match Simulink
             baseline = testCase.captureBaseline(desc.CIGREInterfaceName);
 
-            % Build manually in Visual Studio following the instruction herein
-            dll = testCase.doVSBuild(ModelName);
-
-            % Extract the dll and header
-            addpath(fullfile(pwd, "x64", "Debug"));
-            addpath(fullfile(pwd, "slprj"));
-
-            doRun = @() runDLL(testCase, dll, Snapshot, "VSBuild", true, "TwoData", false);
-
-            result = testCase.runParallel(doRun, "PauseBeforeRun", true);
+            % runDebugDLL introspects the DLL header for sample time and
+            % port layout; it only needs the inputs and parameters here.
+            result = cigre.internal.runDebugDLL(dll, ...
+                "Inputs", testCase.Inputs, ...
+                "Parameters", testCase.CIGREParameters, ...
+                "PauseBeforeRun", false);
 
             baseline = timetable2table(baseline, 'ConvertRowTimes', false);
             baseline.Properties.VariableNames = result.Properties.VariableNames;
             baseline.Properties.VariableContinuity = [];
 
             testCase.verifyEqual(result, baseline, "RelTol", 1e-10)
-
         end
 
     end
 
     methods
-
-        function dll = doVSBuild(testCase, modelName)
-            arguments
-                testCase
-                modelName (1,1) string
-            end
-
-            dll = modelName + "_CIGRE.dll";
-            clipboard("copy", dll);
-
-            src = fullfile(cigreRoot, "src\CIGRESource");
-            clipboard("copy", src);
-
-            % manually create in VS
-            fld =  fullfile(cigreRoot(), "\src\CIGRESource;");
-            fld = fld + genpath(pwd + "\slprj\cigre\");
-            fld = fld + fullfile(pwd + "\slprj\ert\_sharedutils") + ";";
-            fld = fld + fullfile(matlabroot, "extern", "include")+";";
-            fld = fld + fullfile(matlabroot, "simulink", "include") + ";";
-            fld = fld + fullfile(matlabroot, "rtw\c\src") + ";";
-            fld = fld + fullfile(pwd, modelName + "_wrap_cigre_rtw");
-            %clipboard("copy", fld);
-
-            keyboard %#ok<KEYBOARDFUN>
-
-        end
 
         function defineInputsAndParameters(testCase, desc, nvp)
             arguments
@@ -349,16 +316,10 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             end
 
             testCase.tempLoad(mdlName);
-            simIn = Simulink.SimulationInput(mdlName);
-
-            simIn = testCase.configureInputs(simIn, mdlName);
-            simIn = testCase.configureParameters(simIn, mdlName);
-
-            simIn = setModelParameter(simIn, "StopTime", string(testCase.SimTime), ...
-                "FixedStep", string(testCase.TimeStep));
-
-            baseline = testCase.runSimulationAndCapture(simIn);
-
+            baseline = cigre.util.captureSimulinkBaseline(mdlName, ...
+                testCase.Inputs, testCase.SimulinkParameters, ...
+                testCase.SimTime, testCase.TimeStep);
+            testCase.Outputs = baseline;
         end
 
         function result = runDLL(testCase, dllName, snapshot, nvp)
@@ -366,7 +327,6 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 testCase
                 dllName (1,1) string
                 snapshot (1,1) logical = true
-                nvp.VSBuild (1,1) logical = false
                 nvp.TwoData (1,1) logical = true
             end
 
@@ -546,38 +506,11 @@ classdef tGenerateCigre < test.util.WithParallelFixture
             end
 
             time = testCase.Time;
-            inputs = desc.Inputs;
 
             testCase.Inputs = {};
 
             if isempty(testCase.InputData)
-                input = cell(1, numel(inputs));
-                for i = 1:numel(inputs)
-                    c = inputs(i).BaseType;
-
-                    d = inputs(i).Dimensions;
-                    if isscalar(d)
-                        d = [d, 1];
-                    end
-                    thisVal = ones(d);
-
-                    if c == "boolean"
-                        iVal = (thisVal ~= 0);
-                    else
-                        iVal = cast(i * thisVal, c);
-                    end
-
-                    % This supports matrices
-                    iVals = repelem({iVal}, numel(time), 1);
-                    iVals = cat(3, iVals{:});
-                    iVals = permute(iVals, [3,1,2]);
-
-                    % timetable/table constructors require their N-V
-                    % pair names as char vectors in legacy syntax.
-                    input{i} = timetable(iVals, 'RowTimes', time, 'VariableNames', "Var" + i);
-                end
-
-                input = [input{:}];
+                input = cigre.internal.generateDefaultInputs(desc, time);
             else
                 input = testCase.InputData;
             end
@@ -597,299 +530,10 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 parameterConfig (1,1) cigre.config.ParameterConfiguration
             end
 
-            testCase.SimulinkParameters = struct("Name", {}, "Value", {});
-            testCase.CIGREParameters = struct("Name", {}, "Value", {});
-
-            % Build SimulinkParameters from the top-level parameter tree using model defaults
-            simulinkParams = desc.Parameters;
-            for i = 1:numel(simulinkParams)
-                simulinkParam = simulinkParams(i);
-                c = simulinkParam.BaseType;
-                simulinkVal = simulinkParam.DefaultValue;
-                try
-                    simulinkVal = cast(simulinkVal, c);
-                catch
-                    % Not castable, e.g. a struct — leave as-is
-                end
-                testCase.SimulinkParameters(i) = struct("Name", simulinkParam.SimulinkName, "Value", simulinkVal);
-            end
-
-            % Apply effective defaults from the config to SimulinkParameters so the
-            % Simulink baseline uses the same values as the DLL — including values
-            % that are hardcoded for hidden parameters
-            allCigreParams = desc.CIGREParameters;
-            [visibleParams, hiddenParams] = parameterConfig.partitionParameters(allCigreParams);
-
-            allEffectiveParams = [visibleParams, hiddenParams];
-            for i = 1:numel(allEffectiveParams)
-                p = allEffectiveParams(i);
-                testCase.SimulinkParameters = testCase.applyEffectiveDefault(testCase.SimulinkParameters, p.SimulinkName, p.DefaultValue);
-            end
-
-            % CIGREParameters contains only visible parameters with effective defaults,
-            % since hidden parameters are hardcoded in the DLL and absent from its interface
-            for j = 1:numel(visibleParams)
-                cigreParam = visibleParams(j);
-                cigreVal = cigreParam.DefaultValue;
-                try
-                    if cigreParam.BaseType == "boolean"
-                        cigreVal = boolean(cigreVal);
-                    else
-                        cigreVal = cast(cigreVal, cigreParam.BaseType);
-                    end
-                catch
-                    warning("Could not cast CIGRE parameter " + cigreParam.CIGREName + " to type " + cigreParam.BaseType);
-                end
-                testCase.CIGREParameters(end+1) = struct("Name", cigreParam.CIGREName, "Value", cigreVal);
-            end
-        end
-
-        function simIn = configureInputs(testCase, simIn, mdlName)
-            arguments
-                testCase
-                simIn
-                mdlName (1,1) string
-            end
-
-            try
-                if verLessThan("MATLAB", "25.1") %#ok<VERLESSMATLAB>
-                    inDS = createInputDataset(mdlName);
-                else
-                    inDS = createInputDataset(mdlName, "UpdateDiagram", false);
-                end
-                nInputs = numel(inDS.getElementNames());
-            catch me
-                % errors if no inputs
-                if me.identifier == "sl_sta:editor:modelNoExternalInterface"
-                    nInputs = 0;
-                else
-                    rethrow(me)
-                end
-            end
-
-            testCase.assertTrue(size(testCase.Inputs, 2) == nInputs, "Number of test inputs does not match model");
-
-            if nInputs == 0
-                return
-            end
-
-            for i = 1:nInputs
-                input = testCase.Inputs(:, i);
-
-                if istimetable(input)
-                    vals = input.Variables;
-                    if numel(size(vals)) > 2
-                        % With e.g. t times points, an input of t x m x n
-                        % needs permuting to m x n x t
-                        vals = permute(vals, [(2:numel(size(vals))), 1]);
-                    end
-                    input = timeseries(vals, seconds(input.Time));
-                    input = input.setinterpmethod("nearest");
-                    input = input.setuniformtime("StartTime", 0, "EndTime", seconds(max(testCase.Inputs.Time(end))));
-                    input.Name = testCase.Inputs.Properties.VariableNames{i};
-                end
-                inDS{i} = input;
-            end
-
-            simIn = simIn.setExternalInput(inDS);
-        end
-
-        function simIn = configureParameters(testCase, simIn, mdlName)
-            arguments
-                testCase
-                simIn
-                mdlName (1,1) string
-            end
-
-            params = testCase.SimulinkParameters;
-
-            ip = get_param(simIn.ModelName + "/mdl", "InstanceParameters");
-            for i = 1:numel(params)
-                name = testCase.SimulinkParameters(i).Name;
-                val = testCase.SimulinkParameters(i).Value;
-                val = char(util.valToString(val)); % Parameter value needs to be a char on the input object
-                idx = (string({ip.Name}) == name);
-                if any(idx)
-                    ip(idx).Value = val;
-                else
-                    % In model workspace
-                    mdl = erase(mdlName, "_wrap");
-                    param = util.findParam(mdl, name);
-                    if isa(param, "Simulink.data.dictionary.Entry")
-                        simIn = simIn.setVariable(name, eval(val));
-                    elseif isfield(param, "Value") || isprop(param, "Value")
-                        param.Value = eval(val);
-                        simIn = simIn.setVariable(name, param, "Workspace", mdl);
-                    else
-                        param = eval(value);
-                        simIn = simIn.setVariable(name, param, "Workspace", mdl);
-                    end
-                end
-            end
-
-            if ~isempty(ip)
-                % Newer MATLAB releases renamed the Path field on
-                % InstanceParameters to FullPath; rename in-place so the
-                % set works across versions.
-                ipNew = arrayfun(@(x) renameStructField(x, "Path", "FullPath"), ip);
-                simIn = simIn.setBlockParameter(simIn.ModelName + "/mdl", "InstanceParameters", ipNew);
-            end
-        end
-
-        function baseline = runSimulationAndCapture(testCase, simIn)
-            arguments
-                testCase
-                simIn
-            end
-
-            results = sim(simIn);
-            if isempty(results.yout{1}.Values.Data)
-                % R2025a occasionally returns empty yout on the first
-                % sim call for some models; re-running produces results.
-                results = sim(simIn);
-            end
-
-            baseline = extractData(results);
-            testCase.Outputs = baseline;
+            [testCase.SimulinkParameters, testCase.CIGREParameters] = ...
+                cigre.internal.resolveParameters(desc, parameterConfig);
         end
 
     end
 
-    methods (Access = private, Static)
-
-        function simulinkParams = applyEffectiveDefault(simulinkParams, cigreSimulinkName, effectiveDefault)
-            % Update the SimulinkParameters entry that corresponds to a flat CIGRE
-            % SimulinkName. The root variable name (before the first '.' or '[')
-            % identifies the entry; the remainder identifies the element to update.
-            arguments
-                simulinkParams  (1,:) struct
-                cigreSimulinkName (1,1) string
-                effectiveDefault (1,1) double
-            end
-
-            bracketPos = strfind(cigreSimulinkName, "[");
-            dotPos = strfind(cigreSimulinkName, ".");
-            splitPos = min([bracketPos, dotPos, strlength(cigreSimulinkName) + 1]);
-            % Pad with a trailing space so extractBefore returns the full
-            % name when the split index points past the end.
-            rootName = extractBefore(cigreSimulinkName + " ", splitPos);
-
-            entryIdx = find(string({simulinkParams.Name}) == rootName, 1);
-            if isempty(entryIdx)
-                return
-            end
-
-            currentValue = simulinkParams(entryIdx).Value;
-
-            if ~isempty(bracketPos) && (isempty(dotPos) || bracketPos(1) < dotPos(1))
-                % Array element, e.g. "p1[2]". The bracketed index is
-                % zero-based (it came from the generated C code).
-                zeroBasedIndex = str2double(extractBetween(cigreSimulinkName, "[", "]"));
-                currentValue(zeroBasedIndex + 1) = cast(effectiveDefault, class(currentValue));
-            elseif ~isempty(dotPos)
-                fieldPath = extractAfter(cigreSimulinkName, ".");
-                currentValue = test.system.tGenerateCigre.setNestedField(currentValue, fieldPath, effectiveDefault);
-            else
-                currentValue = cast(effectiveDefault, class(currentValue));
-            end
-
-            simulinkParams(entryIdx).Value = currentValue;
-        end
-
-        function s = setNestedField(s, fieldPath, value)
-            % Recursively set a value in a nested struct given a dot-separated field path
-            arguments
-                s
-                fieldPath (1,1) string
-                value     (1,1) double
-            end
-
-            dotPos = strfind(fieldPath, ".");
-            if isempty(dotPos)
-                s.(fieldPath) = cast(value, class(s.(fieldPath)));
-            else
-                head = extractBefore(fieldPath, dotPos(1));
-                tail = extractAfter(fieldPath, dotPos(1));
-                s.(head) = test.system.tGenerateCigre.setNestedField(s.(head), tail, value);
-            end
-        end
-
-    end
-
-end
-
-function cleanups = setAutoToolchain(modelName)
-% setAutoToolchain Switch the top model and every referenced submodel
-% to auto-detected toolchain. Returns an array of onCleanup objects
-% that keep the affected systems loaded for the lifetime of the test;
-% releasing them lets bdclose run unimpeded at teardown.
-arguments
-    modelName (1,1) string
-end
-
-[~, cTop] = util.loadSystem(modelName);
-overrideToolchain(modelName);
-
-refs = string(find_mdlrefs(modelName));
-cleanups = {cTop};
-for i = 1:numel(refs)
-    if refs(i) == modelName
-        continue
-    end
-    [~, cRef] = util.loadSystem(refs(i));
-    overrideToolchain(refs(i));
-    cleanups{end+1} = cRef; %#ok<AGROW>
-end
-end
-
-function overrideToolchain(modelName)
-% Apply the auto-detect override, then clear the dirty flag so the
-% wrapper's save_system isn't blocked by SaveSystemWithDirtyReferencedModels.
-% The in-memory override still takes effect; we just don't want Simulink
-% to think the file on disk needs rewriting.
-%
-% When the model's active config is a reference (Simulink.ConfigSetRef),
-% set_param on the model name fails with ConfigSetRef_SetParamNotAllowed;
-% reach through to the underlying Simulink.ConfigSet and update there
-% instead. Several models in test/models/ (NestedBus, Test_CP*) use this
-% shape because they share a referenced config set with their submodels.
-cs = getActiveConfigSet(modelName);
-if ~isa(cs, "Simulink.ConfigSet")
-    cs = cs.getRefConfigSet();
-end
-set_param(cs, "Toolchain", "Automatically locate an installed toolchain");
-
-% UpdateModelReferenceTargets is being removed in a future release;
-% MATLAB warns at every build when the saved value is anything other
-% than "IfOutOfDate". Normalise it now so CI logs aren't full of the
-% deprecation warning.
-try
-    set_param(cs, "UpdateModelReferenceTargets", "IfOutOfDate");
-catch
-    % Parameter or value missing on older releases - safe to skip.
-end
-
-set_param(modelName, "Dirty", "off");
-end
-
-
-function tf = isKnownReleaseLimitation(me)
-% Heuristic for "this codegen failure is a documented R2020b shortcoming
-% the test cannot work around without re-implementing per-release support
-% in the production code". The caller treats matches as assumeFail rather
-% than failure, so the test reports Incomplete in the CI summary.
-%
-% Current entries:
-%
-%   Simulink:modelReference:ParamIntf_UngroupedArgument
-%     Triggered when a model uses Model-block argument parameters whose
-%     storage class isn't set to a per-instance class. R2021a+ handles
-%     this via coder.mapping.utils.create + setDataDefault("MultiInstance")
-%     in createBusExplodedWrapper; R2020b lacks the "MultiInstance"
-%     storage value and the try/catch around that call silently skips it,
-%     leaving the parameter at "Auto" which tlc_c rejects.
-knownIds = [
-    "Simulink:modelReference:ParamIntf_UngroupedArgument"
-];
-tf = any(string(me.identifier) == knownIds);
 end

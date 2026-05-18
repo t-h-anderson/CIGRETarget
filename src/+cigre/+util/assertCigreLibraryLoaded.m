@@ -14,7 +14,21 @@ function assertCigreLibraryLoaded(alias, notfound)
 % the S-Function later.
 arguments
     alias (1,1) string
-    notfound (1,:) cell = {}
+    % loadlibrary returns notfound as a cell, but its shape varies:
+    % {} (0x0) when everything bound, cell(1,N) when N functions were
+    % missing. A (1,:) constraint rejects the 0x0 form, so keep the
+    % type constraint loose and convert defensively below.
+    notfound = {}
+end
+
+if ~iscell(notfound)
+    % Be tolerant of callers that pass a string / char / empty double
+    % - all of those collapse to an empty cell for our purposes.
+    if isempty(notfound)
+        notfound = {};
+    else
+        notfound = cellstr(string(notfound));
+    end
 end
 
 fns = libfunctions(char(alias));

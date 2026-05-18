@@ -9,6 +9,26 @@ arguments
     nvp.WrapSuffix (1,1) string = "_wrap"
     nvp.VectorDataType (1,1) string = "single"
     nvp.ParameterConfigFile (1,1) string = string(NaN)
+    % Debug: when true, the standard nmake build step is replaced by an
+    % MSBuild invocation against an auto-generated .sln/.vcxproj
+    % (Debug | x64 | DynamicLibrary). The DLL (and its PDB) are copied
+    % to the code gen root, matching where the non-Debug build leaves
+    % its DLL. Returns the resolved path of that copy - suitable for
+    % handing to cigre.importDLL or cigre.internal.runDebugDLL -
+    % instead of the bare base name the release path emits.
+    % Windows-only.
+    nvp.Debug (1,1) logical = false
+end
+
+if nvp.Debug
+    if ~ispc
+        error("CIGRE:buildDLL:DebugOnlyOnWindows", ...
+            "Debug=true uses MSBuild on the generated .vcxproj/.sln and is only supported on Windows.");
+    end
+    if nvp.SkipBuild
+        error("CIGRE:buildDLL:DebugAndSkipBuild", ...
+            "Debug=true and SkipBuild=true are mutually exclusive: Debug needs codegen output to compile, SkipBuild stops at codegen.");
+    end
 end
 
 model = modelIn;
@@ -59,11 +79,27 @@ contextPath = fullfile(codeGenFolder, "cigre_build_context.mat");
 save(contextPath, "-struct", "buildContext");
 cleanupContext = onCleanup(@() deleteIfExists(contextPath));
 
-if ~nvp.SkipBuild
+if nvp.Debug
+    % Debug path: codegen only, then drive a VS .sln/.vcxproj through
+    % MSBuild for a Debug | x64 DLL with PDB symbols. The auto-detected
+    % PlatformToolset matches whichever VS is installed (vswhere).
+    buildModel(wrapper);
+    [~, toolset] = cigre.internal.findVSInstallation();
+    slnPath = cigre.internal.writeVSProject(model, codeGenFolder, ...
+        "PlatformToolset", toolset);
+    builtDll = cigre.internal.invokeMSBuild(slnPath, model + "_CIGRE");
+    % MSBuild leaves the DLL under x64\Debug; copy it (and its PDB) up
+    % to the code gen root so it lands where the non-Debug build puts
+    % its DLL, keeping downstream consumers location-agnostic between
+    % the two build flavours.
+    dll = copyToCodeGenRoot(builtDll, codeGenFolder);
+elseif ~nvp.SkipBuild
     cigre.internal.build(wrapper);
+    dll = model + "_CIGRE";
 else
     % SkipBuild: emit code via the hook without invoking the make step.
     buildModel(wrapper);
+    dll = model + "_CIGRE";
 end
 
 % analyseModel already ran inside the build hook, but ModelDescription is
@@ -72,7 +108,6 @@ end
 desc = cigre.description.ModelDescription.analyseModel(model, wrapper, ...
     "CodeGenFolder", codeGenFolder);
 
-dll = model + "_CIGRE";
 c = [];
 
 if nvp.Verbose
@@ -92,4 +127,24 @@ end
     if isfile(path)
         delete(path);
     end
+end
+
+function dllPath = copyToCodeGenRoot(builtDll, codeGenFolder)
+% Copy the freshly built DLL - and its PDB, if present - from the
+% MSBuild x64\Debug output folder up to the code gen root, and return
+% the path of the copy. The PDB travels with the DLL so a debugger
+% attached to the root-folder copy still resolves source lines.
+arguments
+    builtDll (1,1) string
+    codeGenFolder (1,1) string
+end
+
+[srcDir, base, ext] = fileparts(builtDll);
+dllPath = string(fullfile(codeGenFolder, base + ext));
+copyfile(builtDll, dllPath);
+
+pdbSrc = fullfile(srcDir, base + ".pdb");
+if isfile(pdbSrc)
+    copyfile(pdbSrc, fullfile(codeGenFolder, base + ".pdb"));
+end
 end
