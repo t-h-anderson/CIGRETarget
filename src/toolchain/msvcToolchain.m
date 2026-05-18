@@ -52,56 +52,21 @@ toolchainObjectHandle = coder.make.ToolchainInfo( ...
     'SupportedVersion',     compilerVersion, ...
     'Revision',             '1.0' );
 
-switch( compilerVersion ) 
-    case 'Visual C++ 2017'
-        compilers = mex.getCompilerConfigurations('C', 'Installed');
-        mscv2017 = compilers(ismember({compilers(:).Name}', 'Microsoft Visual C++ 2017 (C)'));
-        if isempty(mscv2017)
-            error('An installation of Microsoft Visual C++ 2017 cannot be detected');
-        end
-        compilerPathOperatingSystemEnvironmentVariable  = fullfile(mscv2017.Location);
-        compilerSetUpOperatingSystemCommandRelativeName = '\VC\Auxiliary\Build\vcvarsall.bat';
-        mexOptsFile = '$(MATLAB_ROOT)\bin\$(ARCH)\mexopts\msvc2017.xml';
-        compilerThreadingFlag = '';
-        matlabSetupCommand = [];
-        matlabCleanupCommand = [ ];
-        inlinedCommands = '!include $(MATLAB_ROOT)\rtw\c\tools\vcdefs.mak';
-        toolchainObjectHandle.ShellSetup{1} = 'set "VSCMD_START_DIR=%CD%"';
-        
-    case 'Visual C++ 2019'
-        compilers = mex.getCompilerConfigurations('C', 'Installed');
-        mscv2019 = compilers(ismember({compilers(:).Name}', 'Microsoft Visual C++ 2019 (C)'));
-        if isempty(mscv2019)
-            error('An installation of Microsoft Visual C++ 2019 cannot be detected');
-        end
-        compilerPathOperatingSystemEnvironmentVariable  = fullfile(mscv2019.Location);
-        compilerSetUpOperatingSystemCommandRelativeName = '\VC\Auxiliary\Build\vcvarsall.bat';
-        mexOptsFile = '$(MATLAB_ROOT)\bin\$(ARCH)\mexopts\msvc2019.xml';
-        compilerThreadingFlag = '';
-        matlabSetupCommand = [];
-        matlabCleanupCommand = [ ];
-        inlinedCommands = '!include $(MATLAB_ROOT)\rtw\c\tools\vcdefs.mak';
-        toolchainObjectHandle.ShellSetup{1} = 'set "VSCMD_START_DIR=%CD%"';
-
-    case 'Visual C++ 2022'
-        compilers = mex.getCompilerConfigurations('C', 'Installed');
-        mscv2022 = compilers(ismember({compilers(:).Name}', 'Microsoft Visual C++ 2022 (C)'));
-        if isempty(mscv2022)
-            error('An installation of Microsoft Visual C++ 2022 cannot be detected');
-        end
-        compilerPathOperatingSystemEnvironmentVariable  = fullfile(mscv2022.Location);
-        compilerSetUpOperatingSystemCommandRelativeName = '\VC\Auxiliary\Build\vcvarsall.bat';
-        mexOptsFile = '$(MATLAB_ROOT)\bin\$(ARCH)\mexopts\msvc2022.xml';
-        compilerThreadingFlag = '';
-        matlabSetupCommand = [];
-        matlabCleanupCommand = [ ];
-        inlinedCommands = '!include $(MATLAB_ROOT)\rtw\c\tools\vcdefs.mak';
-        toolchainObjectHandle.ShellSetup{1} = 'set "VSCMD_START_DIR=%CD%"';
-        
-    otherwise
-        errorMessage = "Version " + compilerVersion + " is not supported.";
-        error( errorMessage );
+year = extractAfter(compilerVersion, "Visual C++ ");
+compilerName = char("Microsoft Visual C++ " + year + " (C)");
+compilers = mex.getCompilerConfigurations('C', 'Installed');
+matchedCompiler = compilers(ismember({compilers(:).Name}', compilerName));
+if isempty(matchedCompiler)
+    error("An installation of Microsoft Visual C++ " + year + " cannot be detected");
 end
+compilerPathOperatingSystemEnvironmentVariable  = fullfile(matchedCompiler.Location);
+compilerSetUpOperatingSystemCommandRelativeName = '\VC\Auxiliary\Build\vcvarsall.bat';
+mexOptsFile = char("$(MATLAB_ROOT)\bin\$(ARCH)\mexopts\msvc" + year + ".xml");
+compilerThreadingFlag = '';
+matlabSetupCommand = [];
+matlabCleanupCommand = [ ];
+inlinedCommands = '!include $(MATLAB_ROOT)\rtw\c\tools\vcdefs.mak';
+toolchainObjectHandle.ShellSetup{1} = 'set "VSCMD_START_DIR=%CD%"';
 
 % VCVARS
 % Issue: VS---COMNTOOLS may or may not have a file separator in the end. How

@@ -6,7 +6,23 @@ arguments
     nvp.VectorDataType (1,1) string = "single"
 end
 
-[mdlh, cMdl] = util.loadSystem(model); %#ok<ASGLU>
+[wrapperName, mdlh, mdlRef, cMdl, cWrap] = setupWrapper(model, nvp, nargout > 1); %#ok<ASGLU>
+processInputPorts(mdlh, wrapperName, nvp);
+processOutputPorts(mdlh, wrapperName, model, nvp);
+Simulink.BlockDiagram.arrangeSystem(wrapperName);
+copyInstanceParameters(mdlRef, model, wrapperName);
+
+end
+
+
+function [wrapperName, mdlh, mdlRef, cMdl, cWrap] = setupWrapper(model, nvp, wantWrapperHandle)
+arguments
+    model (1,1) string
+    nvp struct
+    wantWrapperHandle (1,1) logical
+end
+
+[mdlh, cMdl] = util.loadSystem(model);
 
 wrapperName = model + nvp.NameSuffix;
 bdclose(wrapperName);
@@ -19,7 +35,7 @@ if exist(wrapperName, "file")
 end
 
 new_system(wrapperName);
-if nargout > 1
+if wantWrapperHandle
     [~, cWrap] = util.loadSystem(wrapperName);
 else
     util.loadSystem(wrapperName);
@@ -69,7 +85,10 @@ for i = 1:numel(p)
 end
 set_param(mdlRef, "InstanceParameters", p);
 
-%% Input
+end
+
+
+function processInputPorts(mdlh, wrapperName, nvp)
 % Explode each top-level Inport, replacing buses with either per-signal
 % ports or a single concatenated vector port. Working from the model
 % reference outward keeps the original block ordering on the wrapper.
@@ -109,13 +128,7 @@ for i = 1:numel(inhs)
 
         % The CIGRE ABI carries enums as int32; cast on the inside of the
         % wrapper so the outside port stays a plain integer.
-        c = add_block("simulink/Quick Insert/Signal Attributes/Cast", wrapperName + "/Convert" + name);
-        set_param(c, "OutDataTypeStr", inTypes);
-        l = add_line(wrapperName, "Convert" + name + "/1", "mdl/" + i);
-
-        in = add_block("built-in/Inport", wrapperName + "/" + name);
-        set_param(in, "OutDataTypeStr", "int32");
-        add_line(wrapperName, name + "/1", "Convert" + name + "/" + 1);
+        l = addEnumCastAdapter(wrapperName, name, "input", i, "int32", inTypes);
 
         signalName = inputSignals.SignalName;
         set_param(l, "Name", signalName);
@@ -131,8 +144,10 @@ for i = 1:numel(inhs)
 
 end
 
+end
 
-%% Output
+
+function processOutputPorts(mdlh, wrapperName, model, nvp)
 outh = find_system(mdlh, "SearchDepth", 1, "BlockType", "Outport");
 for i = 1:numel(outh)
 
@@ -142,6 +157,9 @@ for i = 1:numel(outh)
     isEnum = contains(outTypes, "Enum:");
 
     name = get_param(outh(i), "Name");
+
+    outInputSignals = get_param(outh(i), "PortHandles");
+    outputSignals = get_param(outInputSignals.Inport, "SignalHierarchy");
 
     if isBus
 
@@ -164,21 +182,12 @@ for i = 1:numel(outh)
 
         % Mirror of the input-side cast: the wrapper's port is int32, the
         % inside of the model expects the enum class.
-        c = add_block("simulink/Quick Insert/Signal Attributes/Cast", wrapperName + "/Convert" + name);
-        set_param(c, "OutDataTypeStr", "int32");
-        l = add_line(wrapperName, "mdl/" + i, "Convert" + name + "/1");
+        l = addEnumCastAdapter(wrapperName, name, "output", i, "int32", outTypes);
 
-        in = add_block("built-in/Outport", wrapperName + "/" + name);
-        set_param(in, "OutDataTypeStr", "int32");
-        add_line(wrapperName, "Convert" + name + "/" + 1, name + "/1");
-
-        signalName = inputSignals.SignalName;
+        signalName = outputSignals.SignalName;
         set_param(l, "Name", signalName);
 
     else
-
-        outInputSignals = get_param(outh(i), "PortHandles");
-        outputSignals = get_param(outInputSignals.Inport, "SignalHierarchy");
 
         name = cleanName(name);
         add_block("built-in/Outport", wrapperName + "/" + name);
@@ -189,37 +198,41 @@ for i = 1:numel(outh)
     end
 end
 
-Simulink.BlockDiagram.arrangeSystem(wrapperName);
+end
 
+
+function copyInstanceParameters(mdlRef, model, wrapperName)
 ip = get_param(mdlRef, "InstanceParameters");
 
-if ~isempty(ip)
+if isempty(ip)
+    return;
+end
 
-    mws = get_param(model, "ModelWorkspace");
-    p = mws.whos;
-    wws = get_param(wrapperName, "ModelWorkspace");
+mws = get_param(model, "ModelWorkspace");
+p = mws.whos;
+wws = get_param(wrapperName, "ModelWorkspace");
 
-    ipNames = string({ip.Name});
-    for i = 1:numel(p)
-        name = p(i).name;
-        var = mws.getVariable(name);
-        assignin(wws, name, var);
+ipNames = string({ip.Name});
+for i = 1:numel(p)
+    name = p(i).name;
+    var = mws.getVariable(name);
+    assignin(wws, name, var);
 
-        idx = (ipNames == name);
-        if any(idx)
-            % InstanceParameters.Value is a char literal that Simulink
-            % eval's in the wrapper workspace at compile time.
-            ip(idx).Value = char(util.valToString(var.Value));
-        end
+    idx = (ipNames == name);
+    if any(idx)
+        % InstanceParameters.Value is a char literal that Simulink
+        % eval's in the wrapper workspace at compile time.
+        ip(idx).Value = char(util.valToString(var.Value));
     end
-
-    % InstanceParameters' Path field was renamed to FullPath in newer
-    % releases; rename in-place so set_param succeeds across versions.
-    ipNew = arrayfun(@(x) renameStructField(x, {"Path"}, {"FullPath"}), ip);
-    set_param(mdlRef, "InstanceParameters", ipNew);
 end
 
+% InstanceParameters' Path field was renamed to FullPath in newer
+% releases; rename in-place so set_param succeeds across versions.
+ipNew = arrayfun(@(x) renameStructField(x, {"Path"}, {"FullPath"}), ip);
+set_param(mdlRef, "InstanceParameters", ipNew);
+
 end
+
 
 function name = cleanName(name)
 arguments
@@ -228,5 +241,53 @@ end
 
 % Slashes in Simulink block paths are escaped by doubling them.
 name = strrep(name, "/", "//");
+
+end
+
+
+function lineHandle = addEnumCastAdapter(wrapperName, name, direction, mdlPortIdx, externalType, internalType)
+% Wire an enum-typed top-level port through a Cast block so the
+% wrapper's external interface uses externalType while the inside of
+% the model sees internalType. The CIGRE ABI carries enums as int32,
+% so callers pass externalType="int32" and internalType set to the
+% enum class string (e.g. "Enum: MyKind") for input direction.
+%
+% direction:
+%   "input"  - external port is an Inport; data flows
+%              external -> cast -> mdl. Cast outputs internalType.
+%   "output" - external port is an Outport; data flows
+%              mdl -> cast -> external port. Cast outputs externalType.
+%
+% Returns the handle of the line into/out of the model reference
+% (cast->mdl for inputs, mdl->cast for outputs) so the caller can
+% set its Name to the signal name reported by the source port.
+arguments
+    wrapperName (1,1) string
+    name (1,1) string
+    direction (1,1) string {mustBeMember(direction, ["input", "output"])}
+    mdlPortIdx (1,1) double
+    externalType (1,1) string
+    internalType (1,1) string
+end
+
+castName = "Convert" + name;
+castBlock = add_block("simulink/Quick Insert/Signal Attributes/Cast", ...
+    wrapperName + "/" + castName);
+
+if direction == "input"
+    set_param(castBlock, "OutDataTypeStr", internalType);
+    lineHandle = add_line(wrapperName, castName + "/1", "mdl/" + mdlPortIdx);
+
+    portBlock = add_block("built-in/Inport", wrapperName + "/" + name);
+    set_param(portBlock, "OutDataTypeStr", externalType);
+    add_line(wrapperName, name + "/1", castName + "/1");
+else
+    set_param(castBlock, "OutDataTypeStr", externalType);
+    lineHandle = add_line(wrapperName, "mdl/" + mdlPortIdx, castName + "/1");
+
+    portBlock = add_block("built-in/Outport", wrapperName + "/" + name);
+    set_param(portBlock, "OutDataTypeStr", externalType);
+    add_line(wrapperName, castName + "/1", name + "/1");
+end
 
 end

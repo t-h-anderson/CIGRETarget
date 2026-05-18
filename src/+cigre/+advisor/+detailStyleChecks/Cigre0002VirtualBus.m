@@ -26,36 +26,28 @@ classdef Cigre0002VirtualBus < cigre.advisor.common.CustomCheck
                 checkObj
             end
 
-            invalidPorts = {};
+            findOpts = {"SearchDepth", 1};
+            scans = struct( ...
+                'BlockType', {"Inport", "Outport"}, ...
+                'Predicate', {@isNonVirtualBusInport, @isNonVirtualBusOutport}, ...
+                'FindOpts',  {findOpts, findOpts});
 
-            inp = find_system(model, "SearchDepth", 1, "BlockType", "Inport");
-            for idx = 1:numel(inp)
-                if string(get_param(inp{idx}, "BusOutputAsStruct")) == "on"
-                    invalidPorts{end+1} = inp{idx};
-                end
-            end
-
-            outp = find_system(model, "SearchDepth", 1, "BlockType", "Outport");
-            for idx = 1:numel(outp)
-                ph = get_param(outp{idx}, "PortHandles");
-                lh = get_param(ph.Inport, "Line");
-                sph = get_param(lh, "SrcPortHandle");
-                busType = string(get_param(sph, "CompiledBusType"));
-                if busType == "NON_VIRTUAL_BUS"
-                    invalidPorts{end+1} = outp{idx};
-                end
-            end
-
-            description = "Check that there are no non-virtual busses connected to top level input and output ports.";
-            statusPass = "No non-virtual busses found on top level ports.";
-            statusFail = "The following ports have non-virtual busses connected:";
-            recAction = "Ensure busses connected to top level input and output ports are virtual.";
-            if numel(invalidPorts) > 0
-                violationType = "fail";
-            else
-                violationType = "pass";
-            end
-            cigre.advisor.common.CustomCheck.reportResults(checkObj, model, violationType, invalidPorts, description, statusPass, statusFail, recAction);
+            cigre.advisor.common.CustomCheck.reportFromBlockScan(checkObj, model, scans, ...
+                "Check that there are no non-virtual busses connected to top level input and output ports.", ...
+                "No non-virtual busses found on top level ports.", ...
+                "The following ports have non-virtual busses connected:", ...
+                "Ensure busses connected to top level input and output ports are virtual.");
         end
     end
+end
+
+function tf = isNonVirtualBusInport(block)
+    tf = string(get_param(block, "BusOutputAsStruct")) == "on";
+end
+
+function tf = isNonVirtualBusOutport(block)
+    ph = get_param(block, "PortHandles");
+    lh = get_param(ph.Inport, "Line");
+    sph = get_param(lh, "SrcPortHandle");
+    tf = string(get_param(sph, "CompiledBusType")) == "NON_VIRTUAL_BUS";
 end

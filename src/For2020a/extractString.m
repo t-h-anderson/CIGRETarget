@@ -1,10 +1,11 @@
-function val = extractString(str, arg)
+function val = extractString(str, arg, opts)
 arguments
     str
     arg
+    opts.LegacyMatlab (1,1) logical = compat.legacyMatlab()
 end
 
-if verLessThan("MATLAB", "9.9")
+if opts.LegacyMatlab
     if isnumeric(arg)
         val = str{1}(arg);
     else

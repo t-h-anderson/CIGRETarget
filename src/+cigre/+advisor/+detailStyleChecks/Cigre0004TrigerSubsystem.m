@@ -21,26 +21,19 @@ classdef Cigre0004TrigerSubsystem < cigre.advisor.common.CustomCheck
                 checkObj
             end
 
-            violatingBlocks = {};
             % R2020b's find_system rejects strings for these on/off
             % values ("Option 'FollowLinks' must have a value of 'on',
             % 'off' or be a logical scalar"); use char literals.
-            blks = find_system(model, 'FollowLinks', 'on', ...
-                'LookUnderMasks', 'on', 'BlockType', 'TriggerPort');
-            for idx = 1:numel(blks)
-                triggerMode = string(get_param(blks{idx}, "InitialTriggerSignalState"));
-                if triggerMode == "compatibility (no trigger on first evaluation)"
-                    violatingBlocks{end+1} = blks{idx}; %#ok<AGROW>
-                end
-            end
+            scans = struct( ...
+                'BlockType', "TriggerPort", ...
+                'Predicate', @(b) string(get_param(b, "InitialTriggerSignalState")) == "compatibility (no trigger on first evaluation)", ...
+                'FindOpts', {{'FollowLinks', 'on', 'LookUnderMasks', 'on'}});
 
-            description = "Check that no trigger blocks have initial trigger signal state set to compatibility mode.";
-            statusPass = "No trigger blocks using compatibility mode found.";
-            statusFail = "The following blocks have compatibility mode set:";
-            recAction = "Set the blocks initial trigger signal state to zero, positive or negative.";
-            violationType = "fail";
-
-            cigre.advisor.common.CustomCheck.reportResults(checkObj, model, violationType, violatingBlocks, description, statusPass, statusFail, recAction);
+            cigre.advisor.common.CustomCheck.reportFromBlockScan(checkObj, model, scans, ...
+                "Check that no trigger blocks have initial trigger signal state set to compatibility mode.", ...
+                "No trigger blocks using compatibility mode found.", ...
+                "The following blocks have compatibility mode set:", ...
+                "Set the blocks initial trigger signal state to zero, positive or negative.");
         end
     end
 end

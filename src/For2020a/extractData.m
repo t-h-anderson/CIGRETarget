@@ -1,9 +1,10 @@
-function baseline = extractData(results)
+function baseline = extractData(results, opts)
 arguments
     results (1,1)
+    opts.LegacyMatlab (1,1) logical = compat.legacyMatlab()
 end
 
-if verLessThan("MATLAB", "9.9")
+if opts.LegacyMatlab
 
     try
         y = results.yout;

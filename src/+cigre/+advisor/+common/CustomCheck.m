@@ -79,6 +79,43 @@ classdef CustomCheck < handle
             checkObj.setResultDetails(ElementResults);
         end
 
+        function reportFromBlockScan(checkObj, model, scans, description, statusPass, statusFail, recAction)
+            arguments
+                checkObj
+                model (1,1) string
+                scans (1,:) struct
+                description (1,1) string
+                statusPass (1,1) string
+                statusFail (1,1) string
+                recAction (1,1) string
+            end
+            % Run a list of "find one BlockType, filter with a
+            % predicate" scans and report the accumulated violations
+            % through reportResults. Each entry in `scans` must have
+            % BlockType (string), Predicate (function_handle taking a
+            % block path and returning a logical; true means
+            % violation), and FindOpts (cell array of find_system
+            % name/value options).
+            violatingBlocks = {};
+            for ii = 1:numel(scans)
+                blocks = find_system(model, scans(ii).FindOpts{:}, ...
+                    "BlockType", char(scans(ii).BlockType));
+                for jj = 1:numel(blocks)
+                    if scans(ii).Predicate(blocks{jj})
+                        violatingBlocks{end+1} = blocks{jj}; %#ok<AGROW>
+                    end
+                end
+            end
+
+            if isempty(violatingBlocks)
+                vtype = "pass";
+            else
+                vtype = "fail";
+            end
+            cigre.advisor.common.CustomCheck.reportResults(checkObj, model, ...
+                vtype, violatingBlocks, description, statusPass, statusFail, recAction);
+        end
+
         function reportResults(checkObj, model, vtype, violatingBlocks, description, statusPass, statusFail, recAction)
             arguments
                 checkObj
