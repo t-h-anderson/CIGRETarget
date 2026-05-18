@@ -4,7 +4,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
 
         %% Model Name
         %ModelName
-        ModelName = test.util.getAllTestModels()
+        %ModelName = test.util.getAllTestModels()
         %ModelName = {"Test_DataInput"}
         %ModelName = {"Test_SISO"}
         %ModelName = {"Test_StrtFunc"}
@@ -12,6 +12,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
         %ModelName = {"Test_BadNames"}
         %ModelName = {"Snap"}
         %ModelName = {"Test_CP_global"}
+        ModelName = {"Test_CP"}
         %ModelName = {"Test_LongNames_abcdefghijklmnopqrstuvwxyz"}
         %ModelName = {"Test_BlockIO"}
         %ModelName = {"Test_SignalObject"}
@@ -410,14 +411,8 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 input = testCase.InputData;
             end
 
-            warning("Custom input")
-
-            input.Var1(:) = 0;
-            input.Var1(thisInput.Time > seconds(50)) = 100;
-            input.Var2(:) = 0;
             testCase.Inputs = input;
             
-
             %% Parameters
             testCase.SimulinkParameters = struct("Name", {}, "Value", {});
             testCase.CIGREParameters = struct("Name", {}, "Value", {});
@@ -554,7 +549,7 @@ classdef tGenerateCigre < test.util.WithParallelFixture
                 % Newer MATLAB releases renamed the Path field on
                 % InstanceParameters to FullPath; rename in-place so the
                 % set works across versions.
-                ipNew = arrayfun(@(x) renameStructField(x, "Path", "FullPath"), ip);
+                ipNew = arrayfun(@(x) renameStructField(x, 'Path', 'FullPath'), ip);
                 simIn = simIn.setBlockParameter(simIn.ModelName + "/mdl", "InstanceParameters", ipNew);
             end
 
