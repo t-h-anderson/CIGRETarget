@@ -1,19 +1,7 @@
 #include "heap.h"
 
-#pragma warning(push)
-#pragma warning(disable: 4200) /* C99 flexible array member - valid but nonstandard in MSVC */
-typedef struct Heap_ {
-	int32_t max_size;
-	int32_t nr_allocated_buffers;
-	int32_t allocated_size;
-	/* NOTE: on 64-bit MSVC the compiler inserts 4 bytes of padding here before the pointer,
-	 * making sizeof(Heap) == 104, not the 100 that HEAP_HEADER_SIZE defines. Verify
-	 * HEAP_HEADER_SIZE matches sizeof(Heap) if this struct is ever changed. */
-	uint8_t *next_free_buf_start;
-	uint64_t buffer_pointers[HEAP_MAX_NR_BUFFERS];
-	uint8_t start_buffer[];
-} Heap;
-#pragma warning(pop)
+/* The Heap struct and HEAP_HEADER_SIZE live in heap.h so the generated
+ * wrapper can size the IntStates buffer with sizeof(Heap). */
 
 void heap_print(void *heap_base)
 {
@@ -44,7 +32,7 @@ void heap_initialize(void *heap_base, int32_t max_size)
 
 	heap->max_size = max_size;
 	heap->nr_allocated_buffers = 0;
-	heap->allocated_size = HEAP_HEADER_SIZE;
+	heap->allocated_size = (int32_t)HEAP_HEADER_SIZE;
 	heap->next_free_buf_start = &heap->start_buffer[0];
 	for (idx = 0; idx < HEAP_MAX_NR_BUFFERS; idx++) {
 	    heap->buffer_pointers[idx] = 0; 

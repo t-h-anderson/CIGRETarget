@@ -6,7 +6,24 @@
 #include <stdio.h>
 
 #define HEAP_MAX_NR_BUFFERS 10
-#define HEAP_HEADER_SIZE (12+8+(HEAP_MAX_NR_BUFFERS*8))
+
+#pragma warning(push)
+#pragma warning(disable: 4200) /* C99 flexible array member - valid but nonstandard in MSVC */
+typedef struct Heap_ {
+	int32_t max_size;
+	int32_t nr_allocated_buffers;
+	int32_t allocated_size;
+	uint8_t *next_free_buf_start;
+	uint64_t buffer_pointers[HEAP_MAX_NR_BUFFERS];
+	uint8_t start_buffer[];
+} Heap;
+#pragma warning(pop)
+
+/* Actual byte size of the heap header. Using sizeof(Heap) keeps this
+ * correct across architectures: the struct picks up whatever padding the
+ * compiler inserts (104 bytes on 64-bit MSVC, not the 100 a manual field
+ * count gave), so the heap bounds accounting can never under-count. */
+#define HEAP_HEADER_SIZE (sizeof(Heap))
 
 extern void heap_print(void *heap_base);
 extern void heap_initialize(void *heap_base, int32_t max_size);
