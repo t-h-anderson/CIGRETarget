@@ -1,4 +1,5 @@
 #include "heap.h"
+#include <string.h>  /* memset */
 
 /* The Heap struct and HEAP_HEADER_SIZE live in heap.h so the generated
  * wrapper can size the IntStates buffer with sizeof(Heap). */

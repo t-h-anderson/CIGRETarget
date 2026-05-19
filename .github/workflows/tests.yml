@@ -98,3 +98,38 @@ jobs:
           path: artifacts/JunitXMLResults.xml
           reporter: java-junit
           fail-on-error: false
+
+  runtime-compile:
+    name: CIGRE runtime cross-compile (MinGW-w64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MinGW-w64 cross-compilers
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y gcc-mingw-w64
+
+      # Compile-checks the shippable CIGRE C runtime (heap.c,
+      # CIGRE_Defaults.c) for both 32- and 64-bit Windows targets,
+      # catching syntax, header and portability breakage without needing
+      # Windows or MATLAB. It does not cover the generated wrapper:
+      # TemplateWrapper.c carries <<placeholders>> and needs a full
+      # codegen run. Warnings are surfaced in the log for review; only
+      # hard compile errors fail the job.
+      - name: Cross-compile CIGRE runtime sources
+        working-directory: src/CIGRESource
+        run: |
+          flags="-c -O2 -std=c11 -Wall -Wextra -Wno-unknown-pragmas"
+          status=0
+          for cc in x86_64-w64-mingw32-gcc i686-w64-mingw32-gcc; do
+            for src in heap.c CIGRE_Defaults.c; do
+              echo "::group::${cc} ${src}"
+              if ! "${cc}" ${flags} "${src}" -o "/tmp/$(basename "${src}" .c).o"; then
+                echo "::error::${cc} failed to compile ${src}"
+                status=1
+              fi
+              echo "::endgroup::"
+            done
+          done
+          exit "${status}"
