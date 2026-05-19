@@ -421,14 +421,15 @@ arguments
 end
 % Append one heap_malloc / heap_get_address line to the accumulating
 % placeholder lists, using incremental strrep to build up the list.
-% The (void) cast after each declaration suppresses MSVC C4189 for variables
-% that are allocated to reserve heap space but not directly dereferenced.
+% The malloc line null-checks each allocation with CIGRE_REQUIRE_ALLOC
+% (which also references the variable); the restore line keeps a (void)
+% cast to suppress MSVC C4189 for buffers that are not dereferenced.
 type = state.Type;
 ptrs = state.Pointers;
 
 mallocLine = type + ptrs + " " + varName ...
     + " = heap_malloc(&instance->IntStates[0], (int32_t)sizeof(" + type + "));" ...
-    + newline + "    (void)" + varName + ";" ...
+    + newline + "    CIGRE_REQUIRE_ALLOC(" + varName + ", instance);" ...
     + newline + "    <<InternalStatesMalloc>>";
 
 restoreLine = type + ptrs + " " + varName ...

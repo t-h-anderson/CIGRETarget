@@ -89,6 +89,7 @@ __declspec(dllexport) int32_T __cdecl Model_Initialize(IEEE_Cigre_DLLInterface_I
     // The following come from the reference model build of the top level model
     // DW_<<ModelName>>_f_T comes from the reference model build of the top level model
     <<RTMVarType>>* <<RTMStructName>> = heap_malloc(&instance->IntStates[0], (int32_t)sizeof(<<RTMVarType>>));
+    CIGRE_REQUIRE_ALLOC(<<RTMStructName>>, instance);
     <<InternalStatesMalloc>>
 
     // Copy data to a model
