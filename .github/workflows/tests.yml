@@ -98,3 +98,37 @@ jobs:
           path: artifacts/JunitXMLResults.xml
           reporter: java-junit
           fail-on-error: false
+
+  package:
+    name: Package toolbox
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Base MATLAB can package the toolbox, but the licence token is still
+    # supplied so the session starts the same way as the test job rather
+    # than depending on the GitHub-hosted free licence.
+    env:
+      MLM_LICENSE_TOKEN: ${{ secrets.MATLAB_LICENCE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # buildtool and matlab.addons.toolbox.ToolboxOptions need R2023a or
+      # later, so pin a recent release rather than the R2020b test target.
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          release: R2026a
+          cache: true
+
+      # Runs `buildtool package`, the default task in buildfile.m, which
+      # writes the .mltbx installer to the repository root.
+      - name: Build toolbox installer
+        uses: matlab-actions/run-build@v2
+        with:
+          tasks: package
+
+      - name: Upload toolbox installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: toolbox-installer
+          path: "Simulink to CIGRE Export Tool.mltbx"
+          if-no-files-found: error

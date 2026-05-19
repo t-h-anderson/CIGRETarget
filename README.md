@@ -12,13 +12,13 @@ Open MATLAB and load the project:
 open CIGRE.prj
 ```
 
-Generate the toolbox installer:
+Build the toolbox installer with the MATLAB build tool:
 
-```
-open ToolboxPackagingConfiguration.prj
+```matlab
+buildtool package
 ```
 
-Click **Package** to produce `CIGRE.mltbx`, then double-click the `.mltbx` file inside MATLAB to install the toolbox. After installation, close the MATLAB project before using the toolbox.
+This produces `Simulink to CIGRE Export Tool.mltbx`. Double-click the `.mltbx` file inside MATLAB to install the toolbox. After installation, close the MATLAB project before using the toolbox.
 
 *NOTE*: **DO NOT** install the toolbox if you are developing the target. This will cause conflicts.
 
