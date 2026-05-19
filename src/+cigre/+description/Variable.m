@@ -300,7 +300,7 @@ classdef Variable
                 name = erase(imp.ReadExpression, "get_");
             elseif isprop(imp, "ElementIdentifier") && ~isempty(imp.ElementIdentifier)
                 name = imp.ElementIdentifier;
-            elseif isprop(imp, "GraphcalName")
+            elseif isprop(imp, "GraphicalName")
                 name = imp.GraphicalName;
             elseif isprop(imp, "Type")
                 % We want the property name
