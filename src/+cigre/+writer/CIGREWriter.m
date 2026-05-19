@@ -531,7 +531,10 @@ for i = 1:size(intMinMap, 1)
     end
 end
 
-literal = string(value);
+% Generated-code literals are internal values, not human-entered text,
+% so emit them at full double precision. string() would truncate to
+% ~5 significant figures and silently corrupt the value baked into the DLL.
+literal = string(sprintf("%.17g", value));
 end
 
 
@@ -560,7 +563,7 @@ for i = 1:numel(modelArgHidden)
     structName = erase(p.StorageSpecifier, "ModelArgument:");
     paramMaps = paramMaps ...
         + "<<RTMStructName>>->dwork->mdl_InstanceData.rtm." + structName + "->" ...
-        + p.SimulinkName + " = " + string(double(p.DefaultValue)) + ";" + newline;
+        + p.SimulinkName + " = " + formatCNumericLiteral(double(p.DefaultValue)) + ";" + newline;
 end
 
 if isempty(modelArgVisible) && isempty(modelArgHidden)
@@ -597,7 +600,7 @@ for i = 1:numel(globalVisible)
 end
 for i = 1:numel(globalHidden)
     p = globalHidden(i);
-    paramMaps = paramMaps + p.ERTName + " = " + string(double(p.DefaultValue)) + ";" + newline;
+    paramMaps = paramMaps + p.ERTName + " = " + formatCNumericLiteral(double(p.DefaultValue)) + ";" + newline;
 end
 end
 
