@@ -24,7 +24,8 @@ end
 %                 InterfaceInstance, calls Model_FirstCall and
 %                 Model_Initialize, stores state in UserData.
 %   Outputs()   - packs input port data, calls Model_Outputs, unpacks
-%                 output port data.
+%                 output port data. Warns once per simulation if the DLL
+%                 returns fewer values than the block has output ports.
 %   Terminate() - calls Model_Terminate and unloads the DLL.
 
     setup(block);
@@ -161,6 +162,9 @@ end
         userData.dll = dll;
         userData.instance = instance;
         userData.info = info;
+        % Latches once Outputs has warned about an output-count mismatch,
+        % so the warning is shown once per simulation rather than per step.
+        userData.outputWarningIssued = false;
         set_param(block.BlockHandle, "UserData", userData)
     catch startErr
         unloadIfLoaded(alias);
@@ -186,8 +190,25 @@ end
 
     results = dll.step(instance);
 
-    for i = 1:numel(info.Outputs)
-        if i <= numel(results)
+    % A CIGRE-compliant DLL returns one value per declared output port.
+    % If it returns fewer, the surplus ports keep their previous value
+    % (zero on the first step). Warn - rather than error - so a
+    % partially-implemented DLL stays usable during development, and warn
+    % only once per simulation since the mismatch repeats every step.
+    nResults = numel(results);
+    nPorts = numel(info.Outputs);
+    if nResults < nPorts && ~userData.outputWarningIssued
+        warning("CIGRE:cigreDLLSFunction:OutputCountMismatch", ...
+            "CIGRE DLL '%s' returned %d output value(s) but the block " + ...
+            "has %d output port(s). Output port(s) %d-%d keep their " + ...
+            "previous value. This warning is shown once per simulation.", ...
+            info.Name, nResults, nPorts, nResults + 1, nPorts);
+        userData.outputWarningIssued = true;
+        set_param(block.BlockHandle, "UserData", userData);
+    end
+
+    for i = 1:nPorts
+        if i <= nResults
             block.OutputPort(i).Data = castToPort(results{i}, block.OutputPort(i).DatatypeID);
         end
     end

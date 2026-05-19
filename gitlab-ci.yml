@@ -3,7 +3,7 @@ run_tests:
         - linux-matlab
             
     script:
-        - mkdir artifacts
+        - mkdir -p artifacts
         - matlab -batch "runAllTests"
 
     artifacts:

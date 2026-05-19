@@ -55,13 +55,41 @@ elseif isstring(val) || ischar(val)
     str = """" + val + """";
 else
     c = string(class(val));
+    % shortestExact keeps already-short values short (3.14 stays "3.14")
+    % while preserving full precision when it is needed - string() and
+    % num2str() silently truncate to ~5 significant figures.
+    numText = shortestExact(val);
     if c ~= "double"
         % Wrap non-double numeric literals with a cast so the eval'd value
         % round-trips back to the same class (Simulink defaults to double).
-        str = str + c + "(" + val + ")";
+        str = str + c + "(" + numText + ")";
     else
-        str = str + string(val);
+        str = str + numText;
     end
 end
 
+end
+
+
+function txt = shortestExact(val)
+% Shortest decimal text for a numeric scalar that converts back to the
+% exact same value. Integer types are exact as-is; floating-point types
+% get the fewest significant figures that still round-trip, avoiding the
+% precision loss of string() / num2str().
+arguments
+    val (1,1)
+end
+% Integers are always exact - and a saturating cast back to an integer
+% type would falsely accept a too-short string (e.g. for uint8, "3e+02"
+% saturates to 255), so format them directly.
+if isinteger(val)
+    txt = string(val);
+    return
+end
+for precision = 1:17
+    txt = string(sprintf("%.*g", precision, val));
+    if isequaln(str2double(txt), double(val))
+        return
+    end
+end
 end

@@ -241,17 +241,25 @@ classdef CIGREWriter
             % model_reference_types.h include required by some model configurations.
             results = strrep(results, "<<WrapperHeader>>", desc.CIGREInterfaceName + ".h");
 
+            % The two includes are independent: a model may need
+            % model_reference_types.h, the _data.c include, both, or
+            % neither. They must be resolved separately - an earlier
+            % version cleared modelRefHeader in the _data.c else branch,
+            % silently dropping a model_reference_types.h include that
+            % had already been added.
             here = desc.CodeGenFolder;
+            modelRefHeader = "";
             if isfile(fullfile(here, "/slprj/cigre/_sharedutils/model_reference_types.h"))
                 modelRefHeader = "#include ""model_reference_types.h""";
-            else
-                modelRefHeader = "";
             end
 
             if isfile(fullfile(here, desc.CIGREInterfaceName + "_data.c"))
-                modelRefHeader = modelRefHeader + newline + "#include """ + desc.CIGREInterfaceName + "_data.c""";
-            else
-                modelRefHeader = "";
+                dataInclude = "#include """ + desc.CIGREInterfaceName + "_data.c""";
+                if modelRefHeader == ""
+                    modelRefHeader = dataInclude;
+                else
+                    modelRefHeader = modelRefHeader + newline + dataInclude;
+                end
             end
 
             results = strrep(results, "<<model_reference_types>>", modelRefHeader);
@@ -413,14 +421,15 @@ arguments
 end
 % Append one heap_malloc / heap_get_address line to the accumulating
 % placeholder lists, using incremental strrep to build up the list.
-% The (void) cast after each declaration suppresses MSVC C4189 for variables
-% that are allocated to reserve heap space but not directly dereferenced.
+% The malloc line null-checks each allocation with CIGRE_REQUIRE_ALLOC
+% (which also references the variable); the restore line keeps a (void)
+% cast to suppress MSVC C4189 for buffers that are not dereferenced.
 type = state.Type;
 ptrs = state.Pointers;
 
 mallocLine = type + ptrs + " " + varName ...
     + " = heap_malloc(&instance->IntStates[0], (int32_t)sizeof(" + type + "));" ...
-    + newline + "    (void)" + varName + ";" ...
+    + newline + "    CIGRE_REQUIRE_ALLOC(" + varName + ", instance);" ...
     + newline + "    <<InternalStatesMalloc>>";
 
 restoreLine = type + ptrs + " " + varName ...
@@ -523,7 +532,10 @@ for i = 1:size(intMinMap, 1)
     end
 end
 
-literal = string(value);
+% Generated-code literals are internal values, not human-entered text,
+% so emit them at full double precision. string() would truncate to
+% ~5 significant figures and silently corrupt the value baked into the DLL.
+literal = string(sprintf("%.17g", value));
 end
 
 
@@ -552,7 +564,7 @@ for i = 1:numel(modelArgHidden)
     structName = erase(p.StorageSpecifier, "ModelArgument:");
     paramMaps = paramMaps ...
         + "<<RTMStructName>>->dwork->mdl_InstanceData.rtm." + structName + "->" ...
-        + p.SimulinkName + " = " + string(double(p.DefaultValue)) + ";" + newline;
+        + p.SimulinkName + " = " + formatCNumericLiteral(double(p.DefaultValue)) + ";" + newline;
 end
 
 if isempty(modelArgVisible) && isempty(modelArgHidden)
@@ -589,7 +601,7 @@ for i = 1:numel(globalVisible)
 end
 for i = 1:numel(globalHidden)
     p = globalHidden(i);
-    paramMaps = paramMaps + p.ERTName + " = " + string(double(p.DefaultValue)) + ";" + newline;
+    paramMaps = paramMaps + p.ERTName + " = " + formatCNumericLiteral(double(p.DefaultValue)) + ";" + newline;
 end
 end
 

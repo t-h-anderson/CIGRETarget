@@ -23,7 +23,7 @@ classdef ParameterConfiguration
 
             hasOverrideColumn = ismember("OverrideDefault", string(raw.Properties.VariableNames));
 
-            configs = cell(1,numel(raw));
+            configs = cell(1, height(raw));
             for i = 1:height(raw)
                 nvpArgs = struct("Name", raw.Name(i), "IsVisible", logical(raw.IsVisible(i)));
 

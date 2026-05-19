@@ -4,15 +4,18 @@ arguments
     nvp.Type (1,1) string {mustBeMember(nvp.Type, ["All", "32", "64"])} = "All"
 end
 
+% Accumulate across every requested toolchain - a plain assignment
+% inside the loop would discard all but the last toolchain's names.
+tcName = string.empty(1, 0);
 for i = 1:numel(nvp.Toolchain)
     switch nvp.Type
         case "All"
-            tcName = makeDLLToolchain(nvp.Toolchain(i), "32");
+            tcName(end+1) = makeDLLToolchain(nvp.Toolchain(i), "32"); %#ok<AGROW>
             tcName(end+1) = makeDLLToolchain(nvp.Toolchain(i), "64"); %#ok<AGROW>
         case "32"
-            tcName = makeDLLToolchain(nvp.Toolchain(i), "32");
+            tcName(end+1) = makeDLLToolchain(nvp.Toolchain(i), "32"); %#ok<AGROW>
         case "64"
-            tcName = makeDLLToolchain(nvp.Toolchain(i), "64");
+            tcName(end+1) = makeDLLToolchain(nvp.Toolchain(i), "64"); %#ok<AGROW>
     end
 end
 

@@ -1,12 +1,13 @@
-classdef tVariable < matlab.unittest.TestCase
+classdef tVariable < matlab.mock.TestCase
     % Unit tests for cigre.description.Variable.
     %
     % Variable represents a single typed signal, parameter, or state
     % variable extracted from the Simulink code descriptor. Its tree
     % structure (via NestedVariable) supports parameter structs. The key
     % behaviours tested here are those that don't require a live Simulink
-    % session: leaf detection, recursive leaf traversal, the create factory,
-    % and the IsModelArgument dependent property.
+    % session: leaf detection, recursive leaf traversal, the create
+    % factory, the IsModelArgument dependent property, and Min/Max limit
+    % defaulting (exercised against a mocked coder data interface).
 
     methods (Test)
 
@@ -153,6 +154,57 @@ classdef tVariable < matlab.unittest.TestCase
             testCase.verifyEqual(string([vars.SimulinkName]), ["x", "y", "z"]);
         end
 
+        % --- extract Min/Max limit defaults --------------------------------
+
+        function extractMissingMinDefaultsToLargeNegative(testCase)
+            % A floating-point parameter with no minimum must default to a
+            % large *negative* bound. realmin (the smallest positive
+            % double) would wrongly reject every negative value the
+            % parameter can legitimately take.
+            interface = makeRangedInterfaceMock(testCase, '', '');
+
+            minVal = cigre.description.Variable.extract(interface, "Min");
+
+            testCase.verifyLessThan(minVal, 0, ...
+                "A missing minimum must resolve to a negative lower bound");
+            testCase.verifyEqual(minVal, -realmax / 2);
+        end
+
+        function extractNegInfMinDefaultsToLargeNegative(testCase)
+            % An explicit -inf minimum must resolve to the same finite
+            % negative bound as a missing minimum.
+            interface = makeRangedInterfaceMock(testCase, "-inf", "inf");
+
+            minVal = cigre.description.Variable.extract(interface, "Min");
+
+            testCase.verifyEqual(minVal, -realmax / 2);
+        end
+
+        function extractMissingMaxDefaultsToLargePositive(testCase)
+            % Guards the companion Max branch so the Min default cannot be
+            % "fixed" by accidentally breaking the Min/Max symmetry.
+            interface = makeRangedInterfaceMock(testCase, '', '');
+
+            maxVal = cigre.description.Variable.extract(interface, "Max");
+
+            testCase.verifyGreaterThan(maxVal, 0);
+            testCase.verifyEqual(maxVal, realmax / 2);
+        end
+
     end
 
+end
+
+
+% --- Local helpers --------------------------------------------------------
+
+function interface = makeRangedInterfaceMock(testCase, minValue, maxValue)
+% Build a mock coder data interface exposing just the Type and Range
+% properties that Variable.extract / extractBaseType read. Type is a
+% plain double; Range carries the supplied Min / Max. Using matlab.mock
+% keeps the fake interface inline rather than in a separate helper class.
+[interface, behavior] = testCase.createMock("AddedProperties", ["Type", "Range"]);
+testCase.assignOutputsWhen(get(behavior.Type), struct("Name", "double"));
+testCase.assignOutputsWhen(get(behavior.Range), ...
+    struct("Min", minValue, "Max", maxValue));
 end
