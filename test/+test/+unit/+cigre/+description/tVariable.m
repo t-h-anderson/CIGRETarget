@@ -153,6 +153,49 @@ classdef tVariable < matlab.unittest.TestCase
             testCase.verifyEqual(string([vars.SimulinkName]), ["x", "y", "z"]);
         end
 
+        % --- extract Min/Max limit defaults --------------------------------
+
+        function extractMissingMinDefaultsToLargeNegative(testCase)
+            % A floating-point parameter with no minimum must default to a
+            % large *negative* bound. realmin (the smallest positive
+            % double) would wrongly reject every negative value the
+            % parameter can legitimately take.
+            fake = test.util.FakeRangedInterface;
+            fake.Type  = struct("Name", "double");
+            fake.Range = struct("Min", '', "Max", '');
+
+            minVal = cigre.description.Variable.extract(fake, "Min");
+
+            testCase.verifyLessThan(minVal, 0, ...
+                "A missing minimum must resolve to a negative lower bound");
+            testCase.verifyEqual(minVal, -realmax / 2);
+        end
+
+        function extractNegInfMinDefaultsToLargeNegative(testCase)
+            % An explicit -inf minimum must resolve to the same finite
+            % negative bound as a missing minimum.
+            fake = test.util.FakeRangedInterface;
+            fake.Type  = struct("Name", "double");
+            fake.Range = struct("Min", "-inf", "Max", "inf");
+
+            minVal = cigre.description.Variable.extract(fake, "Min");
+
+            testCase.verifyEqual(minVal, -realmax / 2);
+        end
+
+        function extractMissingMaxDefaultsToLargePositive(testCase)
+            % Guards the companion Max branch so the Min default cannot be
+            % "fixed" by accidentally breaking the Min/Max symmetry.
+            fake = test.util.FakeRangedInterface;
+            fake.Type  = struct("Name", "double");
+            fake.Range = struct("Min", '', "Max", '');
+
+            maxVal = cigre.description.Variable.extract(fake, "Max");
+
+            testCase.verifyGreaterThan(maxVal, 0);
+            testCase.verifyEqual(maxVal, realmax / 2);
+        end
+
     end
 
 end

@@ -419,7 +419,12 @@ classdef Variable
                 if isInt
                     limitVal = intmin(type);
                 else
-                    limitVal = realmin;
+                    % A missing/-inf lower bound must be a large negative
+                    % number. realmin is the smallest positive double, so
+                    % it would wrongly reject every negative value the
+                    % parameter can legitimately take. Mirror the realmax/2
+                    % used for the upper bound below.
+                    limitVal = -realmax / 2;
                 end
             end
 
