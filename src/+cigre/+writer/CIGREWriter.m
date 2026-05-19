@@ -241,17 +241,25 @@ classdef CIGREWriter
             % model_reference_types.h include required by some model configurations.
             results = strrep(results, "<<WrapperHeader>>", desc.CIGREInterfaceName + ".h");
 
+            % The two includes are independent: a model may need
+            % model_reference_types.h, the _data.c include, both, or
+            % neither. They must be resolved separately - an earlier
+            % version cleared modelRefHeader in the _data.c else branch,
+            % silently dropping a model_reference_types.h include that
+            % had already been added.
             here = desc.CodeGenFolder;
+            modelRefHeader = "";
             if isfile(fullfile(here, "/slprj/cigre/_sharedutils/model_reference_types.h"))
                 modelRefHeader = "#include ""model_reference_types.h""";
-            else
-                modelRefHeader = "";
             end
 
             if isfile(fullfile(here, desc.CIGREInterfaceName + "_data.c"))
-                modelRefHeader = modelRefHeader + newline + "#include """ + desc.CIGREInterfaceName + "_data.c""";
-            else
-                modelRefHeader = "";
+                dataInclude = "#include """ + desc.CIGREInterfaceName + "_data.c""";
+                if modelRefHeader == ""
+                    modelRefHeader = dataInclude;
+                else
+                    modelRefHeader = modelRefHeader + newline + dataInclude;
+                end
             end
 
             results = strrep(results, "<<model_reference_types>>", modelRefHeader);
