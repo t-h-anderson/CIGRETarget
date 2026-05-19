@@ -150,6 +150,28 @@ classdef tValToString < matlab.unittest.TestCase
             testCase.verifyEqual(result, original);
         end
 
+        % --- High-precision values (no truncation) -------------------------
+
+        function highPrecisionDoubleRoundtrips(testCase)
+            % string() / num2str() truncate to ~5 significant figures;
+            % valToString must preserve enough digits to reconstruct the
+            % exact original value.
+            original = pi;
+            result = eval(util.valToString(original));
+            testCase.verifyEqual(result, original);
+        end
+
+        function highPrecisionDoubleNotTruncated(testCase)
+            result = util.valToString(pi);
+            testCase.verifyEqual(str2double(result), pi);
+        end
+
+        function highPrecisionSingleRoundtrips(testCase)
+            original = single(pi);
+            result = eval(util.valToString(original));
+            testCase.verifyEqual(result, original);
+        end
+
     end
 
 end
