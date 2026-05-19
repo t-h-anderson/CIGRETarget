@@ -72,16 +72,23 @@ end
 
 
 function txt = shortestExact(val)
-% Shortest decimal text for a numeric scalar that still converts back to
-% the exact same value and class. Picks the fewest significant figures
-% that round-trip, so clean values stay clean without the precision loss
-% of string() / num2str().
+% Shortest decimal text for a numeric scalar that converts back to the
+% exact same value. Integer types are exact as-is; floating-point types
+% get the fewest significant figures that still round-trip, avoiding the
+% precision loss of string() / num2str().
 arguments
     val (1,1)
 end
+% Integers are always exact - and a saturating cast back to an integer
+% type would falsely accept a too-short string (e.g. for uint8, "3e+02"
+% saturates to 255), so format them directly.
+if isinteger(val)
+    txt = string(val);
+    return
+end
 for precision = 1:17
     txt = string(sprintf("%.*g", precision, val));
-    if isequaln(cast(str2double(txt), class(val)), val)
+    if isequaln(str2double(txt), double(val))
         return
     end
 end
